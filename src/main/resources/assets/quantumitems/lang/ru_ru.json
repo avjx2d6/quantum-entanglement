@@ -1,0 +1,6 @@
+{
+  "itemGroup.quantumitems": "Квантовая запутанность",
+  "block.quantumitems.quantum_entangler": "Квантовый запутыватель",
+  "item.quantumitems.quantum_shard": "Квантовый осколок",
+  "tooltip.quantumitems.link_id": "Link ID: %s#%s"
+}

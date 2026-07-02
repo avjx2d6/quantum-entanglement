@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "quantumitems:block/quantum_entangler" }
+  }
+}

@@ -1,0 +1,24 @@
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "MIT"
+
+[[mods]]
+modId = "quantumitems"
+version = "0.1.0"
+displayName = "Quantum Entanglement"
+description = '''Entangle item stacks into quantum networks that share a single pool of items across any distance.'''
+authors = "avjx2d6"
+
+[[dependencies.quantumitems]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21.1.0,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.quantumitems]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21.1,1.22)"
+ordering = "NONE"
+side = "BOTH"

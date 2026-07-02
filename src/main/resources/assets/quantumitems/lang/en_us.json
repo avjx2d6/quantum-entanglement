@@ -1,0 +1,6 @@
+{
+  "itemGroup.quantumitems": "Quantum Entanglement",
+  "block.quantumitems.quantum_entangler": "Quantum Entangler",
+  "item.quantumitems.quantum_shard": "Quantum Shard",
+  "tooltip.quantumitems.link_id": "Link ID: %s#%s"
+}
