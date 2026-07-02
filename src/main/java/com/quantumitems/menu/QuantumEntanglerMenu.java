@@ -10,8 +10,6 @@ import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.items.IItemHandler;
-import net.neoforged.neoforge.items.SlotItemHandler;
 
 public class QuantumEntanglerMenu extends AbstractContainerMenu {
     private static final int MACHINE_SLOTS = 4;
@@ -32,21 +30,20 @@ public class QuantumEntanglerMenu extends AbstractContainerMenu {
         this.blockEntity = blockEntity;
         this.data = data;
 
-        IItemHandler items = blockEntity.getItems();
-        this.addSlot(new SlotItemHandler(items, QuantumEntanglerBlockEntity.SLOT_INPUT, 35, 21) {
+        this.addSlot(new Slot(blockEntity, QuantumEntanglerBlockEntity.SLOT_INPUT, 35, 21) {
             @Override
             public boolean mayPlace(ItemStack stack) {
                 return stack.getMaxStackSize() > 1;
             }
         });
-        this.addSlot(new SlotItemHandler(items, QuantumEntanglerBlockEntity.SLOT_SHARD, 35, 51) {
+        this.addSlot(new Slot(blockEntity, QuantumEntanglerBlockEntity.SLOT_SHARD, 35, 51) {
             @Override
             public boolean mayPlace(ItemStack stack) {
                 return stack.is(ModRegistry.QUANTUM_SHARD.get());
             }
         });
-        this.addSlot(new OutputSlot(items, QuantumEntanglerBlockEntity.SLOT_OUT_A, 125, 21));
-        this.addSlot(new OutputSlot(items, QuantumEntanglerBlockEntity.SLOT_OUT_B, 125, 51));
+        this.addSlot(new OutputSlot(blockEntity, QuantumEntanglerBlockEntity.SLOT_OUT_A, 125, 21));
+        this.addSlot(new OutputSlot(blockEntity, QuantumEntanglerBlockEntity.SLOT_OUT_B, 125, 51));
 
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
@@ -109,13 +106,12 @@ public class QuantumEntanglerMenu extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(Player player) {
-        return blockEntity != null && !blockEntity.isRemoved()
-                && player.distanceToSqr(blockEntity.getBlockPos().getCenter()) <= 64.0;
+        return blockEntity != null && !blockEntity.isRemoved() && blockEntity.stillValid(player);
     }
 
-    private static class OutputSlot extends SlotItemHandler {
-        OutputSlot(IItemHandler handler, int index, int x, int y) {
-            super(handler, index, x, y);
+    private static class OutputSlot extends Slot {
+        OutputSlot(QuantumEntanglerBlockEntity container, int index, int x, int y) {
+            super(container, index, x, y);
         }
 
         @Override

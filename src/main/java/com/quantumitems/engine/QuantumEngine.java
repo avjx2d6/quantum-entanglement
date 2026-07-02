@@ -72,6 +72,18 @@ public final class QuantumEngine {
      * touchpoint; idempotent.
      */
     public Status reconcile(ItemStack stack) {
+        return reconcile(stack, true);
+    }
+
+    /**
+     * @param wipeDuplicates whether a stack that lost the canonicity race is
+     *                       zeroed out. Materialization points (slots, ground,
+     *                       split) pass true; count writes pass false because
+     *                       vanilla constantly sizes transient copies
+     *                       (copyWithCount, simulated extractions) that must
+     *                       stay untouched.
+     */
+    public Status reconcile(ItemStack stack, boolean wipeDuplicates) {
         QuantumLinkData link = stack.get(ModRegistry.QUANTUM_LINK.get());
         if (link == null) {
             return Status.PLAIN;
@@ -86,7 +98,9 @@ public final class QuantumEngine {
         WeakReference<ItemStack> ref = canonical.get(key);
         ItemStack existing = ref != null ? ref.get() : null;
         if (existing != null && existing != stack && !existing.isEmpty()) {
-            wipe(stack);
+            if (wipeDuplicates) {
+                wipe(stack);
+            }
             return Status.DUPLICATE;
         }
         if (existing != stack) {
@@ -111,12 +125,17 @@ public final class QuantumEngine {
      */
     public boolean handleSetCount(ItemStack stack, int newCount) {
         int seenCount = stack.getCount();
-        Status status = reconcile(stack);
+        Status status = reconcile(stack, false);
         switch (status) {
             case PLAIN, COLLAPSED -> {
                 return false; // vanilla applies the write to a plain stack
             }
-            case DEAD, DUPLICATE -> {
+            case DUPLICATE -> {
+                // a transient copy being sized (copyWithCount, simulations):
+                // none of our business, vanilla writes to the copy
+                return false;
+            }
+            case DEAD -> {
                 return true; // stack is wiped; swallow the write
             }
             default -> {

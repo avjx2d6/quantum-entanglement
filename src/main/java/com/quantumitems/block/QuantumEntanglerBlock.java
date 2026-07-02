@@ -47,7 +47,7 @@ public class QuantumEntanglerBlock extends Block implements EntityBlock {
     @Override
     protected void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean movedByPiston) {
         if (!state.is(newState.getBlock()) && level.getBlockEntity(pos) instanceof QuantumEntanglerBlockEntity blockEntity) {
-            blockEntity.dropContents(level, pos);
+            net.minecraft.world.Containers.dropContents(level, pos, blockEntity);
         }
         super.onRemove(state, level, pos, newState, movedByPiston);
     }

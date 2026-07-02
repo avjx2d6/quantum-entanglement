@@ -8,11 +8,14 @@ import com.quantumitems.engine.QuantumEngine;
 import com.quantumitems.menu.QuantumEntanglerMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.Container;
+import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -22,24 +25,24 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.items.ItemStackHandler;
 
 import javax.annotation.Nullable;
 
-public class QuantumEntanglerBlockEntity extends BlockEntity implements MenuProvider {
+/**
+ * Uses a vanilla Container (not an ItemStackHandler) on purpose: vanilla
+ * container semantics move stacks through {@code ItemStack.split} and whole
+ * instances, which the quantum engine understands. ItemStackHandler's
+ * copy-based partial extraction would silently replace canonical window
+ * instances with copies.
+ */
+public class QuantumEntanglerBlockEntity extends BlockEntity implements Container, MenuProvider {
     public static final int SLOT_INPUT = 0;
     public static final int SLOT_SHARD = 1;
     public static final int SLOT_OUT_A = 2;
     public static final int SLOT_OUT_B = 3;
     public static final int PROCESS_TIME = 60;
 
-    private final ItemStackHandler items = new ItemStackHandler(4) {
-        @Override
-        protected void onContentsChanged(int slot) {
-            setChanged();
-        }
-    };
-
+    private final NonNullList<ItemStack> items = NonNullList.withSize(4, ItemStack.EMPTY);
     private int progress;
 
     private final ContainerData dataAccess = new ContainerData() {
@@ -65,10 +68,6 @@ public class QuantumEntanglerBlockEntity extends BlockEntity implements MenuProv
         super(ModRegistry.QUANTUM_ENTANGLER_BE.get(), pos, state);
     }
 
-    public ItemStackHandler getItems() {
-        return items;
-    }
-
     public static void serverTick(Level level, BlockPos pos, BlockState state, QuantumEntanglerBlockEntity blockEntity) {
         if (blockEntity.canProcess((ServerLevel) level)) {
             blockEntity.progress++;
@@ -84,12 +83,12 @@ public class QuantumEntanglerBlockEntity extends BlockEntity implements MenuProv
     }
 
     private boolean canProcess(ServerLevel level) {
-        ItemStack input = items.getStackInSlot(SLOT_INPUT);
-        ItemStack shard = items.getStackInSlot(SLOT_SHARD);
+        ItemStack input = items.get(SLOT_INPUT);
+        ItemStack shard = items.get(SLOT_SHARD);
         if (input.isEmpty() || !shard.is(ModRegistry.QUANTUM_SHARD.get())) {
             return false;
         }
-        if (!items.getStackInSlot(SLOT_OUT_A).isEmpty() || !items.getStackInSlot(SLOT_OUT_B).isEmpty()) {
+        if (!items.get(SLOT_OUT_A).isEmpty() || !items.get(SLOT_OUT_B).isEmpty()) {
             return false;
         }
         if (input.getMaxStackSize() <= 1) {
@@ -108,7 +107,7 @@ public class QuantumEntanglerBlockEntity extends BlockEntity implements MenuProv
     }
 
     private void entangle(ServerLevel level, BlockPos pos) {
-        ItemStack input = items.getStackInSlot(SLOT_INPUT);
+        ItemStack input = items.get(SLOT_INPUT);
         QuantumNetworks networks = QuantumNetworks.get(level.getServer());
         QuantumEngine engine = QuantumEngine.onServerThread();
         QuantumLinkData link = input.get(ModRegistry.QUANTUM_LINK.get());
@@ -139,34 +138,75 @@ public class QuantumEntanglerBlockEntity extends BlockEntity implements MenuProv
             engine.adopt(outB);
         }
 
-        items.setStackInSlot(SLOT_INPUT, ItemStack.EMPTY);
-        items.getStackInSlot(SLOT_SHARD).shrink(1);
-        items.setStackInSlot(SLOT_OUT_A, outA);
-        items.setStackInSlot(SLOT_OUT_B, outB);
+        items.set(SLOT_INPUT, ItemStack.EMPTY);
+        items.get(SLOT_SHARD).shrink(1);
+        items.set(SLOT_OUT_A, outA);
+        items.set(SLOT_OUT_B, outB);
+        setChanged();
         level.playSound(null, pos, SoundEvents.ENCHANTMENT_TABLE_USE, SoundSource.BLOCKS, 0.8f, 1.4f);
     }
 
-    public void dropContents(Level level, BlockPos pos) {
-        for (int slot = 0; slot < items.getSlots(); slot++) {
-            ItemStack stack = items.getStackInSlot(slot);
-            if (!stack.isEmpty()) {
-                net.minecraft.world.Containers.dropItemStack(level, pos.getX(), pos.getY(), pos.getZ(), stack);
-                items.setStackInSlot(slot, ItemStack.EMPTY);
-            }
-        }
+    // --- Container ---
+
+    @Override
+    public int getContainerSize() {
+        return items.size();
     }
+
+    @Override
+    public boolean isEmpty() {
+        return items.stream().allMatch(ItemStack::isEmpty);
+    }
+
+    @Override
+    public ItemStack getItem(int slot) {
+        return items.get(slot);
+    }
+
+    @Override
+    public ItemStack removeItem(int slot, int amount) {
+        ItemStack result = ContainerHelper.removeItem(items, slot, amount);
+        if (!result.isEmpty()) {
+            setChanged();
+        }
+        return result;
+    }
+
+    @Override
+    public ItemStack removeItemNoUpdate(int slot) {
+        return ContainerHelper.takeItem(items, slot);
+    }
+
+    @Override
+    public void setItem(int slot, ItemStack stack) {
+        items.set(slot, stack);
+        setChanged();
+    }
+
+    @Override
+    public boolean stillValid(Player player) {
+        return Container.stillValidBlockEntity(this, player);
+    }
+
+    @Override
+    public void clearContent() {
+        items.clear();
+    }
+
+    // --- persistence / menu ---
 
     @Override
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
-        tag.put("items", items.serializeNBT(registries));
+        ContainerHelper.saveAllItems(tag, items, registries);
         tag.putInt("progress", progress);
     }
 
     @Override
     protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
-        items.deserializeNBT(registries, tag.getCompound("items"));
+        items.clear();
+        ContainerHelper.loadAllItems(tag, items, registries);
         progress = tag.getInt("progress");
     }
 

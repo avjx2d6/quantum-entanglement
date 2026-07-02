@@ -15,6 +15,7 @@ import net.neoforged.neoforge.event.entity.player.PlayerContainerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.common.util.TriState;
 
 @EventBusSubscriber(modid = QuantumItemsMod.MOD_ID)
@@ -39,7 +40,29 @@ public final class ServerEvents {
         if (engine == null) {
             return;
         }
-        Player player = event.getEntity();
+        sweepPlayer(engine, event.getEntity());
+    }
+
+    /**
+     * Slow safety-net sweep: transient linked copies are deliberately left
+     * alone by the engine, so a copy that somehow materializes in a player
+     * inventory (creative clone, /give, mod quirks) is caught here.
+     */
+    @SubscribeEvent
+    public static void onServerTick(ServerTickEvent.Post event) {
+        if (event.getServer().getTickCount() % 100 != 0) {
+            return;
+        }
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        if (engine == null) {
+            return;
+        }
+        for (Player player : event.getServer().getPlayerList().getPlayers()) {
+            sweepPlayer(engine, player);
+        }
+    }
+
+    private static void sweepPlayer(QuantumEngine engine, Player player) {
         Inventory inventory = player.getInventory();
         for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
             reconcileSlot(engine, inventory, slot);

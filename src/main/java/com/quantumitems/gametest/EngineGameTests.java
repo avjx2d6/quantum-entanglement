@@ -126,8 +126,11 @@ public class EngineGameTests {
         TestNetwork network = makeNetwork(helper, 16);
         ItemStack dupe = network.windowA().copy();
 
-        dupe.shrink(1); // first touch of the illegitimate copy
+        // count writes on copies pass through (transient copies are legitimate);
+        // materialization touchpoints like split are where duplicates die
+        ItemStack taken = dupe.split(1);
 
+        helper.assertTrue(taken.isEmpty(), "split of a duplicate must yield nothing");
         helper.assertTrue(dupe.isEmpty(), "duplicate must be wiped");
         helper.assertTrue(!dupe.has(ModRegistry.QUANTUM_LINK.get()), "duplicate must lose the link");
         helper.assertTrue(network.windowA().getCount() == 16, "canonical window untouched");
