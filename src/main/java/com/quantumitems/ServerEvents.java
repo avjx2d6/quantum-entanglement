@@ -16,6 +16,9 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
+
+import java.util.HashSet;
+import java.util.Set;
 import net.neoforged.neoforge.common.util.TriState;
 
 @EventBusSubscriber(modid = QuantumItemsMod.MOD_ID)
@@ -63,13 +66,14 @@ public final class ServerEvents {
     }
 
     private static void sweepPlayer(QuantumEngine engine, Player player) {
+        Set<Long> seen = new HashSet<>();
         Inventory inventory = player.getInventory();
         for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
-            reconcileSlot(engine, inventory, slot);
+            reconcileSlot(engine, inventory, slot, seen);
         }
         Container enderChest = player.getEnderChestInventory();
         for (int slot = 0; slot < enderChest.getContainerSize(); slot++) {
-            reconcileSlot(engine, enderChest, slot);
+            reconcileSlot(engine, enderChest, slot, seen);
         }
     }
 
@@ -80,10 +84,11 @@ public final class ServerEvents {
         if (engine == null) {
             return;
         }
+        Set<Long> seen = new HashSet<>();
         for (Slot slot : event.getContainer().slots) {
             ItemStack stack = slot.getItem();
             if (stack.has(ModRegistry.QUANTUM_LINK.get())) {
-                engine.reconcile(stack);
+                engine.reconcileScan(stack, seen);
                 if (stack.isEmpty()) {
                     slot.set(ItemStack.EMPTY);
                 }
@@ -143,10 +148,10 @@ public final class ServerEvents {
         event.getItemEntity().discard();
     }
 
-    private static void reconcileSlot(QuantumEngine engine, Container container, int slot) {
+    private static void reconcileSlot(QuantumEngine engine, Container container, int slot, Set<Long> seen) {
         ItemStack stack = container.getItem(slot);
         if (stack.has(ModRegistry.QUANTUM_LINK.get())) {
-            engine.reconcile(stack);
+            engine.reconcileScan(stack, seen);
             if (stack.isEmpty()) {
                 container.setItem(slot, ItemStack.EMPTY);
             }

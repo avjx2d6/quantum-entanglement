@@ -11,6 +11,7 @@ import javax.annotation.Nullable;
 import java.lang.ref.WeakReference;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Runtime core of quantum entanglement. Lives for the duration of one server
@@ -59,7 +60,7 @@ public final class QuantumEngine {
         CANONICAL,
         /** Network no longer exists (or member retired) — stack was wiped. */
         DEAD,
-        /** Another live instance owns this member id — stack was wiped. */
+        /** Second sighting of the same member within one scan pass — stack was wiped. */
         DUPLICATE,
         /** Components diverged from the snapshot — network collapsed into this stack (now plain). */
         COLLAPSED
@@ -67,23 +68,15 @@ public final class QuantumEngine {
 
     /**
      * Validates a linked stack against the authority and fixes it up:
-     * adopts it as the canonical instance, corrects a stale count, wipes
-     * dead/duplicate stacks, collapses diverged ones. Safe to call at any
-     * touchpoint; idempotent.
+     * adopts it as the canonical instance (last touch wins — vanilla
+     * legitimately replaces slot instances with equal copies on packet
+     * round-trips and chunk reloads, so identity must never be punished),
+     * corrects a stale count, wipes dead stacks, collapses diverged ones.
+     * Safe to call at any touchpoint; idempotent. Item duplication is
+     * impossible regardless of how many instances float around: every
+     * extraction is bounded by the pool.
      */
     public Status reconcile(ItemStack stack) {
-        return reconcile(stack, true);
-    }
-
-    /**
-     * @param wipeDuplicates whether a stack that lost the canonicity race is
-     *                       zeroed out. Materialization points (slots, ground,
-     *                       split) pass true; count writes pass false because
-     *                       vanilla constantly sizes transient copies
-     *                       (copyWithCount, simulated extractions) that must
-     *                       stay untouched.
-     */
-    public Status reconcile(ItemStack stack, boolean wipeDuplicates) {
         QuantumLinkData link = stack.get(ModRegistry.QUANTUM_LINK.get());
         if (link == null) {
             return Status.PLAIN;
@@ -96,14 +89,7 @@ public final class QuantumEngine {
         }
         long key = key(link.networkId(), link.memberId());
         WeakReference<ItemStack> ref = canonical.get(key);
-        ItemStack existing = ref != null ? ref.get() : null;
-        if (existing != null && existing != stack && !existing.isEmpty()) {
-            if (wipeDuplicates) {
-                wipe(stack);
-            }
-            return Status.DUPLICATE;
-        }
-        if (existing != stack) {
+        if (ref == null || ref.get() != stack) {
             canonical.put(key, new WeakReference<>(stack));
         }
         if (!componentsMatchSnapshot(stack, network)) {
@@ -117,6 +103,26 @@ public final class QuantumEngine {
     }
 
     /**
+     * Scan-pass variant: inventories and open containers are swept slot by
+     * slot with a shared per-pass set, so a member sighted twice in one pass
+     * (creative clone, /give copy) loses its second physical stack. This is
+     * the only place duplicates are wiped — display cleanup, not dupe
+     * protection; the pool already bounds extraction.
+     */
+    public Status reconcileScan(ItemStack stack, Set<Long> seenThisPass) {
+        QuantumLinkData link = stack.get(ModRegistry.QUANTUM_LINK.get());
+        if (link == null) {
+            return Status.PLAIN;
+        }
+        long key = key(link.networkId(), link.memberId());
+        if (!seenThisPass.add(key)) {
+            wipe(stack);
+            return Status.DUPLICATE;
+        }
+        return reconcile(stack);
+    }
+
+    /**
      * Pool-aware replacement for {@code ItemStack.setCount} on linked stacks.
      * The delta the caller intended (relative to the count it saw) is applied
      * to the pool; every live window is then pushed the new pool value.
@@ -125,25 +131,32 @@ public final class QuantumEngine {
      */
     public boolean handleSetCount(ItemStack stack, int newCount) {
         int seenCount = stack.getCount();
-        Status status = reconcile(stack, false);
-        switch (status) {
-            case PLAIN, COLLAPSED -> {
-                return false; // vanilla applies the write to a plain stack
-            }
-            case DUPLICATE -> {
-                // a transient copy being sized (copyWithCount, simulations):
-                // none of our business, vanilla writes to the copy
-                return false;
-            }
-            case DEAD -> {
-                return true; // stack is wiped; swallow the write
-            }
-            default -> {
-            }
-        }
         QuantumLinkData link = stack.get(ModRegistry.QUANTUM_LINK.get());
+        if (link == null) {
+            return false;
+        }
         QuantumNetworks networks = QuantumNetworks.get(server);
         QuantumNetworks.Network network = networks.network(link.networkId());
+        if (network == null || !network.aliveMembers.contains(link.memberId())) {
+            wipe(stack);
+            return true; // dead network: stack wiped, write swallowed
+        }
+        long key = key(link.networkId(), link.memberId());
+        WeakReference<ItemStack> ref = canonical.get(key);
+        ItemStack existing = ref != null ? ref.get() : null;
+        if (existing != null && existing != stack && !existing.isEmpty()) {
+            // a transient copy being sized while the live window exists
+            // (copyWithCount, simulated extractions): vanilla writes to the
+            // copy, the pool is none of its business
+            return false;
+        }
+        if (existing != stack) {
+            canonical.put(key, new WeakReference<>(stack)); // adopt: no live competitor
+        }
+        if (!componentsMatchSnapshot(stack, network)) {
+            collapse(stack, link, network, networks);
+            return false; // vanilla applies the write to the now-plain stack
+        }
         int delta = newCount - seenCount;
         int newPool = Math.max(0, network.pool + delta);
         if (newPool == 0) {
@@ -172,7 +185,7 @@ public final class QuantumEngine {
             case PLAIN, COLLAPSED -> {
                 return null; // vanilla splits the now-plain stack
             }
-            case DEAD, DUPLICATE -> {
+            case DEAD -> {
                 return ItemStack.EMPTY;
             }
             default -> {
@@ -216,9 +229,42 @@ public final class QuantumEngine {
         Status status = reconcile(stack);
         return switch (status) {
             case PLAIN, COLLAPSED -> null;
-            case DEAD, DUPLICATE -> ItemStack.EMPTY;
+            case DEAD -> ItemStack.EMPTY;
             default -> moveWindow(stack, stack.get(ModRegistry.QUANTUM_LINK.get()));
         };
+    }
+
+    /**
+     * Replacement for {@code Inventory.add} on linked stacks. Vanilla adds
+     * items by growing a zero-count copy in the slot and shrinking the
+     * source ({@code addResource}) — that pattern would tear a window apart.
+     * Instead the window transfers wholesale into a free slot; the source
+     * instance is emptied to honour the caller contract.
+     *
+     * @return true/false to report to the caller, or null to let vanilla add
+     *         a plain stack normally
+     */
+    @Nullable
+    public Boolean handleInventoryAdd(net.minecraft.world.entity.player.Inventory inventory, int slot, ItemStack stack) {
+        Status status = reconcile(stack);
+        switch (status) {
+            case PLAIN, COLLAPSED -> {
+                return null;
+            }
+            case DEAD -> {
+                return true; // wiped: nothing left to add
+            }
+            default -> {
+            }
+        }
+        QuantumLinkData link = stack.get(ModRegistry.QUANTUM_LINK.get());
+        int target = slot >= 0 && inventory.getItem(slot).isEmpty() ? slot : inventory.getFreeSlot();
+        if (target < 0) {
+            return false; // caller drops the stack whole; the link travels with it
+        }
+        ItemStack window = moveWindow(stack, link);
+        inventory.setItem(target, window);
+        return true;
     }
 
     /** Transfers window identity from the current instance to a fresh copy. */

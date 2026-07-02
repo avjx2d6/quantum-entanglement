@@ -121,20 +121,89 @@ public class EngineGameTests {
         helper.succeed();
     }
 
+    /**
+     * Vanilla replaces slot instances with equal copies on packet round-trips
+     * (creative slots, chunk reloads). The replacement must be adopted, never
+     * punished — the pool keeps everything bounded anyway.
+     */
     @GameTest(template = "empty", templateNamespace = "quantumitems")
-    public static void duplicateInstanceIsWiped(GameTestHelper helper) {
+    public static void replacedInstanceIsAdopted(GameTestHelper helper) {
         TestNetwork network = makeNetwork(helper, 16);
-        ItemStack dupe = network.windowA().copy();
+        QuantumEngine engine = QuantumEngine.onServerThread();
 
-        // count writes on copies pass through (transient copies are legitimate);
-        // materialization touchpoints like split are where duplicates die
-        ItemStack taken = dupe.split(1);
+        // simulate ServerboundSetCreativeModeSlotPacket: a fresh equal instance
+        // takes the place of the canonical one while the old one is still alive
+        ItemStack replacement = network.windowA().copy();
+        engine.reconcile(replacement);
 
-        helper.assertTrue(taken.isEmpty(), "split of a duplicate must yield nothing");
-        helper.assertTrue(dupe.isEmpty(), "duplicate must be wiped");
-        helper.assertTrue(!dupe.has(ModRegistry.QUANTUM_LINK.get()), "duplicate must lose the link");
-        helper.assertTrue(network.windowA().getCount() == 16, "canonical window untouched");
+        helper.assertTrue(!replacement.isEmpty(), "replacement must survive reconcile");
+        helper.assertTrue(replacement.getCount() == 16, "replacement must show the pool");
+
+        // and it is the live window now: consumption syncs the network
+        replacement.shrink(1);
+        helper.assertTrue(network.windowB().getCount() == 15, "other window must sync to 15");
+        helper.assertTrue(networks(helper).network(network.id()).pool == 15, "pool must be 15");
+        helper.succeed();
+    }
+
+    /** Extraction through several coexisting instances is bounded by the pool. */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void coexistingInstancesArePoolBounded(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 16);
+        ItemStack clone = network.windowA().copy(); // creative-style clone
+
+        ItemStack fromClone = clone.split(6);       // adopts the clone
+        ItemStack fromOriginal = network.windowA().split(6); // adopts the original back
+
+        helper.assertTrue(fromClone.getCount() == 6 && !fromClone.has(ModRegistry.QUANTUM_LINK.get()),
+                "first extraction gives 6 plain");
+        helper.assertTrue(fromOriginal.getCount() == 6 && !fromOriginal.has(ModRegistry.QUANTUM_LINK.get()),
+                "second extraction gives 6 plain");
+        helper.assertTrue(networks(helper).network(network.id()).pool == 4,
+                "pool must be 16 - 6 - 6 = 4: no duplication through clones");
+        helper.succeed();
+    }
+
+    /** Within one scan pass the second sighting of a member is cleaned up. */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void scanWipesSecondSighting(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 16);
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        ItemStack clone = network.windowA().copy();
+
+        java.util.Set<Long> seen = new java.util.HashSet<>();
+        engine.reconcileScan(network.windowA(), seen);
+        QuantumEngine.Status second = engine.reconcileScan(clone, seen);
+
+        helper.assertTrue(second == QuantumEngine.Status.DUPLICATE, "second sighting must be flagged");
+        helper.assertTrue(clone.isEmpty(), "second sighting must be wiped");
+        helper.assertTrue(network.windowA().getCount() == 16, "first sighting untouched");
         helper.assertTrue(networks(helper).network(network.id()).pool == 16, "pool untouched");
+        helper.succeed();
+    }
+
+    /** Returning a window to the inventory (menu close, pickup fallback) moves it whole. */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void placeItemBackKeepsWindowWhole(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 16);
+        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+
+        player.getInventory().placeItemBackInInventory(network.windowA());
+
+        ItemStack inInventory = ItemStack.EMPTY;
+        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+            ItemStack candidate = player.getInventory().getItem(slot);
+            if (!candidate.isEmpty()) {
+                inInventory = candidate;
+                break;
+            }
+        }
+        helper.assertTrue(inInventory.has(ModRegistry.QUANTUM_LINK.get()), "window must land with its link");
+        helper.assertTrue(inInventory.getCount() == 16, "window must show the pool");
+        helper.assertTrue(networks(helper).network(network.id()).pool == 16, "pool untouched by the move");
+
+        inInventory.shrink(2);
+        helper.assertTrue(network.windowB().getCount() == 14, "landed window must be live: sync to 14");
         helper.succeed();
     }
 
