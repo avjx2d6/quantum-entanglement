@@ -267,6 +267,103 @@ public final class QuantumEngine {
         return true;
     }
 
+    /**
+     * Absorbs plain items into a window's pool, up to the item's max stack
+     * size. The plain stack must match the network snapshot exactly.
+     *
+     * @return how many items were absorbed (0 = nothing happened)
+     */
+    public int absorb(ItemStack window, ItemStack plain, int requested) {
+        if (reconcile(window) != Status.CANONICAL) {
+            return 0;
+        }
+        QuantumLinkData link = window.get(ModRegistry.QUANTUM_LINK.get());
+        QuantumNetworks networks = QuantumNetworks.get(server);
+        QuantumNetworks.Network network = networks.network(link.networkId());
+        if (plain.has(ModRegistry.QUANTUM_LINK.get()) || !plain.is(network.item)
+                || !plain.getComponentsPatch().equals(network.snapshot)) {
+            return 0;
+        }
+        int absorbed = Math.min(Math.min(requested, plain.getCount()), window.getMaxStackSize() - network.pool);
+        if (absorbed <= 0) {
+            return 0;
+        }
+        network.pool += absorbed;
+        networks.setDirty();
+        rawSetCount(window, network.pool);
+        pushToMembers(link.networkId(), network, window);
+        plain.shrink(absorbed);
+        return absorbed;
+    }
+
+    /** Finds a live window of a matching network for this plain stack, if any. */
+    @Nullable
+    public ItemStack findAbsorbingWindow(net.minecraft.world.Container container, ItemStack plain) {
+        for (int slot = 0; slot < container.getContainerSize(); slot++) {
+            ItemStack candidate = container.getItem(slot);
+            QuantumLinkData link = candidate.get(ModRegistry.QUANTUM_LINK.get());
+            if (link == null) {
+                continue;
+            }
+            QuantumNetworks.Network network = QuantumNetworks.get(server).network(link.networkId());
+            if (network != null && plain.is(network.item)
+                    && plain.getComponentsPatch().equals(network.snapshot)
+                    && network.pool < candidate.getMaxStackSize()) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Crafting-consumption guard: taking a craft result consumes ingredients
+     * through {@code removeItem(slot, 1)} → split. With pool == 1 that split
+     * is a whole-take, and the returned window would be silently discarded by
+     * the crafting code — duping the last item. Pre-collapsing turns the
+     * ingredient into a plain item the consumption can eat honestly.
+     */
+    public void precollapseIfSingleton(ItemStack stack) {
+        if (reconcile(stack) != Status.CANONICAL) {
+            return;
+        }
+        QuantumLinkData link = stack.get(ModRegistry.QUANTUM_LINK.get());
+        QuantumNetworks networks = QuantumNetworks.get(server);
+        QuantumNetworks.Network network = networks.network(link.networkId());
+        if (network.pool == 1) {
+            collapse(stack, link, network, networks);
+        }
+    }
+
+    /**
+     * A window's item entity was destroyed (despawn, lava, cactus, void).
+     * The member retires; the pool is untouched — a window burned, not the
+     * items. If it was the last window, the pool dies with it.
+     */
+    public void windowDestroyed(ItemStack stack) {
+        QuantumLinkData link = stack.get(ModRegistry.QUANTUM_LINK.get());
+        if (link == null) {
+            return;
+        }
+        QuantumNetworks networks = QuantumNetworks.get(server);
+        QuantumNetworks.Network network = networks.network(link.networkId());
+        if (network == null || !network.aliveMembers.contains(link.memberId())) {
+            return;
+        }
+        long key = key(link.networkId(), link.memberId());
+        WeakReference<ItemStack> ref = canonical.get(key);
+        ItemStack existing = ref != null ? ref.get() : null;
+        if (existing != null && existing != stack && !existing.isEmpty()) {
+            return; // a stale copy burned; the real window lives elsewhere
+        }
+        canonical.remove(key);
+        network.aliveMembers.remove(Integer.valueOf(link.memberId()));
+        if (network.aliveMembers.isEmpty()) {
+            networks.removeNetwork(link.networkId());
+        } else {
+            networks.setDirty();
+        }
+    }
+
     /** Transfers window identity from the current instance to a fresh copy. */
     private ItemStack moveWindow(ItemStack stack, QuantumLinkData link) {
         ItemStack moved = stack.copy();

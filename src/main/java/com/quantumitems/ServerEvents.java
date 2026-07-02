@@ -2,16 +2,22 @@ package com.quantumitems;
 
 import com.quantumitems.engine.QuantumEngine;
 import net.minecraft.world.Container;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.ClickAction;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.ItemStackedOnOtherEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
+import net.neoforged.neoforge.event.entity.player.AnvilRepairEvent;
 import net.neoforged.neoforge.event.entity.player.ItemEntityPickupEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerContainerEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEnchantItemEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
@@ -116,36 +122,117 @@ public final class ServerEvents {
     }
 
     /**
-     * Custom pickup for linked windows. Vanilla pickup copies the stack and
-     * grows the copy from zero ({@code Inventory.addResource}), which the
-     * canonical-instance registry would rightly treat as a duplicate — so we
-     * move the window instance into a free slot wholesale instead.
+     * Pickup handling. Linked windows go through the vanilla path — the
+     * Inventory.add mixin transfers them wholesale, and vanilla's own
+     * pickup-delay/owner checks apply (no instant re-pickup of drops).
+     * Plain items get one extra step: if the player carries a window of a
+     * matching network, they are absorbed into the pool first.
      */
     @SubscribeEvent
     public static void onItemPickup(ItemEntityPickupEvent.Pre event) {
-        ItemStack stack = event.getItemEntity().getItem();
-        if (!stack.has(ModRegistry.QUANTUM_LINK.get())) {
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        if (engine == null || event.getItemEntity().hasPickUpDelay()) {
             return;
+        }
+        ItemStack stack = event.getItemEntity().getItem();
+        if (stack.has(ModRegistry.QUANTUM_LINK.get())) {
+            return; // windows: vanilla path + Inventory.add mixin
+        }
+        ItemStack window = engine.findAbsorbingWindow(event.getPlayer().getInventory(), stack);
+        if (window == null) {
+            return;
+        }
+        int absorbed = engine.absorb(window, stack, stack.getCount());
+        if (absorbed > 0 && stack.isEmpty()) {
+            event.setCanPickup(TriState.FALSE);
+            event.getPlayer().take(event.getItemEntity(), absorbed);
+            event.getItemEntity().discard();
+        }
+        // leftover (pool cap reached) falls through to the vanilla pickup
+    }
+
+    /**
+     * Click absorption: plain items clicked onto a window (or a carried
+     * window clicked onto plain items) flow into the pool. Left click — the
+     * whole stack, right click — one item. If nothing fits, vanilla swap
+     * behaviour applies.
+     */
+    @SubscribeEvent
+    public static void onItemStackedOnOther(ItemStackedOnOtherEvent event) {
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        if (engine == null) {
+            return;
+        }
+        ItemStack carried = event.getCarriedItem();
+        ItemStack inSlot = event.getStackedOnItem();
+        int requested = event.getClickAction() == ClickAction.PRIMARY ? Integer.MAX_VALUE : 1;
+
+        int absorbed = 0;
+        if (inSlot.has(ModRegistry.QUANTUM_LINK.get()) && !carried.isEmpty()
+                && !carried.has(ModRegistry.QUANTUM_LINK.get())) {
+            absorbed = engine.absorb(inSlot, carried, requested);
+        } else if (carried.has(ModRegistry.QUANTUM_LINK.get()) && !inSlot.isEmpty()
+                && !inSlot.has(ModRegistry.QUANTUM_LINK.get())) {
+            absorbed = engine.absorb(carried, inSlot, requested);
+        }
+        if (absorbed > 0) {
+            event.getSlot().setChanged();
+            event.setCanceled(true);
+        }
+    }
+
+    /** Renaming on an anvil is a property change: the network collapses instantly. */
+    @SubscribeEvent
+    public static void onAnvilRepair(AnvilRepairEvent event) {
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        if (engine != null && event.getOutput().has(ModRegistry.QUANTUM_LINK.get())) {
+            engine.reconcile(event.getOutput()); // diverged components → collapse
+        }
+    }
+
+    /** Enchanting mutates the stack in place — same collapse, instantly. */
+    @SubscribeEvent
+    public static void onEnchant(PlayerEnchantItemEvent event) {
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        if (engine != null && event.getEnchantedItem().has(ModRegistry.QUANTUM_LINK.get())) {
+            engine.reconcile(event.getEnchantedItem());
+        }
+    }
+
+    /** Guard: crafting with the last pooled item must not dupe it (see engine docs). */
+    @SubscribeEvent
+    public static void onItemCrafted(PlayerEvent.ItemCraftedEvent event) {
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        if (engine == null) {
+            return;
+        }
+        Container grid = event.getInventory();
+        for (int slot = 0; slot < grid.getContainerSize(); slot++) {
+            ItemStack stack = grid.getItem(slot);
+            if (stack.has(ModRegistry.QUANTUM_LINK.get())) {
+                engine.precollapseIfSingleton(stack);
+            }
+        }
+    }
+
+    /** A window destroyed on the ground (despawn, lava, void) retires its member. */
+    @SubscribeEvent
+    public static void onEntityLeave(EntityLeaveLevelEvent event) {
+        if (event.getLevel().isClientSide() || !(event.getEntity() instanceof ItemEntity itemEntity)) {
+            return;
+        }
+        Entity.RemovalReason reason = itemEntity.getRemovalReason();
+        if (reason == null || !reason.shouldDestroy()) {
+            return; // chunk unload etc. — the window persists
         }
         QuantumEngine engine = QuantumEngine.onServerThread();
         if (engine == null) {
             return;
         }
-        event.setCanPickup(TriState.FALSE);
-        engine.reconcile(stack);
-        if (stack.isEmpty()) {
-            event.getItemEntity().discard();
-            return;
+        ItemStack stack = itemEntity.getItem();
+        if (stack.has(ModRegistry.QUANTUM_LINK.get())) {
+            engine.windowDestroyed(stack);
         }
-        Inventory inventory = event.getPlayer().getInventory();
-        int freeSlot = inventory.getFreeSlot();
-        if (freeSlot < 0) {
-            return; // no room — the window stays on the ground
-        }
-        inventory.setItem(freeSlot, stack);
-        event.getPlayer().take(event.getItemEntity(), stack.getCount());
-        event.getItemEntity().setItem(ItemStack.EMPTY);
-        event.getItemEntity().discard();
     }
 
     private static void reconcileSlot(QuantumEngine engine, Container container, int slot, Set<Long> seen) {

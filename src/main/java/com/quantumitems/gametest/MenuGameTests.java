@@ -169,6 +169,42 @@ public class MenuGameTests {
         helper.succeed();
     }
 
+    /** Clicking a plain stack onto a window absorbs it into the pool (event path). */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void clickAbsorbsPlainIntoWindow(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 30);
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        SimpleContainer chest = new SimpleContainer(27);
+        chest.setItem(0, network.windowA());
+        ChestMenu menu = ChestMenu.threeRows(1, player.getInventory(), chest);
+        menu.setCarried(new ItemStack(Items.BREAD, 10));
+
+        menu.clicked(0, 0, ClickType.PICKUP, player); // left click plain onto window
+
+        helper.assertTrue(menu.getCarried().isEmpty(), "carried plain must be fully absorbed");
+        helper.assertTrue(chest.getItem(0).getCount() == 40, "window must show 40");
+        helper.assertTrue(network.windowB().getCount() == 40, "other window must show 40");
+        helper.assertTrue(networks(helper).network(network.id()).pool == 40, "pool must be 40");
+        helper.succeed();
+    }
+
+    /** Right click absorbs exactly one item. */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void rightClickAbsorbsOne(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 30);
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        SimpleContainer chest = new SimpleContainer(27);
+        chest.setItem(0, network.windowA());
+        ChestMenu menu = ChestMenu.threeRows(1, player.getInventory(), chest);
+        menu.setCarried(new ItemStack(Items.BREAD, 10));
+
+        menu.clicked(0, 1, ClickType.PICKUP, player); // right click plain onto window
+
+        helper.assertTrue(menu.getCarried().getCount() == 9, "carried must lose exactly one");
+        helper.assertTrue(networks(helper).network(network.id()).pool == 31, "pool must be 31");
+        helper.succeed();
+    }
+
     /** Shift-click through a real menu: the window travels whole, link intact. */
     @GameTest(template = "empty", templateNamespace = "quantumitems")
     public static void shiftClickMovesWindow(GameTestHelper helper) {
