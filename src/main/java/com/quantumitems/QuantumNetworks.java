@@ -72,6 +72,13 @@ public class QuantumNetworks extends SavedData {
         return id;
     }
 
+    /** Removes a dissolved network. */
+    public void removeNetwork(int networkId) {
+        if (networks.remove(networkId) != null) {
+            setDirty();
+        }
+    }
+
     /**
      * Allocates one more window in an existing network.
      *

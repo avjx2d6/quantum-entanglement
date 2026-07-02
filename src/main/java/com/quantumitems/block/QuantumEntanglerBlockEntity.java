@@ -4,6 +4,7 @@ import com.quantumitems.ModRegistry;
 import com.quantumitems.QuantumItemsMod;
 import com.quantumitems.QuantumLinkData;
 import com.quantumitems.QuantumNetworks;
+import com.quantumitems.engine.QuantumEngine;
 import com.quantumitems.menu.QuantumEntanglerMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -98,6 +99,10 @@ public class QuantumEntanglerBlockEntity extends BlockEntity implements MenuProv
         if (link == null) {
             return true;
         }
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        if (engine == null || engine.reconcile(input) != QuantumEngine.Status.CANONICAL) {
+            return false; // dead/duplicate/diverged input was fixed up in place
+        }
         QuantumNetworks.Network network = QuantumNetworks.get(level.getServer()).network(link.networkId());
         return network != null && network.aliveMembers.size() < QuantumNetworks.MAX_MEMBERS;
     }
@@ -105,6 +110,7 @@ public class QuantumEntanglerBlockEntity extends BlockEntity implements MenuProv
     private void entangle(ServerLevel level, BlockPos pos) {
         ItemStack input = items.getStackInSlot(SLOT_INPUT);
         QuantumNetworks networks = QuantumNetworks.get(level.getServer());
+        QuantumEngine engine = QuantumEngine.onServerThread();
         QuantumLinkData link = input.get(ModRegistry.QUANTUM_LINK.get());
 
         ItemStack outA;
@@ -117,17 +123,20 @@ public class QuantumEntanglerBlockEntity extends BlockEntity implements MenuProv
             outB = input.copy();
             outB.set(ModRegistry.QUANTUM_LINK.get(), new QuantumLinkData(networkId, 2));
         } else {
-            // Expansion: the window passes through, a new window of the same network appears.
+            // Expansion: the window passes through AS THE SAME INSTANCE (a copy
+            // would be flagged as a duplicate by the canonical registry), and a
+            // new window of the same network appears beside it.
             int member = networks.addMember(link.networkId());
             if (member < 0) {
                 return;
             }
-            QuantumNetworks.Network network = networks.network(link.networkId());
-            outA = input.copy();
-            outA.setCount(network.pool);
+            outA = input;
             outB = input.copy();
-            outB.setCount(network.pool);
             outB.set(ModRegistry.QUANTUM_LINK.get(), new QuantumLinkData(link.networkId(), member));
+        }
+        if (engine != null) {
+            engine.adopt(outA);
+            engine.adopt(outB);
         }
 
         items.setStackInSlot(SLOT_INPUT, ItemStack.EMPTY);
