@@ -6,12 +6,10 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.ClickAction;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.ItemStackedOnOtherEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
 import net.neoforged.neoforge.event.entity.player.AnvilRepairEvent;
@@ -168,76 +166,6 @@ public final class ServerEvents {
             event.getItemEntity().discard();
         }
         // leftover falls through to the vanilla pickup (partial stacks, free slots)
-    }
-
-    /**
-     * A window is a sink for matching items: touching like-items together
-     * feeds the pool, whichever one is carried. Plain clicked onto a window
-     * slot, or a window clicked onto a plain slot, both flow the plain items
-     * into the pool (left click — the whole stack, right click — one). The
-     * network is never destroyed by combining like-items; extraction stays on
-     * the split/drop paths. When nothing fits, vanilla swap applies.
-     */
-    @SubscribeEvent
-    public static void onItemStackedOnOther(ItemStackedOnOtherEvent event) {
-        QuantumEngine engine = QuantumEngine.onServerThread();
-        if (engine == null && !event.getPlayer().level().isClientSide()) {
-            return;
-        }
-        ItemStack carried = event.getCarriedItem();
-        ItemStack inSlot = event.getStackedOnItem();
-        boolean carriedIsWindow = carried.has(ModRegistry.QUANTUM_LINK.get());
-        boolean slotIsWindow = inSlot.has(ModRegistry.QUANTUM_LINK.get());
-
-        // Exactly one side is a window and the other is a non-empty plain
-        // stack: the window absorbs the plain into its pool, either direction.
-        ItemStack window = null;
-        ItemStack plain = null;
-        if (slotIsWindow && !carriedIsWindow && !carried.isEmpty()) {
-            window = inSlot;
-            plain = carried;
-        } else if (carriedIsWindow && !slotIsWindow && !inSlot.isEmpty()) {
-            window = carried;
-            plain = inSlot;
-        }
-        if (window == null) {
-            return;
-        }
-
-        int requested = event.getClickAction() == ClickAction.PRIMARY ? Integer.MAX_VALUE : 1;
-        int absorbed = engine != null
-                ? engine.absorb(window, plain, requested)
-                : clientAbsorb(window, plain, requested);
-        if (absorbed > 0) {
-            event.getSlot().setChanged();
-            event.setCanceled(true);
-        }
-    }
-
-    /**
-     * Client-side prediction mirror of {@code QuantumEngine.absorb}: the
-     * window's synced count IS the pool, so the client can compute the same
-     * outcome the server will and menus never flicker.
-     */
-    private static int clientAbsorb(ItemStack window, ItemStack plain, int requested) {
-        if (!windowMatchesPlain(window, plain)) {
-            return 0;
-        }
-        int absorbed = Math.min(Math.min(requested, plain.getCount()),
-                window.getMaxStackSize() - window.getCount());
-        if (absorbed <= 0) {
-            return 0;
-        }
-        window.grow(absorbed);
-        plain.shrink(absorbed);
-        return absorbed;
-    }
-
-    private static boolean windowMatchesPlain(ItemStack window, ItemStack plain) {
-        return plain.is(window.getItem())
-                && window.getComponentsPatch()
-                        .forget(type -> type == ModRegistry.QUANTUM_LINK.get())
-                        .equals(plain.getComponentsPatch());
     }
 
     /** Renaming on an anvil is a property change: the network collapses instantly. */

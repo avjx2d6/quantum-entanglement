@@ -21,22 +21,28 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.Optional;
 
 /**
- * NeoForge routes vanilla hopper transfers through IItemHandler wrappers, and
- * both hooks mishandle windows:
+ * Merging is generic now — the {@code isSameItemSameComponents} hook lets
+ * every transport combine windows and plain stacks, so pulling from a window
+ * and pushing plain into one both work through plain vanilla/NeoForge code.
  *
- * <ul>
- * <li>{@code insertHook} removes an item (pool −1 through our split), and on a
- * failed insert restores the slot from a STALE COPY while discarding the
- * extracted item — draining the pool every retry tick.</li>
- * <li>{@code extractHook} simulates the extraction with a LINKED copy, which
- * never merges with plain stacks in the hopper — items spread out one per
- * slot and the hopper stalls, even though the real extraction yields plain
- * items that would merge fine.</li>
- * </ul>
+ * <p>One NeoForge pattern still misbehaves and is not about "understanding
+ * windows": {@code insertHook} removes an item first ({@code removeItem} →
+ * our split drains the pool) and, when the target turns out to be full,
+ * "restores" the slot from a stale pre-removal copy while discarding the
+ * extracted item. For plain stacks that round-trips to a no-op; for a window
+ * the pool was already decremented and the extracted item is destroyed —
+ * a silent drain every retry tick. The fix is a simulate-first guard: only
+ * remove from a window slot once we know the target will actually take it.
  *
- * Both are reimplemented simulate-first with an honest probe: what the real
- * extraction will actually yield (plain for a partial pool, the window itself
- * for the last item).
+ * <p>{@code extractHook} has the mirror problem only at the last item: it
+ * calls {@code destStack.grow(1)} and discards the stack it extracted. For a
+ * plain item that is fine, but the last pooled item leaves as a whole window
+ * (a relocation, so the pool is not decremented) — grown into the target and
+ * then thrown away, the pool lingers at 1 while the item is already gone: a
+ * dupe. Pre-collapsing a singleton source window to plain before vanilla
+ * extracts turns it into an honest plain take that drains the pool to zero.
+ * Player pickups run through {@code Slot}, not this hook, so they still keep
+ * the link on a single-item window.
  */
 @Mixin(value = VanillaInventoryCodeHooks.class, remap = false)
 public abstract class VanillaInventoryCodeHooksMixin {
@@ -51,11 +57,55 @@ public abstract class VanillaInventoryCodeHooksMixin {
         throw new AssertionError();
     }
 
+    @Inject(method = "extractHook", at = @At("HEAD"))
+    private static void quantumitems$extractHook(Level level, Hopper dest, CallbackInfoReturnable<Boolean> cir) {
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        if (engine == null) {
+            return;
+        }
+        Optional<Pair<IItemHandler, Object>> source = quantumitems$sourceHandler(level, dest);
+        if (source.isEmpty()) {
+            return;
+        }
+        IItemHandler handler = source.get().getKey();
+        for (int i = 0; i < handler.getSlots(); i++) {
+            ItemStack stack = handler.getStackInSlot(i);
+            // pool > 1 is left untouched — vanilla + the stacking hook pull plain
+            // items that merge; only the last item would dupe. And only collapse
+            // when the hopper can actually take it, so a full hopper merely
+            // pointed at a singleton window never ends the network (or its
+            // siblings) without a real transfer.
+            if (stack.has(ModRegistry.QUANTUM_LINK.get()) && stack.getCount() == 1
+                    && quantumitems$destHasRoom(dest, stack)) {
+                engine.precollapseIfSingleton(stack);
+            }
+        }
+        // no cancel: vanilla extractHook now pulls honest plain / multi-item pools
+    }
+
+    /** Would the hopper accept one plain copy of this window's item right now? */
+    private static boolean quantumitems$destHasRoom(Hopper dest, ItemStack window) {
+        ItemStack plain = window.copyWithCount(1);
+        plain.remove(ModRegistry.QUANTUM_LINK.get());
+        for (int j = 0; j < dest.getContainerSize(); j++) {
+            ItemStack destStack = dest.getItem(j);
+            if (!dest.canPlaceItem(j, plain)) {
+                continue;
+            }
+            if (destStack.isEmpty()
+                    || (destStack.getCount() < Math.min(destStack.getMaxStackSize(), dest.getMaxStackSize())
+                            && ItemStack.isSameItemSameComponents(destStack, plain))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Inject(method = "insertHook", at = @At("HEAD"), cancellable = true)
     private static void quantumitems$insertHook(HopperBlockEntity hopper, CallbackInfoReturnable<Boolean> cir) {
         QuantumEngine engine = QuantumEngine.onServerThread();
         if (engine == null || !quantumitems$hasLinked(hopper)) {
-            return;
+            return; // no window in the hopper: vanilla handles plain pushes fine
         }
         Direction facing = hopper.getBlockState().getValue(HopperBlock.FACING);
         Optional<Pair<IItemHandler, Object>> attached =
@@ -67,30 +117,6 @@ public abstract class VanillaInventoryCodeHooksMixin {
         cir.setReturnValue(quantumitems$push(engine, hopper, attached.get().getKey()));
     }
 
-    @Inject(method = "extractHook", at = @At("HEAD"), cancellable = true)
-    private static void quantumitems$extractHook(Level level, Hopper dest, CallbackInfoReturnable<Boolean> cir) {
-        QuantumEngine engine = QuantumEngine.onServerThread();
-        if (engine == null) {
-            return;
-        }
-        Optional<Pair<IItemHandler, Object>> source = quantumitems$sourceHandler(level, dest);
-        if (source.isEmpty()) {
-            return; // no handler: the original hook returns null and vanilla continues
-        }
-        IItemHandler handler = source.get().getKey();
-        boolean anyLinked = false;
-        for (int i = 0; i < handler.getSlots(); i++) {
-            if (handler.getStackInSlot(i).has(ModRegistry.QUANTUM_LINK.get())) {
-                anyLinked = true;
-                break;
-            }
-        }
-        if (!anyLinked) {
-            return;
-        }
-        cir.setReturnValue(quantumitems$pull(engine, dest, handler));
-    }
-
     private static boolean quantumitems$hasLinked(HopperBlockEntity hopper) {
         for (int i = 0; i < hopper.getContainerSize(); i++) {
             if (hopper.getItem(i).has(ModRegistry.QUANTUM_LINK.get())) {
@@ -100,7 +126,7 @@ public abstract class VanillaInventoryCodeHooksMixin {
         return false;
     }
 
-    /** What the real one-item extraction will yield: plain, or the window itself when pool == 1. */
+    /** What a one-item extraction really yields: plain, or the window itself when pool == 1. */
     private static ItemStack quantumitems$probe(ItemStack window) {
         if (window.getCount() > 1) {
             ItemStack probe = window.copyWithCount(1);
@@ -126,7 +152,7 @@ public abstract class VanillaInventoryCodeHooksMixin {
                 probe = inSlot.copyWithCount(1);
             }
             if (!ItemHandlerHelper.insertItemStacked(handler, probe, true).isEmpty()) {
-                continue; // does not fit — nothing was touched
+                continue; // target has no room — never touch the pool
             }
             ItemStack extracted = hopper.removeItem(i, 1);
             if (extracted.isEmpty()) {
@@ -134,7 +160,7 @@ public abstract class VanillaInventoryCodeHooksMixin {
             }
             ItemStack remainder = ItemHandlerHelper.insertItemStacked(handler, extracted, false);
             if (!remainder.isEmpty()) {
-                // simulate/real mismatch (exotic handlers): undo honestly
+                // simulate/real mismatch (exotic handlers): put it back honestly
                 ItemStack nowInSlot = hopper.getItem(i);
                 if (remainder.has(ModRegistry.QUANTUM_LINK.get())) {
                     hopper.setItem(i, remainder); // bounce the moved window home
@@ -147,51 +173,6 @@ public abstract class VanillaInventoryCodeHooksMixin {
                 }
             }
             return true;
-        }
-        return false;
-    }
-
-    private static Boolean quantumitems$pull(QuantumEngine engine, Hopper dest, IItemHandler handler) {
-        for (int i = 0; i < handler.getSlots(); i++) {
-            ItemStack inSlot = handler.getStackInSlot(i);
-            if (inSlot.isEmpty()) {
-                continue;
-            }
-            ItemStack probe;
-            if (inSlot.has(ModRegistry.QUANTUM_LINK.get())) {
-                if (engine.reconcile(inSlot) != QuantumEngine.Status.CANONICAL) {
-                    continue;
-                }
-                probe = quantumitems$probe(inSlot);
-            } else {
-                probe = handler.extractItem(i, 1, true);
-                if (probe.isEmpty()) {
-                    continue;
-                }
-            }
-            for (int j = 0; j < dest.getContainerSize(); j++) {
-                ItemStack destStack = dest.getItem(j);
-                boolean fits = dest.canPlaceItem(j, probe)
-                        && (destStack.isEmpty()
-                                || destStack.getCount() < destStack.getMaxStackSize()
-                                        && destStack.getCount() < dest.getMaxStackSize()
-                                        && ItemStack.isSameItemSameComponents(probe, destStack));
-                if (!fits) {
-                    continue;
-                }
-                ItemStack extracted = handler.extractItem(i, 1, false);
-                if (extracted.isEmpty()) {
-                    break;
-                }
-                if (destStack.isEmpty()) {
-                    dest.setItem(j, extracted);
-                } else {
-                    destStack.grow(extracted.getCount());
-                    dest.setItem(j, destStack);
-                }
-                dest.setChanged();
-                return true;
-            }
         }
         return false;
     }

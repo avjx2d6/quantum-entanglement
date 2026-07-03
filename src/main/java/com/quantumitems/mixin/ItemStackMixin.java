@@ -2,6 +2,7 @@ package com.quantumitems.mixin;
 
 import com.quantumitems.ModRegistry;
 import com.quantumitems.engine.QuantumEngine;
+import net.minecraft.core.component.DataComponentPatch;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -10,14 +11,45 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * The two (and a half) choke points of the quantum engine. Every vanilla
- * count mutation funnels through {@code setCount} (shrink/grow/consume are
- * thin wrappers), every partial extraction through {@code split}, and
- * {@code copyAndClear} is a whole-stack move. All hooks are no-ops unless
- * the stack carries QuantumLinkData and we are on the server thread.
+ * The choke points of the quantum engine. Every vanilla count mutation
+ * funnels through {@code setCount} (shrink/grow/consume are thin wrappers),
+ * every partial extraction through {@code split}, and {@code copyAndClear}
+ * is a whole-stack move. Most hooks are no-ops unless the stack carries
+ * QuantumLinkData and we are on the server thread.
+ *
+ * <p>{@code isSameItemSameComponents} is the one exception: it is the single
+ * root point every transport (vanilla hoppers, shift-click, cursor merges,
+ * modded chutes and pipes) consults to decide whether two stacks combine.
+ * Making a window and a plain stack of the same item read as "the same"
+ * there lets all of them merge generically — the count then flows through
+ * the {@code setCount} hook into the shared pool, no per-transport code.
  */
 @Mixin(ItemStack.class)
 public abstract class ItemStackMixin {
+
+    /**
+     * A window and a plain stack of the same base item (components equal once
+     * the link is ignored) stack together everywhere vanilla asks this. Two
+     * windows are left to vanilla: same member stacks, different members or
+     * networks stay distinct so separate pools never merge by accident.
+     */
+    @Inject(method = "isSameItemSameComponents", at = @At("HEAD"), cancellable = true)
+    private static void quantumitems$linkAgnosticStacking(ItemStack a, ItemStack b,
+                                                          CallbackInfoReturnable<Boolean> cir) {
+        if (a.isEmpty() || b.isEmpty()) {
+            return;
+        }
+        boolean aLinked = a.has(ModRegistry.QUANTUM_LINK.get());
+        boolean bLinked = b.has(ModRegistry.QUANTUM_LINK.get());
+        if (aLinked == bLinked || !ItemStack.isSameItem(a, b)) {
+            return; // both plain / both windows / different items: vanilla decides
+        }
+        DataComponentPatch pa = a.getComponentsPatch().forget(t -> t == ModRegistry.QUANTUM_LINK.get());
+        DataComponentPatch pb = b.getComponentsPatch().forget(t -> t == ModRegistry.QUANTUM_LINK.get());
+        if (pa.equals(pb)) {
+            cir.setReturnValue(true);
+        }
+    }
 
     @Inject(method = "setCount", at = @At("HEAD"), cancellable = true)
     private void quantumitems$setCount(int newCount, CallbackInfo ci) {

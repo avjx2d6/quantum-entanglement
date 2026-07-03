@@ -98,9 +98,14 @@ public class HopperGameTests {
         });
     }
 
-    /** Pulling the last pooled item moves the window itself into the hopper. */
+    /**
+     * A hopper pulling a single-item pool takes it as PLAIN, not a stray
+     * window — automation normalises the last item and the network ends.
+     * (Players holding a single linked item go through the menu path, which
+     * keeps the link; this is the transport path.)
+     */
     @GameTest(template = "box", templateNamespace = "quantumitems", timeoutTicks = 200)
-    public static void hopperPullsLastItemAsWindow(GameTestHelper helper) {
+    public static void hopperPullsSingletonAsPlain(GameTestHelper helper) {
         TestNetwork network = makeNetwork(helper, 1);
         helper.setBlock(new BlockPos(1, 2, 1), Blocks.CHEST);
         helper.setBlock(new BlockPos(1, 1, 1), Blocks.HOPPER);
@@ -109,16 +114,70 @@ public class HopperGameTests {
 
         helper.runAfterDelay(40, () -> {
             HopperBlockEntity hopper = (HopperBlockEntity) helper.getBlockEntity(new BlockPos(1, 1, 1));
-            boolean windowInHopper = false;
+            int plain = 0;
             for (int slot = 0; slot < hopper.getContainerSize(); slot++) {
-                if (hopper.getItem(slot).has(ModRegistry.QUANTUM_LINK.get())) {
-                    windowInHopper = true;
-                }
+                ItemStack stack = hopper.getItem(slot);
+                helper.assertTrue(!stack.has(ModRegistry.QUANTUM_LINK.get()), "no stray window in the hopper");
+                plain += stack.getCount();
             }
-            helper.assertTrue(windowInHopper, "the window itself must move into the hopper");
+            helper.assertTrue(plain == 1, "the single item arrives as one plain item");
             helper.assertTrue(chest.getItem(0).isEmpty(), "chest slot must be empty");
-            helper.assertTrue(networks(helper).network(network.id()) != null, "network must survive the move");
+            helper.assertTrue(networks(helper).network(network.id()) == null, "network ends with its last item");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * A FULL hopper pointed at a chest holding a single-item window must not
+     * collapse it — the network (and its siblings) survive until a real
+     * transfer happens, never from mere proximity.
+     */
+    @GameTest(template = "box", templateNamespace = "quantumitems", timeoutTicks = 200)
+    public static void fullHopperDoesNotCollapseSingleton(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 1);
+        helper.setBlock(new BlockPos(1, 2, 1), Blocks.CHEST);
+        helper.setBlock(new BlockPos(1, 1, 1), Blocks.HOPPER);
+        ChestBlockEntity chest = (ChestBlockEntity) helper.getBlockEntity(new BlockPos(1, 2, 1));
+        HopperBlockEntity hopper = (HopperBlockEntity) helper.getBlockEntity(new BlockPos(1, 1, 1));
+        chest.setItem(0, network.windowA());
+        for (int slot = 0; slot < hopper.getContainerSize(); slot++) {
+            hopper.setItem(slot, new ItemStack(Items.STICK, 64)); // no room for bread
+        }
+
+        helper.runAfterDelay(40, () -> {
+            helper.assertTrue(networks(helper).network(network.id()) != null, "network must survive a full hopper");
             helper.assertTrue(networks(helper).network(network.id()).pool == 1, "pool unchanged");
+            helper.assertTrue(chest.getItem(0).has(ModRegistry.QUANTUM_LINK.get()), "the window stays a window");
+            helper.assertTrue(network.windowB().getCount() == 1, "the sibling window is untouched");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * Draining a whole multi-item pool through a hopper must yield exactly that
+     * many plain items merged together — no stray window and, crucially, no
+     * dupe when the pool hits its last item while plain has already piled up.
+     */
+    @GameTest(template = "box", templateNamespace = "quantumitems", timeoutTicks = 200)
+    public static void hopperDrainsWholePoolToPlainNoDupe(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 3);
+        helper.setBlock(new BlockPos(1, 2, 1), Blocks.CHEST);
+        helper.setBlock(new BlockPos(1, 1, 1), Blocks.HOPPER);
+        ChestBlockEntity chest = (ChestBlockEntity) helper.getBlockEntity(new BlockPos(1, 2, 1));
+        chest.setItem(0, network.windowA());
+
+        helper.runAfterDelay(80, () -> {
+            HopperBlockEntity hopper = (HopperBlockEntity) helper.getBlockEntity(new BlockPos(1, 1, 1));
+            int plain = 0;
+            for (int slot = 0; slot < hopper.getContainerSize(); slot++) {
+                ItemStack stack = hopper.getItem(slot);
+                helper.assertTrue(!stack.has(ModRegistry.QUANTUM_LINK.get()),
+                        "no linked stack may linger — the last item drains as plain");
+                plain += stack.getCount();
+            }
+            helper.assertTrue(chest.getItem(0).isEmpty(), "source must be empty");
+            helper.assertTrue(plain == 3, "exactly the 3 pooled items come out as plain, no dupe");
+            helper.assertTrue(networks(helper).network(network.id()) == null, "network ends with the pool");
             helper.succeed();
         });
     }
@@ -147,6 +206,32 @@ public class HopperGameTests {
                 }
             }
             helper.assertTrue(windowStillThere, "the window must stay in the hopper");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * A hopper feeding plain items into a container that holds a window merges
+     * them into the pool — pushing plain "into the link" works through plain
+     * vanilla insertion because the stacking hook makes them combine.
+     */
+    @GameTest(template = "box", templateNamespace = "quantumitems", timeoutTicks = 200)
+    public static void hopperPushesPlainIntoWindow(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 10);
+        helper.setBlock(new BlockPos(1, 1, 1), Blocks.CHEST);
+        helper.setBlock(new BlockPos(1, 2, 1), Blocks.HOPPER);
+        ChestBlockEntity chest = (ChestBlockEntity) helper.getBlockEntity(new BlockPos(1, 1, 1));
+        HopperBlockEntity hopper = (HopperBlockEntity) helper.getBlockEntity(new BlockPos(1, 2, 1));
+        chest.setItem(0, network.windowA());
+        hopper.setItem(0, new ItemStack(Items.BREAD, 5));
+
+        helper.runAfterDelay(60, () -> {
+            int pool = networks(helper).network(network.id()).pool;
+            helper.assertTrue(pool == 15, "the 5 plain items must merge into the pool");
+            helper.assertTrue(chest.getItem(0).has(ModRegistry.QUANTUM_LINK.get()), "the window stays a window");
+            helper.assertTrue(chest.getItem(0).getCount() == 15, "the window shows the grown pool");
+            helper.assertTrue(network.windowB().getCount() == 15, "other window tracks the pool");
+            helper.assertTrue(hopper.getItem(0).isEmpty(), "the hopper emptied its plain into the pool");
             helper.succeed();
         });
     }
