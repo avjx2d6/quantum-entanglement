@@ -10,6 +10,7 @@
     "ItemEntityMixin",
     "ItemStackMixin",
     "ServerGamePacketListenerMixin",
+    "SidedInvWrapperMixin",
     "VanillaInventoryCodeHooksMixin"
   ],
   "client": [],

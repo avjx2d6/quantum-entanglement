@@ -11,6 +11,7 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.entity.HopperBlockEntity;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -230,6 +231,33 @@ public class HopperGameTests {
             helper.assertTrue(pool == 15, "the 5 plain items must merge into the pool");
             helper.assertTrue(chest.getItem(0).has(ModRegistry.QUANTUM_LINK.get()), "the window stays a window");
             helper.assertTrue(chest.getItem(0).getCount() == 15, "the window shows the grown pool");
+            helper.assertTrue(network.windowB().getCount() == 15, "other window tracks the pool");
+            helper.assertTrue(hopper.getItem(0).isEmpty(), "the hopper emptied its plain into the pool");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * A hopper feeding plain items into a window sitting in a FURNACE input
+     * slot must merge them into the pool — sided containers (furnaces, most
+     * modded machines via SidedInvWrapper) must honour the link just like a
+     * plain chest does.
+     */
+    @GameTest(template = "box", templateNamespace = "quantumitems", timeoutTicks = 200)
+    public static void hopperPushesPlainIntoWindowInFurnace(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 10);
+        helper.setBlock(new BlockPos(1, 1, 1), Blocks.FURNACE);
+        helper.setBlock(new BlockPos(1, 2, 1), Blocks.HOPPER); // above, faces down into the input slot
+        AbstractFurnaceBlockEntity furnace = (AbstractFurnaceBlockEntity) helper.getBlockEntity(new BlockPos(1, 1, 1));
+        HopperBlockEntity hopper = (HopperBlockEntity) helper.getBlockEntity(new BlockPos(1, 2, 1));
+        furnace.setItem(0, network.windowA()); // the window occupies the smelt input
+        hopper.setItem(0, new ItemStack(Items.BREAD, 5));
+
+        helper.runAfterDelay(60, () -> {
+            int pool = networks(helper).network(network.id()).pool;
+            helper.assertTrue(pool == 15, "the 5 plain items must merge into the pool");
+            helper.assertTrue(furnace.getItem(0).has(ModRegistry.QUANTUM_LINK.get()), "the window stays a window");
+            helper.assertTrue(furnace.getItem(0).getCount() == 15, "the window shows the grown pool");
             helper.assertTrue(network.windowB().getCount() == 15, "other window tracks the pool");
             helper.assertTrue(hopper.getItem(0).isEmpty(), "the hopper emptied its plain into the pool");
             helper.succeed();
