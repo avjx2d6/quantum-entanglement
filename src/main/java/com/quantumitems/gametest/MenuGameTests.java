@@ -169,6 +169,43 @@ public class MenuGameTests {
         helper.succeed();
     }
 
+    /** Left click with a carried window fills a matching plain slot up to its cap. */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void carriedWindowLeftClickFillsSlot(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 10);
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        SimpleContainer chest = new SimpleContainer(27);
+        chest.setItem(0, new ItemStack(Items.BREAD, 60)); // room for 4
+        ChestMenu menu = ChestMenu.threeRows(1, player.getInventory(), chest);
+        menu.setCarried(network.windowA());
+
+        menu.clicked(0, 0, ClickType.PICKUP, player);
+
+        helper.assertTrue(chest.getItem(0).getCount() == 64, "slot must fill to its cap");
+        helper.assertTrue(menu.getCarried().getCount() == 6, "window must show pool 6");
+        helper.assertTrue(networks(helper).network(network.id()).pool == 6, "pool must be 6");
+        helper.succeed();
+    }
+
+    /** Pouring out the entire pool by left click is a full extraction: the network dissolves. */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void pouringOutWholePoolDissolves(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 3);
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        SimpleContainer chest = new SimpleContainer(27);
+        chest.setItem(0, new ItemStack(Items.BREAD, 10));
+        ChestMenu menu = ChestMenu.threeRows(1, player.getInventory(), chest);
+        menu.setCarried(network.windowA());
+
+        menu.clicked(0, 0, ClickType.PICKUP, player);
+
+        helper.assertTrue(chest.getItem(0).getCount() == 13, "all 3 pooled items must pour into the slot");
+        helper.assertTrue(menu.getCarried().isEmpty(), "cursor must be empty — the window is spent");
+        helper.assertTrue(network.windowB().isEmpty(), "other window must vanish");
+        helper.assertTrue(networks(helper).network(network.id()) == null, "network must be gone");
+        helper.succeed();
+    }
+
     /** Clicking a plain stack onto a window absorbs it into the pool (event path). */
     @GameTest(template = "empty", templateNamespace = "quantumitems")
     public static void clickAbsorbsPlainIntoWindow(GameTestHelper helper) {

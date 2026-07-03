@@ -387,31 +387,40 @@ public final class QuantumEngine {
     }
 
     /**
-     * Right-click deposit: carrying a window over a matching plain stack puts
-     * one plain item from the pool into the slot — mirroring vanilla's
-     * "right click deposits one". Depositing the very last item is refused
-     * (vanilla swap applies instead).
+     * Deposit from a carried window into a matching plain stack, mirroring
+     * vanilla's click semantics: right click puts one, left click fills the
+     * slot up to its max stack size. Draining the pool to zero dissolves the
+     * network — pouring out the last items is an honest full extraction.
+     *
+     * @return how many items were deposited
      */
-    public boolean depositOne(ItemStack window, ItemStack slotPlain) {
+    public int depositInto(ItemStack window, ItemStack slotPlain, int requested) {
         if (reconcile(window) != Status.CANONICAL) {
-            return false;
+            return 0;
         }
         QuantumLinkData link = window.get(ModRegistry.QUANTUM_LINK.get());
         QuantumNetworks networks = QuantumNetworks.get(server);
         QuantumNetworks.Network network = networks.network(link.networkId());
-        if (network.pool < 2
-                || slotPlain.has(ModRegistry.QUANTUM_LINK.get())
+        if (slotPlain.has(ModRegistry.QUANTUM_LINK.get())
                 || !slotPlain.is(network.item)
-                || !slotPlain.getComponentsPatch().equals(network.snapshot)
-                || slotPlain.getCount() >= slotPlain.getMaxStackSize()) {
-            return false;
+                || !slotPlain.getComponentsPatch().equals(network.snapshot)) {
+            return 0;
         }
-        network.pool--;
-        networks.setDirty();
-        rawSetCount(window, network.pool);
-        pushToMembers(link.networkId(), network, window);
-        slotPlain.grow(1);
-        return true;
+        int deposited = Math.min(Math.min(requested, network.pool),
+                slotPlain.getMaxStackSize() - slotPlain.getCount());
+        if (deposited <= 0) {
+            return 0;
+        }
+        slotPlain.grow(deposited);
+        if (deposited >= network.pool) {
+            dissolve(link.networkId(), network, networks); // poured out everything
+        } else {
+            network.pool -= deposited;
+            networks.setDirty();
+            rawSetCount(window, network.pool);
+            pushToMembers(link.networkId(), network, window);
+        }
+        return deposited;
     }
 
     /**

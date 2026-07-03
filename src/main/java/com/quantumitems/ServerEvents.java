@@ -197,12 +197,12 @@ public final class ServerEvents {
                 event.getSlot().setChanged();
                 event.setCanceled(true);
             }
-        } else if (carriedIsWindow && !slotIsWindow && !inSlot.isEmpty()
-                && event.getClickAction() == ClickAction.SECONDARY) {
-            boolean deposited = engine != null
-                    ? engine.depositOne(carried, inSlot)
-                    : clientDepositOne(carried, inSlot);
-            if (deposited) {
+        } else if (carriedIsWindow && !slotIsWindow && !inSlot.isEmpty()) {
+            int requested = event.getClickAction() == ClickAction.PRIMARY ? Integer.MAX_VALUE : 1;
+            int deposited = engine != null
+                    ? engine.depositInto(carried, inSlot, requested)
+                    : clientDeposit(carried, inSlot, requested);
+            if (deposited > 0) {
                 event.getSlot().setChanged();
                 event.setCanceled(true);
             }
@@ -228,16 +228,24 @@ public final class ServerEvents {
         return absorbed;
     }
 
-    /** Client-side prediction mirror of {@code QuantumEngine.depositOne}. */
-    private static boolean clientDepositOne(ItemStack window, ItemStack slotPlain) {
-        if (window.getCount() < 2
-                || !windowMatchesPlain(window, slotPlain)
-                || slotPlain.getCount() >= slotPlain.getMaxStackSize()) {
-            return false;
+    /** Client-side prediction mirror of {@code QuantumEngine.depositInto}. */
+    private static int clientDeposit(ItemStack window, ItemStack slotPlain, int requested) {
+        if (!windowMatchesPlain(window, slotPlain)) {
+            return 0;
         }
-        window.shrink(1);
-        slotPlain.grow(1);
-        return true;
+        int deposited = Math.min(Math.min(requested, window.getCount()),
+                slotPlain.getMaxStackSize() - slotPlain.getCount());
+        if (deposited <= 0) {
+            return 0;
+        }
+        slotPlain.grow(deposited);
+        if (deposited >= window.getCount()) {
+            window.remove(ModRegistry.QUANTUM_LINK.get());
+            window.setCount(0); // full extraction: the server dissolves the network
+        } else {
+            window.shrink(deposited);
+        }
+        return deposited;
     }
 
     private static boolean windowMatchesPlain(ItemStack window, ItemStack plain) {
