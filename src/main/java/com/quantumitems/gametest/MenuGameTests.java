@@ -85,6 +85,33 @@ public class MenuGameTests {
         helper.succeed();
     }
 
+    /**
+     * Depositing a carried window onto a plain stack must drain the pool, even
+     * when the carried instance is not the registered canonical one (client
+     * round-trips can hand the server a fresh window instance). Otherwise the
+     * count write is mistaken for a simulation copy, the pool is left alone,
+     * and the deposited items are duplicated.
+     */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void depositCarriedWindowNeverDupes(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 40);
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        SimpleContainer chest = new SimpleContainer(27);
+        chest.setItem(0, new ItemStack(Items.BREAD, 60)); // room for only 4 — deposit stays partial
+        ChestMenu menu = ChestMenu.threeRows(1, player.getInventory(), chest);
+        menu.setCarried(network.windowA().copy()); // a non-canonical instance of the window
+
+        menu.clicked(0, 0, ClickType.PICKUP, player); // left-click deposit onto the plain 60
+
+        int pool = networks(helper).network(network.id()).pool;
+        int slotCount = chest.getItem(0).getCount();
+        helper.assertTrue(slotCount > 60, "some items must have been deposited");
+        helper.assertTrue(!chest.getItem(0).has(ModRegistry.QUANTUM_LINK.get()), "the slot stays plain");
+        helper.assertTrue(pool == 40 - (slotCount - 60), "pool must drain by exactly what was deposited");
+        helper.assertTrue(pool + slotCount == 100, "no items conjured — 40 pooled + 60 plain, conserved");
+        helper.succeed();
+    }
+
     /** Right-click splits half into the cursor — the half must be plain, pool halved. */
     @GameTest(template = "empty", templateNamespace = "quantumitems")
     public static void rightClickHalfGivesPlain(GameTestHelper helper) {
