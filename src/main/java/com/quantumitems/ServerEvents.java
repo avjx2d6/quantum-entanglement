@@ -161,17 +161,13 @@ public final class ServerEvents {
         if (stack.has(ModRegistry.QUANTUM_LINK.get())) {
             return; // windows: vanilla path + Inventory.add mixin
         }
-        ItemStack window = engine.findPickupAbsorber(event.getPlayer().getInventory(), stack);
-        if (window == null) {
-            return; // no window, or a plain stack with room comes first in vanilla order
-        }
-        int absorbed = engine.absorb(window, stack, stack.getCount());
+        int absorbed = engine.absorbPickup(event.getPlayer().getInventory(), stack);
         if (absorbed > 0 && stack.isEmpty()) {
             event.setCanPickup(TriState.FALSE);
             event.getPlayer().take(event.getItemEntity(), absorbed);
             event.getItemEntity().discard();
         }
-        // leftover (pool cap reached) falls through to the vanilla pickup
+        // leftover falls through to the vanilla pickup (partial stacks, free slots)
     }
 
     /**
@@ -184,7 +180,7 @@ public final class ServerEvents {
     @SubscribeEvent
     public static void onItemStackedOnOther(ItemStackedOnOtherEvent event) {
         QuantumEngine engine = QuantumEngine.onServerThread();
-        if (engine == null) {
+        if (engine == null && !event.getPlayer().level().isClientSide()) {
             return;
         }
         ItemStack carried = event.getCarriedItem();
@@ -194,17 +190,61 @@ public final class ServerEvents {
 
         if (slotIsWindow && !carriedIsWindow && !carried.isEmpty()) {
             int requested = event.getClickAction() == ClickAction.PRIMARY ? Integer.MAX_VALUE : 1;
-            if (engine.absorb(inSlot, carried, requested) > 0) {
+            int absorbed = engine != null
+                    ? engine.absorb(inSlot, carried, requested)
+                    : clientAbsorb(inSlot, carried, requested);
+            if (absorbed > 0) {
                 event.getSlot().setChanged();
                 event.setCanceled(true);
             }
         } else if (carriedIsWindow && !slotIsWindow && !inSlot.isEmpty()
                 && event.getClickAction() == ClickAction.SECONDARY) {
-            if (engine.depositOne(carried, inSlot)) {
+            boolean deposited = engine != null
+                    ? engine.depositOne(carried, inSlot)
+                    : clientDepositOne(carried, inSlot);
+            if (deposited) {
                 event.getSlot().setChanged();
                 event.setCanceled(true);
             }
         }
+    }
+
+    /**
+     * Client-side prediction mirror of {@code QuantumEngine.absorb}: the
+     * window's synced count IS the pool, so the client can compute the same
+     * outcome the server will and menus never flicker.
+     */
+    private static int clientAbsorb(ItemStack window, ItemStack plain, int requested) {
+        if (!windowMatchesPlain(window, plain)) {
+            return 0;
+        }
+        int absorbed = Math.min(Math.min(requested, plain.getCount()),
+                window.getMaxStackSize() - window.getCount());
+        if (absorbed <= 0) {
+            return 0;
+        }
+        window.grow(absorbed);
+        plain.shrink(absorbed);
+        return absorbed;
+    }
+
+    /** Client-side prediction mirror of {@code QuantumEngine.depositOne}. */
+    private static boolean clientDepositOne(ItemStack window, ItemStack slotPlain) {
+        if (window.getCount() < 2
+                || !windowMatchesPlain(window, slotPlain)
+                || slotPlain.getCount() >= slotPlain.getMaxStackSize()) {
+            return false;
+        }
+        window.shrink(1);
+        slotPlain.grow(1);
+        return true;
+    }
+
+    private static boolean windowMatchesPlain(ItemStack window, ItemStack plain) {
+        return plain.is(window.getItem())
+                && window.getComponentsPatch()
+                        .forget(type -> type == ModRegistry.QUANTUM_LINK.get())
+                        .equals(plain.getComponentsPatch());
     }
 
     /** Renaming on an anvil is a property change: the network collapses instantly. */

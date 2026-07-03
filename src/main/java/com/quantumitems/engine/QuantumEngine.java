@@ -302,13 +302,17 @@ public final class QuantumEngine {
     }
 
     /**
-     * Decides where a picked-up plain stack should go, walking the slots in
-     * vanilla's own order (selected, offhand, then storage). The first
-     * matching stack wins: a plain stack with room means vanilla handles the
-     * pickup untouched; a window met first absorbs into the pool.
+     * Pickup absorption that composes with vanilla instead of overriding it.
+     * Walks the inventory in vanilla's own fill order (selected, offhand,
+     * storage), keeping a running total of what vanilla will merge into
+     * partial plain stacks. Only the remainder that vanilla could not merge
+     * before reaching a window is absorbed into that window's pool; whatever
+     * is still left flows back to the vanilla pickup (partial stacks and
+     * free slots).
+     *
+     * @return total items absorbed into pools
      */
-    @Nullable
-    public ItemStack findPickupAbsorber(Inventory inventory, ItemStack plain) {
+    public int absorbPickup(Inventory inventory, ItemStack plain) {
         int storage = inventory.items.size();
         int[] order = new int[storage + 2];
         order[0] = inventory.selected;
@@ -316,27 +320,70 @@ public final class QuantumEngine {
         for (int i = 0; i < storage; i++) {
             order[i + 2] = i;
         }
+        boolean[] visited = new boolean[inventory.getContainerSize()];
+        int unmergeable = plain.getCount();
+        int totalAbsorbed = 0;
         for (int idx : order) {
+            if (unmergeable <= 0) {
+                break;
+            }
+            if (idx < 0 || idx >= visited.length || visited[idx]) {
+                continue; // the selected slot appears twice in the walk order
+            }
+            visited[idx] = true;
             ItemStack candidate = inventory.getItem(idx);
             if (candidate.isEmpty()) {
                 continue;
             }
             QuantumLinkData link = candidate.get(ModRegistry.QUANTUM_LINK.get());
             if (link == null) {
-                if (ItemStack.isSameItemSameComponents(candidate, plain)
-                        && candidate.getCount() < candidate.getMaxStackSize()) {
-                    return null; // vanilla merges into this stack first — stay out of the way
+                if (ItemStack.isSameItemSameComponents(candidate, plain)) {
+                    unmergeable -= candidate.getMaxStackSize() - candidate.getCount();
                 }
                 continue;
             }
             QuantumNetworks.Network network = QuantumNetworks.get(server).network(link.networkId());
-            if (network != null && plain.is(network.item)
-                    && plain.getComponentsPatch().equals(network.snapshot)
-                    && network.pool < candidate.getMaxStackSize()) {
-                return candidate;
+            if (network == null || !plain.is(network.item)
+                    || !plain.getComponentsPatch().equals(network.snapshot)) {
+                continue;
             }
+            int absorbed = absorb(candidate, plain, unmergeable);
+            totalAbsorbed += absorbed;
+            unmergeable -= absorbed;
         }
-        return null;
+        return totalAbsorbed;
+    }
+
+    /**
+     * The creative screen is client-authoritative: a window arriving in a
+     * creative slot packet is a direct edit of the pool. The client already
+     * applies quantum split semantics locally (partial splits go plain), so
+     * an incoming count below the pool means "items were extracted", above —
+     * creative conjuring; both are legitimate in creative.
+     */
+    public void creativeUpdate(ItemStack stack) {
+        QuantumLinkData link = stack.get(ModRegistry.QUANTUM_LINK.get());
+        if (link == null || stack.isEmpty()) {
+            return;
+        }
+        QuantumNetworks networks = QuantumNetworks.get(server);
+        QuantumNetworks.Network network = networks.network(link.networkId());
+        if (network == null || !network.aliveMembers.contains(link.memberId())) {
+            wipe(stack);
+            return;
+        }
+        canonical.put(key(link.networkId(), link.memberId()), new WeakReference<>(stack));
+        if (!componentsMatchSnapshot(stack, network)) {
+            collapse(stack, link, network, networks);
+            return;
+        }
+        int newPool = Math.max(1, Math.min(stack.getCount(), stack.getMaxStackSize()));
+        if (newPool != network.pool) {
+            network.pool = newPool;
+            networks.setDirty();
+        }
+        rawSetCount(stack, network.pool);
+        pushToMembers(link.networkId(), network, stack);
     }
 
     /**

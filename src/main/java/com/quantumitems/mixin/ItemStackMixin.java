@@ -50,6 +50,23 @@ public abstract class ItemStackMixin {
         }
     }
 
+    /**
+     * Client-side quantum semantics. Server splits are handled (and
+     * cancelled) at HEAD, so this only runs where no engine exists — client
+     * prediction and the client-authoritative creative screen. It mirrors the
+     * law locally: a partial split yields plain items, taking the whole
+     * remainder keeps the link. Keeps predictions matching the server and
+     * makes creative-screen manipulation produce honest results.
+     */
+    @Inject(method = "split", at = @At("RETURN"))
+    private void quantumitems$stripPartialSplit(int amount, CallbackInfoReturnable<ItemStack> cir) {
+        ItemStack self = (ItemStack) (Object) this;
+        ItemStack result = cir.getReturnValue();
+        if (result != null && !self.isEmpty() && result.has(ModRegistry.QUANTUM_LINK.get())) {
+            result.remove(ModRegistry.QUANTUM_LINK.get());
+        }
+    }
+
     @Inject(method = "copyAndClear", at = @At("HEAD"), cancellable = true)
     private void quantumitems$copyAndClear(CallbackInfoReturnable<ItemStack> cir) {
         QuantumEngine engine = QuantumEngine.onServerThread();

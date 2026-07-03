@@ -159,16 +159,58 @@ public class Phase3GameTests {
         QuantumEngine engine = QuantumEngine.onServerThread();
         var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
         player.getInventory().selected = 0;
-        player.getInventory().setItem(0, new ItemStack(Items.BREAD, 30)); // plain, has room
+        player.getInventory().setItem(0, new ItemStack(Items.BREAD, 30)); // plain, plenty of room
         player.getInventory().setItem(5, network.windowA());
 
         ItemStack picked = new ItemStack(Items.BREAD, 5);
-        helper.assertTrue(engine.findPickupAbsorber(player.getInventory(), picked) == null,
-                "plain stack with room comes first — vanilla must handle the pickup");
+        helper.assertTrue(engine.absorbPickup(player.getInventory(), picked) == 0,
+                "plain stack with room comes first — vanilla must handle the whole pickup");
+        helper.assertTrue(picked.getCount() == 5, "picked stack untouched");
 
         player.getInventory().setItem(0, new ItemStack(Items.BREAD, 64)); // now full
-        helper.assertTrue(engine.findPickupAbsorber(player.getInventory(), picked) == network.windowA(),
-                "with the plain stack full, the window absorbs");
+        helper.assertTrue(engine.absorbPickup(player.getInventory(), picked) == 5,
+                "with the plain stack full, the window absorbs everything");
+        helper.assertTrue(networks(helper).network(network.id()).pool == 35, "pool must be 35");
+        helper.succeed();
+    }
+
+    /** Absorption composes with vanilla: only the unmergeable remainder enters the pool. */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void pickupAbsorbsOnlyUnmergeableRemainder(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 30);
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        player.getInventory().selected = 0;
+        player.getInventory().setItem(0, new ItemStack(Items.BREAD, 60)); // room for 4
+        player.getInventory().setItem(5, network.windowA());
+
+        ItemStack picked = new ItemStack(Items.BREAD, 10);
+        int absorbed = engine.absorbPickup(player.getInventory(), picked);
+
+        helper.assertTrue(absorbed == 6, "vanilla merges 4, the window absorbs the remaining 6");
+        helper.assertTrue(picked.getCount() == 4, "4 items stay for the vanilla pickup");
+        helper.assertTrue(networks(helper).network(network.id()).pool == 36, "pool must be 36");
+        helper.succeed();
+    }
+
+    /** Creative slot packets are direct pool edits: count down = extraction, up = conjuring. */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void creativeUpdateEditsPool(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 64);
+        QuantumEngine engine = QuantumEngine.onServerThread();
+
+        // the creative client split the window locally and uploaded count 25
+        ItemStack incoming = network.windowA().copy();
+        incoming.setCount(25); // transient copy: passes through untouched
+        engine.creativeUpdate(incoming);
+
+        helper.assertTrue(networks(helper).network(network.id()).pool == 25, "pool must follow the edit");
+        helper.assertTrue(network.windowB().getCount() == 25, "other window must show 25");
+
+        // consuming from the adopted instance keeps syncing
+        incoming.shrink(5);
+        helper.assertTrue(networks(helper).network(network.id()).pool == 20, "pool must be 20");
+        helper.assertTrue(network.windowB().getCount() == 20, "other window must show 20");
         helper.succeed();
     }
 
