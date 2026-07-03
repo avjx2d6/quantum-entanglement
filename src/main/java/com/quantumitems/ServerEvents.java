@@ -171,11 +171,12 @@ public final class ServerEvents {
     }
 
     /**
-     * Clicks mirror vanilla's "deposit into the slot" semantics. Plain items
-     * clicked onto a window flow into the pool (left click — the whole stack,
-     * right click — one). A carried window right-clicked onto a matching
-     * plain stack deposits one plain item from the pool, exactly like a
-     * normal right-click deposit. When nothing fits, vanilla swap applies.
+     * A window is a sink for matching items: touching like-items together
+     * feeds the pool, whichever one is carried. Plain clicked onto a window
+     * slot, or a window clicked onto a plain slot, both flow the plain items
+     * into the pool (left click — the whole stack, right click — one). The
+     * network is never destroyed by combining like-items; extraction stays on
+     * the split/drop paths. When nothing fits, vanilla swap applies.
      */
     @SubscribeEvent
     public static void onItemStackedOnOther(ItemStackedOnOtherEvent event) {
@@ -188,24 +189,28 @@ public final class ServerEvents {
         boolean carriedIsWindow = carried.has(ModRegistry.QUANTUM_LINK.get());
         boolean slotIsWindow = inSlot.has(ModRegistry.QUANTUM_LINK.get());
 
+        // Exactly one side is a window and the other is a non-empty plain
+        // stack: the window absorbs the plain into its pool, either direction.
+        ItemStack window = null;
+        ItemStack plain = null;
         if (slotIsWindow && !carriedIsWindow && !carried.isEmpty()) {
-            int requested = event.getClickAction() == ClickAction.PRIMARY ? Integer.MAX_VALUE : 1;
-            int absorbed = engine != null
-                    ? engine.absorb(inSlot, carried, requested)
-                    : clientAbsorb(inSlot, carried, requested);
-            if (absorbed > 0) {
-                event.getSlot().setChanged();
-                event.setCanceled(true);
-            }
+            window = inSlot;
+            plain = carried;
         } else if (carriedIsWindow && !slotIsWindow && !inSlot.isEmpty()) {
-            int requested = event.getClickAction() == ClickAction.PRIMARY ? Integer.MAX_VALUE : 1;
-            int deposited = engine != null
-                    ? engine.depositInto(carried, inSlot, requested)
-                    : clientDeposit(carried, inSlot, requested);
-            if (deposited > 0) {
-                event.getSlot().setChanged();
-                event.setCanceled(true);
-            }
+            window = carried;
+            plain = inSlot;
+        }
+        if (window == null) {
+            return;
+        }
+
+        int requested = event.getClickAction() == ClickAction.PRIMARY ? Integer.MAX_VALUE : 1;
+        int absorbed = engine != null
+                ? engine.absorb(window, plain, requested)
+                : clientAbsorb(window, plain, requested);
+        if (absorbed > 0) {
+            event.getSlot().setChanged();
+            event.setCanceled(true);
         }
     }
 
@@ -226,26 +231,6 @@ public final class ServerEvents {
         window.grow(absorbed);
         plain.shrink(absorbed);
         return absorbed;
-    }
-
-    /** Client-side prediction mirror of {@code QuantumEngine.depositInto}. */
-    private static int clientDeposit(ItemStack window, ItemStack slotPlain, int requested) {
-        if (!windowMatchesPlain(window, slotPlain)) {
-            return 0;
-        }
-        int deposited = Math.min(Math.min(requested, window.getCount()),
-                slotPlain.getMaxStackSize() - slotPlain.getCount());
-        if (deposited <= 0) {
-            return 0;
-        }
-        slotPlain.grow(deposited);
-        if (deposited >= window.getCount()) {
-            window.remove(ModRegistry.QUANTUM_LINK.get());
-            window.setCount(0); // full extraction: the server dissolves the network
-        } else {
-            window.shrink(deposited);
-        }
-        return deposited;
     }
 
     private static boolean windowMatchesPlain(ItemStack window, ItemStack plain) {

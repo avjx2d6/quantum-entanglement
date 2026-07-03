@@ -387,43 +387,6 @@ public final class QuantumEngine {
     }
 
     /**
-     * Deposit from a carried window into a matching plain stack, mirroring
-     * vanilla's click semantics: right click puts one, left click fills the
-     * slot up to its max stack size. Draining the pool to zero dissolves the
-     * network — pouring out the last items is an honest full extraction.
-     *
-     * @return how many items were deposited
-     */
-    public int depositInto(ItemStack window, ItemStack slotPlain, int requested) {
-        if (reconcile(window) != Status.CANONICAL) {
-            return 0;
-        }
-        QuantumLinkData link = window.get(ModRegistry.QUANTUM_LINK.get());
-        QuantumNetworks networks = QuantumNetworks.get(server);
-        QuantumNetworks.Network network = networks.network(link.networkId());
-        if (slotPlain.has(ModRegistry.QUANTUM_LINK.get())
-                || !slotPlain.is(network.item)
-                || !slotPlain.getComponentsPatch().equals(network.snapshot)) {
-            return 0;
-        }
-        int deposited = Math.min(Math.min(requested, network.pool),
-                slotPlain.getMaxStackSize() - slotPlain.getCount());
-        if (deposited <= 0) {
-            return 0;
-        }
-        slotPlain.grow(deposited);
-        if (deposited >= network.pool) {
-            dissolve(link.networkId(), network, networks); // poured out everything
-        } else {
-            network.pool -= deposited;
-            networks.setDirty();
-            rawSetCount(window, network.pool);
-            pushToMembers(link.networkId(), network, window);
-        }
-        return deposited;
-    }
-
-    /**
      * Ground windows: an ItemEntity's stack only reaches clients through
      * SynchedEntityData, so count pushes into a ground window must be
      * followed by a forced entity-data sync.
