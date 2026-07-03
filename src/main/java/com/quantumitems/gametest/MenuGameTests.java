@@ -205,6 +205,32 @@ public class MenuGameTests {
         helper.succeed();
     }
 
+    /**
+     * Carrying a window and right-clicking deposits one PLAIN item, mirroring
+     * vanilla — the sequence "right click empty slot, right click it again"
+     * must yield 1 then 2 plain items, never pull the item back.
+     */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void carriedWindowRightClickDeposits(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 30);
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        SimpleContainer chest = new SimpleContainer(27);
+        ChestMenu menu = ChestMenu.threeRows(1, player.getInventory(), chest);
+        menu.setCarried(network.windowA());
+
+        menu.clicked(0, 1, ClickType.PICKUP, player); // right click empty slot: vanilla split(1)
+        helper.assertTrue(chest.getItem(0).getCount() == 1, "first deposit must place one item");
+        helper.assertTrue(!chest.getItem(0).has(ModRegistry.QUANTUM_LINK.get()), "deposited item must be plain");
+
+        menu.clicked(0, 1, ClickType.PICKUP, player); // right click again: deposit one more
+        helper.assertTrue(chest.getItem(0).getCount() == 2, "second deposit must place another item");
+        helper.assertTrue(!chest.getItem(0).has(ModRegistry.QUANTUM_LINK.get()), "slot stays plain");
+        helper.assertTrue(menu.getCarried().has(ModRegistry.QUANTUM_LINK.get()), "cursor keeps the window");
+        helper.assertTrue(menu.getCarried().getCount() == 28, "window must show pool 28");
+        helper.assertTrue(networks(helper).network(network.id()).pool == 28, "pool must be 28");
+        helper.succeed();
+    }
+
     /** Shift-click through a real menu: the window travels whole, link intact. */
     @GameTest(template = "empty", templateNamespace = "quantumitems")
     public static void shiftClickMovesWindow(GameTestHelper helper) {

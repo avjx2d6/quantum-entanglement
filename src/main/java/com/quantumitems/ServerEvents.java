@@ -69,9 +69,10 @@ public final class ServerEvents {
         for (Player player : event.getServer().getPlayerList().getPlayers()) {
             sweepPlayer(engine, player);
         }
+        engine.sweepGroundWindows();
     }
 
-    private static void sweepPlayer(QuantumEngine engine, Player player) {
+    public static void sweepPlayer(QuantumEngine engine, Player player) {
         Set<Long> seen = new HashSet<>();
         Inventory inventory = player.getInventory();
         for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
@@ -102,7 +103,11 @@ public final class ServerEvents {
         }
     }
 
-    /** Reconcile linked items appearing on the ground (drops, broken containers, chunk load). */
+    /**
+     * Items appearing on the ground. Windows are reconciled and registered
+     * for entity-data syncs; plain items landing next to a ground window are
+     * absorbed into its pool.
+     */
     @SubscribeEvent
     public static void onEntityJoin(EntityJoinLevelEvent event) {
         if (event.getLevel().isClientSide() || !(event.getEntity() instanceof ItemEntity itemEntity)) {
@@ -117,6 +122,24 @@ public final class ServerEvents {
             engine.reconcile(stack);
             if (stack.isEmpty()) {
                 event.setCanceled(true);
+                return;
+            }
+            QuantumLinkData link = stack.get(ModRegistry.QUANTUM_LINK.get());
+            if (link != null) { // reconcile may have collapsed it to plain
+                engine.registerGroundEntity(link, itemEntity);
+                engine.absorbNearbyPlains(itemEntity);
+            }
+        } else if (!stack.isEmpty()) {
+            for (ItemEntity nearby : event.getLevel().getEntitiesOfClass(ItemEntity.class,
+                    itemEntity.getBoundingBox().inflate(1.0, 0.5, 1.0))) {
+                if (nearby == itemEntity || nearby.isRemoved()
+                        || !nearby.getItem().has(ModRegistry.QUANTUM_LINK.get())) {
+                    continue;
+                }
+                if (engine.absorb(nearby.getItem(), stack, Integer.MAX_VALUE) > 0 && stack.isEmpty()) {
+                    event.setCanceled(true);
+                    return;
+                }
             }
         }
     }
@@ -138,9 +161,9 @@ public final class ServerEvents {
         if (stack.has(ModRegistry.QUANTUM_LINK.get())) {
             return; // windows: vanilla path + Inventory.add mixin
         }
-        ItemStack window = engine.findAbsorbingWindow(event.getPlayer().getInventory(), stack);
+        ItemStack window = engine.findPickupAbsorber(event.getPlayer().getInventory(), stack);
         if (window == null) {
-            return;
+            return; // no window, or a plain stack with room comes first in vanilla order
         }
         int absorbed = engine.absorb(window, stack, stack.getCount());
         if (absorbed > 0 && stack.isEmpty()) {
@@ -152,10 +175,11 @@ public final class ServerEvents {
     }
 
     /**
-     * Click absorption: plain items clicked onto a window (or a carried
-     * window clicked onto plain items) flow into the pool. Left click — the
-     * whole stack, right click — one item. If nothing fits, vanilla swap
-     * behaviour applies.
+     * Clicks mirror vanilla's "deposit into the slot" semantics. Plain items
+     * clicked onto a window flow into the pool (left click — the whole stack,
+     * right click — one). A carried window right-clicked onto a matching
+     * plain stack deposits one plain item from the pool, exactly like a
+     * normal right-click deposit. When nothing fits, vanilla swap applies.
      */
     @SubscribeEvent
     public static void onItemStackedOnOther(ItemStackedOnOtherEvent event) {
@@ -165,19 +189,21 @@ public final class ServerEvents {
         }
         ItemStack carried = event.getCarriedItem();
         ItemStack inSlot = event.getStackedOnItem();
-        int requested = event.getClickAction() == ClickAction.PRIMARY ? Integer.MAX_VALUE : 1;
+        boolean carriedIsWindow = carried.has(ModRegistry.QUANTUM_LINK.get());
+        boolean slotIsWindow = inSlot.has(ModRegistry.QUANTUM_LINK.get());
 
-        int absorbed = 0;
-        if (inSlot.has(ModRegistry.QUANTUM_LINK.get()) && !carried.isEmpty()
-                && !carried.has(ModRegistry.QUANTUM_LINK.get())) {
-            absorbed = engine.absorb(inSlot, carried, requested);
-        } else if (carried.has(ModRegistry.QUANTUM_LINK.get()) && !inSlot.isEmpty()
-                && !inSlot.has(ModRegistry.QUANTUM_LINK.get())) {
-            absorbed = engine.absorb(carried, inSlot, requested);
-        }
-        if (absorbed > 0) {
-            event.getSlot().setChanged();
-            event.setCanceled(true);
+        if (slotIsWindow && !carriedIsWindow && !carried.isEmpty()) {
+            int requested = event.getClickAction() == ClickAction.PRIMARY ? Integer.MAX_VALUE : 1;
+            if (engine.absorb(inSlot, carried, requested) > 0) {
+                event.getSlot().setChanged();
+                event.setCanceled(true);
+            }
+        } else if (carriedIsWindow && !slotIsWindow && !inSlot.isEmpty()
+                && event.getClickAction() == ClickAction.SECONDARY) {
+            if (engine.depositOne(carried, inSlot)) {
+                event.getSlot().setChanged();
+                event.setCanceled(true);
+            }
         }
     }
 

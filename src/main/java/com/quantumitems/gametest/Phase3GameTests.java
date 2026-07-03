@@ -8,6 +8,7 @@ import com.quantumitems.engine.QuantumEngine;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -148,6 +149,50 @@ public class Phase3GameTests {
 
         helper.assertTrue(networks(helper).network(network.id()) == null,
                 "network and pool must die with the last window");
+        helper.succeed();
+    }
+
+    /** Pickup absorption respects vanilla slot order: an earlier plain stack with room wins. */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void pickupPrefersEarlierPlainStack(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 30);
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        player.getInventory().selected = 0;
+        player.getInventory().setItem(0, new ItemStack(Items.BREAD, 30)); // plain, has room
+        player.getInventory().setItem(5, network.windowA());
+
+        ItemStack picked = new ItemStack(Items.BREAD, 5);
+        helper.assertTrue(engine.findPickupAbsorber(player.getInventory(), picked) == null,
+                "plain stack with room comes first — vanilla must handle the pickup");
+
+        player.getInventory().setItem(0, new ItemStack(Items.BREAD, 64)); // now full
+        helper.assertTrue(engine.findPickupAbsorber(player.getInventory(), picked) == network.windowA(),
+                "with the plain stack full, the window absorbs");
+        helper.succeed();
+    }
+
+    /** Ground windows vacuum plain item entities lying next to them. */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void groundWindowAbsorbsNearbyPlain(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 20);
+        var level = helper.getLevel();
+        var pos = helper.absoluteVec(new net.minecraft.world.phys.Vec3(0.5, 2.0, 0.5));
+
+        ItemEntity windowEntity = new ItemEntity(level, pos.x, pos.y, pos.z, network.windowA());
+        windowEntity.setNoPickUpDelay();
+        level.addFreshEntity(windowEntity);
+
+        ItemEntity plainEntity = new ItemEntity(level, pos.x, pos.y, pos.z, new ItemStack(Items.BREAD, 7));
+        plainEntity.setNoPickUpDelay();
+        level.addFreshEntity(plainEntity);
+
+        helper.assertTrue(networks(helper).network(network.id()).pool == 27,
+                "plain entity must be absorbed into the ground window's pool");
+        helper.assertTrue(windowEntity.getItem().getCount() == 27, "ground window must show 27");
+        helper.assertTrue(network.windowB().getCount() == 27, "far window must show 27");
+        helper.assertTrue(plainEntity.isRemoved() || plainEntity.getItem().isEmpty(),
+                "absorbed plain entity must be gone");
         helper.succeed();
     }
 

@@ -5,11 +5,14 @@ import com.quantumitems.QuantumLinkData;
 import com.quantumitems.QuantumNetworks;
 import net.minecraft.core.component.DataComponentPatch;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 
 import javax.annotation.Nullable;
 import java.lang.ref.WeakReference;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -28,6 +31,8 @@ public final class QuantumEngine {
     private final MinecraftServer server;
     /** key = networkId << 32 | memberId → canonical live instance of that window. */
     private final Map<Long, WeakReference<ItemStack>> canonical = new HashMap<>();
+    /** Windows currently lying on the ground, for forced entity-data syncs. */
+    private final Map<Long, WeakReference<ItemEntity>> groundEntities = new HashMap<>();
     /** Reentrancy guard: our own writes to stack counts must not re-enter pool logic. */
     private int internalWrites;
 
@@ -296,13 +301,32 @@ public final class QuantumEngine {
         return absorbed;
     }
 
-    /** Finds a live window of a matching network for this plain stack, if any. */
+    /**
+     * Decides where a picked-up plain stack should go, walking the slots in
+     * vanilla's own order (selected, offhand, then storage). The first
+     * matching stack wins: a plain stack with room means vanilla handles the
+     * pickup untouched; a window met first absorbs into the pool.
+     */
     @Nullable
-    public ItemStack findAbsorbingWindow(net.minecraft.world.Container container, ItemStack plain) {
-        for (int slot = 0; slot < container.getContainerSize(); slot++) {
-            ItemStack candidate = container.getItem(slot);
+    public ItemStack findPickupAbsorber(Inventory inventory, ItemStack plain) {
+        int storage = inventory.items.size();
+        int[] order = new int[storage + 2];
+        order[0] = inventory.selected;
+        order[1] = Inventory.SLOT_OFFHAND;
+        for (int i = 0; i < storage; i++) {
+            order[i + 2] = i;
+        }
+        for (int idx : order) {
+            ItemStack candidate = inventory.getItem(idx);
+            if (candidate.isEmpty()) {
+                continue;
+            }
             QuantumLinkData link = candidate.get(ModRegistry.QUANTUM_LINK.get());
             if (link == null) {
+                if (ItemStack.isSameItemSameComponents(candidate, plain)
+                        && candidate.getCount() < candidate.getMaxStackSize()) {
+                    return null; // vanilla merges into this stack first — stay out of the way
+                }
                 continue;
             }
             QuantumNetworks.Network network = QuantumNetworks.get(server).network(link.networkId());
@@ -313,6 +337,84 @@ public final class QuantumEngine {
             }
         }
         return null;
+    }
+
+    /**
+     * Right-click deposit: carrying a window over a matching plain stack puts
+     * one plain item from the pool into the slot — mirroring vanilla's
+     * "right click deposits one". Depositing the very last item is refused
+     * (vanilla swap applies instead).
+     */
+    public boolean depositOne(ItemStack window, ItemStack slotPlain) {
+        if (reconcile(window) != Status.CANONICAL) {
+            return false;
+        }
+        QuantumLinkData link = window.get(ModRegistry.QUANTUM_LINK.get());
+        QuantumNetworks networks = QuantumNetworks.get(server);
+        QuantumNetworks.Network network = networks.network(link.networkId());
+        if (network.pool < 2
+                || slotPlain.has(ModRegistry.QUANTUM_LINK.get())
+                || !slotPlain.is(network.item)
+                || !slotPlain.getComponentsPatch().equals(network.snapshot)
+                || slotPlain.getCount() >= slotPlain.getMaxStackSize()) {
+            return false;
+        }
+        network.pool--;
+        networks.setDirty();
+        rawSetCount(window, network.pool);
+        pushToMembers(link.networkId(), network, window);
+        slotPlain.grow(1);
+        return true;
+    }
+
+    /**
+     * Ground windows: an ItemEntity's stack only reaches clients through
+     * SynchedEntityData, so count pushes into a ground window must be
+     * followed by a forced entity-data sync.
+     */
+    public void registerGroundEntity(QuantumLinkData link, ItemEntity entity) {
+        groundEntities.put(key(link.networkId(), link.memberId()), new WeakReference<>(entity));
+    }
+
+    /** Absorbs plain item entities lying next to a ground window. */
+    public void absorbNearbyPlains(ItemEntity windowEntity) {
+        ItemStack window = windowEntity.getItem();
+        if (!window.has(ModRegistry.QUANTUM_LINK.get())) {
+            return;
+        }
+        for (ItemEntity other : windowEntity.level().getEntitiesOfClass(ItemEntity.class,
+                windowEntity.getBoundingBox().inflate(1.0, 0.5, 1.0))) {
+            if (other == windowEntity || other.isRemoved()) {
+                continue;
+            }
+            ItemStack plain = other.getItem();
+            if (plain.isEmpty() || plain.has(ModRegistry.QUANTUM_LINK.get())) {
+                continue;
+            }
+            int absorbed = absorb(window, plain, Integer.MAX_VALUE);
+            if (absorbed > 0) {
+                if (plain.isEmpty()) {
+                    other.setItem(ItemStack.EMPTY);
+                    other.discard();
+                } else {
+                    other.setItem(plain.copy()); // forces entity-data sync of the leftover
+                }
+            }
+        }
+    }
+
+    /** Periodic pass over registered ground windows: vacuum neighbours, drop dead refs. */
+    public void sweepGroundWindows() {
+        groundEntities.values().removeIf(ref -> {
+            ItemEntity entity = ref.get();
+            return entity == null || entity.isRemoved();
+        });
+        for (WeakReference<ItemEntity> ref : List.copyOf(groundEntities.values())) {
+            ItemEntity entity = ref.get();
+            if (entity != null && !entity.isRemoved()) {
+                absorbNearbyPlains(entity);
+            }
+        }
     }
 
     /**
@@ -356,6 +458,7 @@ public final class QuantumEngine {
             return; // a stale copy burned; the real window lives elsewhere
         }
         canonical.remove(key);
+        groundEntities.remove(key);
         network.aliveMembers.remove(Integer.valueOf(link.memberId()));
         if (network.aliveMembers.isEmpty()) {
             networks.removeNetwork(link.networkId());
@@ -375,11 +478,14 @@ public final class QuantumEngine {
     /** Dissolves a network: every live window is emptied, the entry removed. */
     public void dissolve(int networkId, QuantumNetworks.Network network, QuantumNetworks networks) {
         for (int member : network.aliveMembers) {
-            WeakReference<ItemStack> ref = canonical.remove(key(networkId, member));
+            long key = key(networkId, member);
+            WeakReference<ItemStack> ref = canonical.remove(key);
             ItemStack memberStack = ref != null ? ref.get() : null;
             if (memberStack != null) {
                 wipe(memberStack);
+                syncGround(key, memberStack);
             }
+            groundEntities.remove(key);
         }
         networks.removeNetwork(networkId);
     }
@@ -392,15 +498,16 @@ public final class QuantumEngine {
                           QuantumNetworks.Network network, QuantumNetworks networks) {
         int pool = network.pool;
         for (int member : network.aliveMembers) {
-            if (member == link.memberId()) {
-                canonical.remove(key(link.networkId(), member));
-                continue;
+            long key = key(link.networkId(), member);
+            WeakReference<ItemStack> ref = canonical.remove(key);
+            if (member != link.memberId()) {
+                ItemStack memberStack = ref != null ? ref.get() : null;
+                if (memberStack != null) {
+                    wipe(memberStack);
+                    syncGround(key, memberStack);
+                }
             }
-            WeakReference<ItemStack> ref = canonical.remove(key(link.networkId(), member));
-            ItemStack memberStack = ref != null ? ref.get() : null;
-            if (memberStack != null) {
-                wipe(memberStack);
-            }
+            groundEntities.remove(key);
         }
         networks.removeNetwork(link.networkId());
         internalWrites++;
@@ -427,11 +534,32 @@ public final class QuantumEngine {
 
     private void pushToMembers(int networkId, QuantumNetworks.Network network, ItemStack source) {
         for (int member : network.aliveMembers) {
-            WeakReference<ItemStack> ref = canonical.get(key(networkId, member));
+            long key = key(networkId, member);
+            WeakReference<ItemStack> ref = canonical.get(key);
             ItemStack memberStack = ref != null ? ref.get() : null;
-            if (memberStack != null && memberStack != source && !memberStack.isEmpty()) {
+            if (memberStack == null) {
+                continue;
+            }
+            if (memberStack != source && !memberStack.isEmpty()) {
                 rawSetCount(memberStack, network.pool);
             }
+            syncGround(key, memberStack);
+        }
+    }
+
+    /** Forces the entity-data sync when a member's stack lives in an ItemEntity. */
+    private void syncGround(long key, ItemStack expected) {
+        WeakReference<ItemEntity> ref = groundEntities.get(key);
+        if (ref == null) {
+            return;
+        }
+        ItemEntity entity = ref.get();
+        if (entity == null || entity.isRemoved()) {
+            groundEntities.remove(key);
+            return;
+        }
+        if (entity.getItem() == expected) {
+            ((GroundWindowSync) entity).quantumitems$forceItemSync();
         }
     }
 
