@@ -214,29 +214,6 @@ public class Phase3GameTests {
         helper.succeed();
     }
 
-    /** Ground windows vacuum plain item entities lying next to them. */
-    @GameTest(template = "empty", templateNamespace = "quantumitems")
-    public static void groundWindowAbsorbsNearbyPlain(GameTestHelper helper) {
-        TestNetwork network = makeNetwork(helper, 20);
-        var level = helper.getLevel();
-        var pos = helper.absoluteVec(new net.minecraft.world.phys.Vec3(0.5, 2.0, 0.5));
-
-        ItemEntity windowEntity = new ItemEntity(level, pos.x, pos.y, pos.z, network.windowA());
-        windowEntity.setNoPickUpDelay();
-        level.addFreshEntity(windowEntity);
-
-        ItemEntity plainEntity = new ItemEntity(level, pos.x, pos.y, pos.z, new ItemStack(Items.BREAD, 7));
-        plainEntity.setNoPickUpDelay();
-        level.addFreshEntity(plainEntity);
-
-        helper.assertTrue(networks(helper).network(network.id()).pool == 27,
-                "plain entity must be absorbed into the ground window's pool");
-        helper.assertTrue(windowEntity.getItem().getCount() == 27, "ground window must show 27");
-        helper.assertTrue(network.windowB().getCount() == 27, "far window must show 27");
-        helper.assertTrue(plainEntity.isRemoved() || plainEntity.getItem().isEmpty(),
-                "absorbed plain entity must be gone");
-        helper.succeed();
-    }
 
     /** A stale copy burning must NOT retire the live member. */
     @GameTest(template = "empty", templateNamespace = "quantumitems")

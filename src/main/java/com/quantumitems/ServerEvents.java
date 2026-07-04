@@ -108,9 +108,10 @@ public final class ServerEvents {
     }
 
     /**
-     * Items appearing on the ground. Windows are reconciled and registered
-     * for entity-data syncs; plain items landing next to a ground window are
-     * absorbed into its pool.
+     * Rule 1: a window may never exist as a free item. The instant one would
+     * appear on the ground it cashes out to plain (whole pool, siblings wiped,
+     * network ended); a dead husk is discarded. No linked item ever lies in the
+     * world, so the ground-desync and item-loss that came with it are gone.
      */
     @SubscribeEvent
     public static void onEntityJoin(EntityJoinLevelEvent event) {
@@ -123,27 +124,11 @@ public final class ServerEvents {
         }
         ItemStack stack = itemEntity.getItem();
         if (stack.has(ModRegistry.QUANTUM_LINK.get())) {
-            engine.reconcile(stack);
+            engine.cashOutToPlain(stack);
             if (stack.isEmpty()) {
-                event.setCanceled(true);
-                return;
-            }
-            QuantumLinkData link = stack.get(ModRegistry.QUANTUM_LINK.get());
-            if (link != null) { // reconcile may have collapsed it to plain
-                engine.registerGroundEntity(link, itemEntity);
-                engine.absorbNearbyPlains(itemEntity);
-            }
-        } else if (!stack.isEmpty()) {
-            for (ItemEntity nearby : event.getLevel().getEntitiesOfClass(ItemEntity.class,
-                    itemEntity.getBoundingBox().inflate(1.0, 0.5, 1.0))) {
-                if (nearby == itemEntity || nearby.isRemoved()
-                        || !nearby.getItem().has(ModRegistry.QUANTUM_LINK.get())) {
-                    continue;
-                }
-                if (engine.absorb(nearby.getItem(), stack, Integer.MAX_VALUE) > 0 && stack.isEmpty()) {
-                    event.setCanceled(true);
-                    return;
-                }
+                event.setCanceled(true); // dead husk: nothing to drop
+            } else {
+                itemEntity.setItem(stack); // push the cashed-out plain to the entity's synced data
             }
         }
     }

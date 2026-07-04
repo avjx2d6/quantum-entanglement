@@ -509,6 +509,28 @@ public final class QuantumEngine {
         return moved;
     }
 
+    /**
+     * Rule 1 cash-out: a window that is about to exist as a free item collapses
+     * to plain here, taking the whole pool with it (siblings wiped, network
+     * ended). A husk of a dead network/member is simply emptied. Item count is
+     * always conserved and no linked item is ever left in the world.
+     */
+    public void cashOutToPlain(ItemStack stack) {
+        QuantumLinkData link = stack.get(ModRegistry.QUANTUM_LINK.get());
+        if (link == null) {
+            return;
+        }
+        QuantumNetworks networks = QuantumNetworks.get(server);
+        QuantumNetworks.Network network = networks.network(link.networkId());
+        if (network == null || !network.aliveMembers.contains(link.memberId())) {
+            debug("cashOut net#" + link.networkId() + " m" + link.memberId() + ": dead husk -> emptied");
+            wipe(stack); // dead network or already-cashed-out member: nothing left
+            return;
+        }
+        debug("cashOut net#" + link.networkId() + " m" + link.memberId() + " -> plain x" + network.pool);
+        collapse(stack, link, network, networks);
+    }
+
     /** Dissolves a network: every live window is emptied, the entry removed. */
     public void dissolve(int networkId, QuantumNetworks.Network network, QuantumNetworks networks) {
         debug("dissolve net#" + networkId + " (pool 0): emptying members " + network.aliveMembers);
