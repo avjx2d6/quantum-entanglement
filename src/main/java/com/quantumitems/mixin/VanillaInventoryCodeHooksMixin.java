@@ -126,14 +126,11 @@ public abstract class VanillaInventoryCodeHooksMixin {
         return false;
     }
 
-    /** What a one-item extraction really yields: plain, or the window itself when pool == 1. */
-    private static ItemStack quantumitems$probe(ItemStack window) {
-        if (window.getCount() > 1) {
-            ItemStack probe = window.copyWithCount(1);
-            probe.remove(ModRegistry.QUANTUM_LINK.get());
-            return probe;
-        }
-        return window.copy();
+    /** One plain item of a window's kind — automation only ever moves plain. */
+    private static ItemStack quantumitems$plainProbe(ItemStack window) {
+        ItemStack probe = window.copyWithCount(1);
+        probe.remove(ModRegistry.QUANTUM_LINK.get());
+        return probe;
     }
 
     private static boolean quantumitems$push(QuantumEngine engine, HopperBlockEntity hopper, IItemHandler handler) {
@@ -142,29 +139,33 @@ public abstract class VanillaInventoryCodeHooksMixin {
             if (inSlot.isEmpty()) {
                 continue;
             }
-            ItemStack probe;
             if (inSlot.has(ModRegistry.QUANTUM_LINK.get())) {
                 if (engine.reconcile(inSlot) != QuantumEngine.Status.CANONICAL) {
                     continue; // wiped or collapsed in place
                 }
-                probe = quantumitems$probe(inSlot);
-            } else {
-                probe = inSlot.copyWithCount(1);
+                // Automation moves only plain: the last pooled item collapses the
+                // window to plain first (so it never travels as a window), but
+                // only if the target can actually take it.
+                if (inSlot.getCount() == 1
+                        && ItemHandlerHelper.insertItemStacked(handler, quantumitems$plainProbe(inSlot), true).isEmpty()) {
+                    engine.precollapseIfSingleton(inSlot); // inSlot is now plain
+                }
             }
+            ItemStack probe = inSlot.has(ModRegistry.QUANTUM_LINK.get())
+                    ? quantumitems$plainProbe(inSlot)
+                    : inSlot.copyWithCount(1);
             if (!ItemHandlerHelper.insertItemStacked(handler, probe, true).isEmpty()) {
                 continue; // target has no room — never touch the pool
             }
-            ItemStack extracted = hopper.removeItem(i, 1);
+            ItemStack extracted = hopper.removeItem(i, 1); // window pool>1 -> split -> plain; else plain
             if (extracted.isEmpty()) {
                 continue;
             }
             ItemStack remainder = ItemHandlerHelper.insertItemStacked(handler, extracted, false);
             if (!remainder.isEmpty()) {
-                // simulate/real mismatch (exotic handlers): put it back honestly
+                // simulate/real mismatch (exotic handlers): put the plain back honestly
                 ItemStack nowInSlot = hopper.getItem(i);
-                if (remainder.has(ModRegistry.QUANTUM_LINK.get())) {
-                    hopper.setItem(i, remainder); // bounce the moved window home
-                } else if (nowInSlot.has(ModRegistry.QUANTUM_LINK.get())) {
+                if (nowInSlot.has(ModRegistry.QUANTUM_LINK.get())) {
                     engine.absorb(nowInSlot, remainder, remainder.getCount());
                 } else if (nowInSlot.isEmpty()) {
                     hopper.setItem(i, remainder);

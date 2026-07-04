@@ -183,6 +183,38 @@ public class HopperGameTests {
         });
     }
 
+    /**
+     * A hopper pushing a whole window's pool down into a container must drain it
+     * fully to PLAIN — the last pooled item must not travel as a window and land
+     * in the target as a mis-counted linked stack (the barrel desync that lost
+     * every item once the pool reconciled). Automation moves only plain.
+     */
+    @GameTest(template = "box", templateNamespace = "quantumitems", timeoutTicks = 200)
+    public static void hopperPushDrainsWindowToPlainNoStray(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 3);
+        helper.setBlock(new BlockPos(1, 1, 1), Blocks.CHEST);
+        helper.setBlock(new BlockPos(1, 2, 1), Blocks.HOPPER); // faces down into the chest
+        ChestBlockEntity chest = (ChestBlockEntity) helper.getBlockEntity(new BlockPos(1, 1, 1));
+        HopperBlockEntity hopper = (HopperBlockEntity) helper.getBlockEntity(new BlockPos(1, 2, 1));
+        hopper.setItem(0, network.windowA());
+
+        helper.runAfterDelay(80, () -> {
+            int plain = 0;
+            for (int slot = 0; slot < chest.getContainerSize(); slot++) {
+                ItemStack stack = chest.getItem(slot);
+                helper.assertTrue(!stack.has(ModRegistry.QUANTUM_LINK.get()), "no linked stack may land in the chest");
+                plain += stack.getCount();
+            }
+            for (int slot = 0; slot < hopper.getContainerSize(); slot++) {
+                helper.assertTrue(!hopper.getItem(slot).has(ModRegistry.QUANTUM_LINK.get()),
+                        "no linked stack may linger in the hopper");
+            }
+            helper.assertTrue(plain == 3, "all 3 pooled items arrive as plain, nothing lost");
+            helper.assertTrue(networks(helper).network(network.id()) == null, "network ends with the pool");
+            helper.succeed();
+        });
+    }
+
     /** A hopper pushing a window into a FULL container must not leak the pool (the drain bug). */
     @GameTest(template = "box", templateNamespace = "quantumitems", timeoutTicks = 200)
     public static void hopperPushIntoFullContainerLosesNothing(GameTestHelper helper) {
