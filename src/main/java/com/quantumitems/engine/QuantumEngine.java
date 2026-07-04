@@ -1,6 +1,7 @@
 package com.quantumitems.engine;
 
 import com.quantumitems.ModRegistry;
+import com.quantumitems.QuantumDebug;
 import com.quantumitems.QuantumLinkData;
 import com.quantumitems.QuantumNetworks;
 import net.minecraft.core.component.DataComponentPatch;
@@ -153,6 +154,8 @@ public final class QuantumEngine {
             // a transient copy being sized while the live window exists
             // (copyWithCount, simulated extractions): vanilla writes to the
             // copy, the pool is none of its business
+            debug("setCount IGNORED as transient copy: net#" + link.networkId() + " m" + link.memberId()
+                    + " seen=" + seenCount + " new=" + newCount + " pool stays " + network.pool);
             return false;
         }
         if (existing != stack) {
@@ -167,6 +170,8 @@ public final class QuantumEngine {
         if (newPool == 0) {
             dissolve(link.networkId(), network, networks);
         } else {
+            debug("setCount net#" + link.networkId() + " m" + link.memberId() + ": " + seenCount + "->" + newCount
+                    + " (delta " + delta + ") => pool " + network.pool + "->" + newPool);
             network.pool = newPool;
             networks.setDirty();
             rawSetCount(stack, newPool);
@@ -204,6 +209,8 @@ public final class QuantumEngine {
             return ItemStack.EMPTY;
         }
         if (taken >= network.pool) {
+            debug("split whole-take net#" + link.networkId() + " m" + link.memberId()
+                    + " -> window relocates (pool " + network.pool + ")");
             return moveWindow(stack, link);
         }
         // copyWithCount calls setCount on a copy that still carries the link —
@@ -216,6 +223,8 @@ public final class QuantumEngine {
         } finally {
             internalWrites--;
         }
+        debug("split net#" + link.networkId() + " m" + link.memberId() + " take " + taken
+                + " plain => pool " + network.pool + "->" + (network.pool - taken));
         network.pool -= taken;
         networks.setDirty();
         rawSetCount(stack, network.pool);
@@ -293,6 +302,8 @@ public final class QuantumEngine {
         if (absorbed <= 0) {
             return 0;
         }
+        debug("absorb net#" + link.networkId() + " m" + link.memberId() + " +" + absorbed
+                + " => pool " + network.pool + "->" + (network.pool + absorbed));
         network.pool += absorbed;
         networks.setDirty();
         rawSetCount(window, network.pool);
@@ -480,8 +491,12 @@ public final class QuantumEngine {
         groundEntities.remove(key);
         network.aliveMembers.remove(Integer.valueOf(link.memberId()));
         if (network.aliveMembers.isEmpty()) {
+            debug("windowDestroyed net#" + link.networkId() + " m" + link.memberId()
+                    + ": last member gone => network removed (pool was " + network.pool + ")");
             networks.removeNetwork(link.networkId());
         } else {
+            debug("windowDestroyed net#" + link.networkId() + " m" + link.memberId()
+                    + " retired, members left " + network.aliveMembers);
             networks.setDirty();
         }
     }
@@ -496,6 +511,7 @@ public final class QuantumEngine {
 
     /** Dissolves a network: every live window is emptied, the entry removed. */
     public void dissolve(int networkId, QuantumNetworks.Network network, QuantumNetworks networks) {
+        debug("dissolve net#" + networkId + " (pool 0): emptying members " + network.aliveMembers);
         for (int member : network.aliveMembers) {
             long key = key(networkId, member);
             WeakReference<ItemStack> ref = canonical.remove(key);
@@ -516,6 +532,8 @@ public final class QuantumEngine {
     private void collapse(ItemStack stack, QuantumLinkData link,
                           QuantumNetworks.Network network, QuantumNetworks networks) {
         int pool = network.pool;
+        debug("collapse net#" + link.networkId() + " => plain x" + pool + " at m" + link.memberId()
+                + ", siblings " + network.aliveMembers + " wiped");
         for (int member : network.aliveMembers) {
             long key = key(link.networkId(), member);
             WeakReference<ItemStack> ref = canonical.remove(key);
@@ -608,6 +626,18 @@ public final class QuantumEngine {
         } finally {
             internalWrites--;
         }
+    }
+
+    /** Echoes a pool-mutation trace to chat when {@code /quantum debug} is on. */
+    private void debug(String message) {
+        QuantumDebug.log(server, message);
+    }
+
+    /** Live snapshot for {@code /quantum networks}: is a member's window instance still around? */
+    public boolean hasLiveInstance(int networkId, int memberId) {
+        WeakReference<ItemStack> ref = canonical.get(key(networkId, memberId));
+        ItemStack stack = ref != null ? ref.get() : null;
+        return stack != null && !stack.isEmpty();
     }
 
     private static long key(int networkId, int memberId) {

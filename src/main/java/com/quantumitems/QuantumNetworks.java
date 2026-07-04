@@ -51,6 +51,11 @@ public class QuantumNetworks extends SavedData {
         return networks.get(networkId);
     }
 
+    /** Read-only view of every live network, for the {@code /quantum networks} diagnostic. */
+    public Map<Integer, Network> all() {
+        return networks;
+    }
+
     /**
      * Creates a network from a plain stack. The snapshot captures the stack's
      * components as they are at entanglement time; any later divergence from

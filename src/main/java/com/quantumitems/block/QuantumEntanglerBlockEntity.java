@@ -121,6 +121,8 @@ public class QuantumEntanglerBlockEntity extends BlockEntity implements Containe
             outA.set(ModRegistry.QUANTUM_LINK.get(), new QuantumLinkData(networkId, 1));
             outB = input.copy();
             outB.set(ModRegistry.QUANTUM_LINK.get(), new QuantumLinkData(networkId, 2));
+            com.quantumitems.QuantumDebug.log(level.getServer(), "created net#" + networkId + " "
+                    + input.getItem() + " x" + input.getCount() + " members[1, 2]");
         } else {
             // Expansion: the window passes through AS THE SAME INSTANCE (a copy
             // would be flagged as a duplicate by the canonical registry), and a
@@ -132,6 +134,8 @@ public class QuantumEntanglerBlockEntity extends BlockEntity implements Containe
             outA = input;
             outB = input.copy();
             outB.set(ModRegistry.QUANTUM_LINK.get(), new QuantumLinkData(link.networkId(), member));
+            com.quantumitems.QuantumDebug.log(level.getServer(),
+                    "expand net#" + link.networkId() + " +member " + member);
         }
         if (engine != null) {
             engine.adopt(outA);
