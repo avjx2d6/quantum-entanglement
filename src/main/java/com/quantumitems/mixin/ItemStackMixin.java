@@ -62,6 +62,31 @@ public abstract class ItemStackMixin {
         }
     }
 
+    /**
+     * Every component write funnels through {@code set} — durability
+     * ({@code setDamageValue}), programmatic enchants, renames. A property
+     * change on a window collapses the network IMMEDIATELY (the snapshot
+     * divergence check would catch it anyway, but only lazily at the next
+     * touch, and a diverged window is a desync window). The collapse runs
+     * before the write, so the new component lands on an honest plain stack.
+     */
+    @Inject(method = "set", at = @At("HEAD"))
+    private <T> void quantumitems$componentMutation(net.minecraft.core.component.DataComponentType<? super T> type,
+                                                    T value,
+                                                    CallbackInfoReturnable<T> cir) {
+        if (type == ModRegistry.QUANTUM_LINK.get()) {
+            return; // deliberate link management (entangler, engine)
+        }
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        if (engine == null || engine.isInternalWrite()) {
+            return;
+        }
+        ItemStack self = (ItemStack) (Object) this;
+        if (self.has(ModRegistry.QUANTUM_LINK.get())) {
+            engine.cashOutToPlain(self);
+        }
+    }
+
     @Inject(method = "setCount", at = @At("HEAD"), cancellable = true)
     private void quantumitems$setCount(int newCount, CallbackInfo ci) {
         QuantumEngine engine = QuantumEngine.onServerThread();

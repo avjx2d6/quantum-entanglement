@@ -150,6 +150,34 @@ public class GroundGameTests {
     }
 
     /**
+     * Durability (and any other component mutation) is a property change that
+     * must collapse the network IMMEDIATELY, not lazily at the next touch —
+     * a lazily-diverged window is a desync window. setDamageValue routes
+     * through ItemStack.set(), the one choke point for all component writes.
+     */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void damagingWindowCollapsesImmediately(GameTestHelper helper) {
+        QuantumNetworks networks = QuantumNetworks.get(helper.getLevel().getServer());
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        ItemStack plain = new ItemStack(Items.IRON_PICKAXE);
+        int id = networks.createNetwork(plain);
+        ItemStack windowA = plain.copy();
+        windowA.set(ModRegistry.QUANTUM_LINK.get(), new QuantumLinkData(id, 1));
+        ItemStack windowB = plain.copy();
+        windowB.set(ModRegistry.QUANTUM_LINK.get(), new QuantumLinkData(id, 2));
+        engine.adopt(windowA);
+        engine.adopt(windowB);
+
+        windowA.setDamageValue(10); // took durability damage
+
+        helper.assertTrue(networks.network(id) == null, "network must collapse the moment properties change");
+        helper.assertTrue(!windowA.has(ModRegistry.QUANTUM_LINK.get()), "damaged stack leaves as plain");
+        helper.assertTrue(windowA.getDamageValue() == 10, "the damage itself must apply");
+        helper.assertTrue(windowB.isEmpty(), "sibling wiped by the collapse");
+        helper.succeed();
+    }
+
+    /**
      * Two live instances of the SAME member (creative clone, /give copy, a
      * hook-bypassing stack copy) must never merge with each other — vanilla
      * sees them component-equal and a click/hopper merge would inflate the
