@@ -41,8 +41,19 @@ public abstract class ItemStackMixin {
         }
         boolean aLinked = a.has(ModRegistry.QUANTUM_LINK.get());
         boolean bLinked = b.has(ModRegistry.QUANTUM_LINK.get());
+        if (aLinked && bLinked) {
+            // Two live instances of the SAME member (creative clone, /give
+            // copy) read component-equal to vanilla — merging a stack with
+            // its own alias inflates the count past the pool. Never equal.
+            if ((Object) a != (Object) b
+                    && java.util.Objects.equals(a.get(ModRegistry.QUANTUM_LINK.get()),
+                            b.get(ModRegistry.QUANTUM_LINK.get()))) {
+                cir.setReturnValue(false);
+            }
+            return; // different members/networks: vanilla decides (components differ)
+        }
         if (aLinked == bLinked || !ItemStack.isSameItem(a, b)) {
-            return; // both plain / both windows / different items: vanilla decides
+            return; // both plain / different items: vanilla decides
         }
         DataComponentPatch pa = a.getComponentsPatch().forget(t -> t == ModRegistry.QUANTUM_LINK.get());
         DataComponentPatch pb = b.getComponentsPatch().forget(t -> t == ModRegistry.QUANTUM_LINK.get());

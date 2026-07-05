@@ -2,10 +2,13 @@ package com.quantumitems.mixin;
 
 import com.quantumitems.ModRegistry;
 import com.quantumitems.engine.QuantumEngine;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.DropperBlock;
 import net.minecraft.world.level.block.HopperBlock;
+import net.minecraft.world.level.block.entity.DispenserBlockEntity;
 import net.minecraft.world.level.block.entity.Hopper;
 import net.minecraft.world.level.block.entity.HopperBlockEntity;
 import net.neoforged.neoforge.items.IItemHandler;
@@ -124,6 +127,61 @@ public abstract class VanillaInventoryCodeHooksMixin {
             }
         }
         return false;
+    }
+
+    /**
+     * Dropper pushing into an adjacent container: the NeoForge hook runs
+     * {@code stack.copy().split(1)} — the copy bypasses the engine, steals
+     * canonicity, and at pool==1 the whole-take ships the WINDOW into the
+     * target. Reimplement for linked sources with the same rules as the
+     * hopper push: only plain ever leaves, the last item collapses in place
+     * first (gated on the target having room).
+     */
+    @Inject(method = "dropperInsertHook", at = @At("HEAD"), cancellable = true)
+    private static void quantumitems$dropperInsertHook(Level level, BlockPos pos, DispenserBlockEntity dropper,
+                                                       int slot, ItemStack stack,
+                                                       CallbackInfoReturnable<Boolean> cir) {
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        ItemStack inSlot = dropper.getItem(slot);
+        if (engine == null || !inSlot.has(ModRegistry.QUANTUM_LINK.get())) {
+            return;
+        }
+        if (engine.reconcile(inSlot) != QuantumEngine.Status.CANONICAL) {
+            cir.setReturnValue(false); // wiped/collapsed in place; retry next activation
+            return;
+        }
+        Direction facing = level.getBlockState(pos).getValue(DropperBlock.FACING);
+        Optional<Pair<IItemHandler, Object>> attached = quantumitems$attachedHandler(level, pos, facing);
+        if (attached.isEmpty()) {
+            cir.setReturnValue(true); // no container: vanilla air-dispense (split -> plain, covered)
+            return;
+        }
+        IItemHandler handler = attached.get().getKey();
+        if (!ItemHandlerHelper.insertItemStacked(handler, quantumitems$plainProbe(inSlot), true).isEmpty()) {
+            cir.setReturnValue(false); // target has no room — never touch the pool
+            return;
+        }
+        if (inSlot.getCount() == 1) {
+            engine.precollapseIfSingleton(inSlot); // last item leaves plain, network ends
+        }
+        ItemStack extracted = dropper.removeItem(slot, 1); // window pool>1 -> split -> plain
+        if (extracted.isEmpty()) {
+            cir.setReturnValue(false);
+            return;
+        }
+        ItemStack remainder = ItemHandlerHelper.insertItemStacked(handler, extracted, false);
+        if (!remainder.isEmpty()) {
+            // simulate/real mismatch (exotic handlers): put the plain back honestly
+            ItemStack now = dropper.getItem(slot);
+            if (now.has(ModRegistry.QUANTUM_LINK.get())) {
+                engine.absorb(now, remainder, remainder.getCount());
+            } else if (now.isEmpty()) {
+                dropper.setItem(slot, remainder);
+            } else {
+                now.grow(remainder.getCount());
+            }
+        }
+        cir.setReturnValue(false);
     }
 
     /** One plain item of a window's kind — automation only ever moves plain. */

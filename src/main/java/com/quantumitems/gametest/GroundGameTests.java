@@ -11,6 +11,7 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.Blocks;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
@@ -77,6 +78,133 @@ public class GroundGameTests {
             helper.assertTrue(networks(helper).network(network.id()) == null,
                     "the network ends when it hits the ground");
             helper.assertTrue(network.windowB().isEmpty(), "the sibling window is cashed out too");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * Dropper path (Carpet-Shadow needed a dedicated DropperBlockMixin here): a
+     * dropper ejecting from a window yields plain items; ejecting the LAST
+     * pooled item must also end as plain on the ground with the network cashed
+     * out — never a linked item entity.
+     */
+    @GameTest(template = "box", templateNamespace = "quantumitems", timeoutTicks = 200)
+    public static void dropperEjectsPlainIncludingLastItem(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 2);
+        helper.setBlock(new BlockPos(1, 1, 1), Blocks.DROPPER);
+        net.minecraft.world.level.block.entity.DropperBlockEntity dropper =
+                (net.minecraft.world.level.block.entity.DropperBlockEntity) helper.getBlockEntity(new BlockPos(1, 1, 1));
+        dropper.setItem(0, network.windowA());
+
+        helper.pulseRedstone(new BlockPos(1, 2, 1), 4);
+        helper.runAfterDelay(20, () -> helper.pulseRedstone(new BlockPos(1, 2, 1), 4));
+
+        helper.runAfterDelay(60, () -> {
+            int plain = 0;
+            for (ItemEntity e : helper.getLevel().getEntitiesOfClass(ItemEntity.class,
+                    helper.getBounds().inflate(2.0))) {
+                helper.assertTrue(!e.getItem().has(ModRegistry.QUANTUM_LINK.get()),
+                        "no linked item may leave a dropper");
+                plain += e.getItem().getCount();
+            }
+            helper.assertTrue(plain == 2, "both pooled items ejected as plain, nothing lost");
+            helper.assertTrue(dropper.getItem(0).isEmpty(), "dropper emptied");
+            helper.assertTrue(networks(helper).network(network.id()) == null, "network ended with the pool");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * Dropper pushing INTO a container (NeoForge dropperInsertHook) goes
+     * through copy().split(1) — at pool==1 that whole-take would ship the
+     * WINDOW into the target container. Rule 2: the last item must arrive
+     * plain and the network end.
+     */
+    @GameTest(template = "box", templateNamespace = "quantumitems", timeoutTicks = 200)
+    public static void dropperIntoContainerLastItemArrivesPlain(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 1);
+        helper.setBlock(new BlockPos(1, 1, 1), Blocks.DROPPER.defaultBlockState()
+                .setValue(net.minecraft.world.level.block.DropperBlock.FACING, net.minecraft.core.Direction.UP));
+        helper.setBlock(new BlockPos(1, 2, 1), Blocks.CHEST);
+        net.minecraft.world.level.block.entity.DropperBlockEntity dropper =
+                (net.minecraft.world.level.block.entity.DropperBlockEntity) helper.getBlockEntity(new BlockPos(1, 1, 1));
+        net.minecraft.world.level.block.entity.ChestBlockEntity chest =
+                (net.minecraft.world.level.block.entity.ChestBlockEntity) helper.getBlockEntity(new BlockPos(1, 2, 1));
+        dropper.setItem(0, network.windowA());
+
+        helper.pulseRedstone(new BlockPos(2, 1, 1), 4);
+
+        helper.runAfterDelay(30, () -> {
+            int bread = 0;
+            for (int slot = 0; slot < chest.getContainerSize(); slot++) {
+                ItemStack stack = chest.getItem(slot);
+                helper.assertTrue(!stack.has(ModRegistry.QUANTUM_LINK.get()),
+                        "no linked stack may land in the chest");
+                bread += stack.getCount();
+            }
+            helper.assertTrue(bread == 1, "the single pooled item arrives as one plain item");
+            helper.assertTrue(dropper.getItem(0).isEmpty(), "dropper emptied");
+            helper.assertTrue(networks(helper).network(network.id()) == null, "network ended with its last item");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * Two live instances of the SAME member (creative clone, /give copy, a
+     * hook-bypassing stack copy) must never merge with each other — vanilla
+     * sees them component-equal and a click/hopper merge would inflate the
+     * visible count far past the pool.
+     */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void sameMemberInstancesNeverMerge(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 6);
+        net.minecraft.world.entity.player.Player player =
+                helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        net.minecraft.world.SimpleContainer chest = new net.minecraft.world.SimpleContainer(27);
+        chest.setItem(0, network.windowA());
+        net.minecraft.world.inventory.ChestMenu menu =
+                net.minecraft.world.inventory.ChestMenu.threeRows(1, player.getInventory(), chest);
+        menu.setCarried(network.windowA().copy()); // a stray alias of the same member
+
+        menu.clicked(0, 0, net.minecraft.world.inventory.ClickType.PICKUP, player);
+
+        helper.assertTrue(chest.getItem(0).getCount() <= 6,
+                "slot count must never exceed the pool (no alias merge inflation)");
+        helper.assertTrue(menu.getCarried().getCount() <= 6,
+                "carried count must never exceed the pool");
+        helper.assertTrue(networks(helper).network(network.id()).pool == 6, "pool untouched");
+        helper.succeed();
+    }
+
+    /**
+     * Container-break path (Carpet-Shadow needed ItemScattererMixin; their
+     * shulker case is a known issue): breaking a chest that holds a window
+     * scatters PLAIN items — the pool is cashed out, siblings wiped, count
+     * conserved.
+     */
+    @GameTest(template = "box", templateNamespace = "quantumitems", timeoutTicks = 100)
+    public static void brokenContainerScattersPlain(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 6);
+        helper.setBlock(new BlockPos(1, 1, 1), Blocks.CHEST);
+        net.minecraft.world.level.block.entity.ChestBlockEntity chest =
+                (net.minecraft.world.level.block.entity.ChestBlockEntity) helper.getBlockEntity(new BlockPos(1, 1, 1));
+        chest.setItem(0, network.windowA());
+
+        helper.destroyBlock(new BlockPos(1, 1, 1));
+
+        helper.runAfterDelay(10, () -> {
+            int bread = 0;
+            for (ItemEntity e : helper.getLevel().getEntitiesOfClass(ItemEntity.class,
+                    helper.getBounds().inflate(2.0))) {
+                helper.assertTrue(!e.getItem().has(ModRegistry.QUANTUM_LINK.get()),
+                        "no linked item may scatter from a broken container");
+                if (e.getItem().is(Items.BREAD)) {
+                    bread += e.getItem().getCount();
+                }
+            }
+            helper.assertTrue(bread == 6, "all 6 pooled items scatter as plain, nothing lost");
+            helper.assertTrue(networks(helper).network(network.id()) == null, "network cashed out");
+            helper.assertTrue(network.windowB().isEmpty(), "sibling wiped");
             helper.succeed();
         });
     }
