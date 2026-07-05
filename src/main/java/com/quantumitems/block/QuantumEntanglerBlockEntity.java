@@ -91,8 +91,8 @@ public class QuantumEntanglerBlockEntity extends BlockEntity implements Containe
         if (!items.get(SLOT_OUT_A).isEmpty() || !items.get(SLOT_OUT_B).isEmpty()) {
             return false;
         }
-        if (input.getMaxStackSize() <= 1) {
-            return false;
+        if (input.getMaxStackSize() <= 1 || input.isDamageableItem()) {
+            return false; // durability loss would collapse the network on first use — refuse the link
         }
         QuantumLinkData link = input.get(ModRegistry.QUANTUM_LINK.get());
         if (link == null) {

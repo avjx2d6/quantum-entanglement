@@ -197,12 +197,12 @@ public class MenuGameTests {
     }
 
     /**
-     * A window is a sink both ways: carrying it and left-clicking a matching
-     * plain stack absorbs the whole stack into the pool (mirror of plain onto a
-     * window). The window keeps its link; the network never dies from a click.
+     * Left click with a carried window onto a matching plain stack: the slot's
+     * items flow into the pool and the WINDOW IS LAID DOWN into the slot —
+     * vanilla "stacks combine and land" feel. The cursor empties.
      */
     @GameTest(template = "empty", templateNamespace = "quantumitems")
-    public static void carriedWindowLeftClickAbsorbsPlain(GameTestHelper helper) {
+    public static void carriedWindowLeftClickAbsorbsAndLands(GameTestHelper helper) {
         TestNetwork network = makeNetwork(helper, 10);
         Player player = helper.makeMockPlayer(GameType.SURVIVAL);
         SimpleContainer chest = new SimpleContainer(27);
@@ -212,9 +212,10 @@ public class MenuGameTests {
 
         menu.clicked(0, 0, ClickType.PICKUP, player);
 
-        helper.assertTrue(chest.getItem(0).isEmpty(), "the whole plain stack is absorbed");
-        helper.assertTrue(menu.getCarried().has(ModRegistry.QUANTUM_LINK.get()), "cursor keeps the window");
-        helper.assertTrue(menu.getCarried().getCount() == 30, "window must show pool 30");
+        ItemStack landed = chest.getItem(0);
+        helper.assertTrue(landed.has(ModRegistry.QUANTUM_LINK.get()), "the window must land in the slot");
+        helper.assertTrue(landed.getCount() == 30, "landed window must show pool 30");
+        helper.assertTrue(menu.getCarried().isEmpty(), "cursor must be empty after laying down");
         helper.assertTrue(network.windowB().getCount() == 30, "other window must show pool 30");
         helper.assertTrue(networks(helper).network(network.id()).pool == 30, "pool must be 30");
         helper.succeed();
@@ -302,12 +303,12 @@ public class MenuGameTests {
     }
 
     /**
-     * Right-clicking a carried window onto a matching PLAIN stack absorbs one
-     * item into the pool — the mirror of right-clicking plain onto a window.
-     * The slot shrinks, the pool grows; the window is never poured out.
+     * Right-clicking a carried window onto a matching PLAIN stack deposits ONE
+     * plain item into the slot (vanilla place-one), keeping the window and the
+     * rest of the pool on the cursor. Repeats build the slot up: 11, 12, …
      */
     @GameTest(template = "empty", templateNamespace = "quantumitems")
-    public static void carriedWindowRightClickAbsorbsOne(GameTestHelper helper) {
+    public static void carriedWindowRightClickDepositsOne(GameTestHelper helper) {
         TestNetwork network = makeNetwork(helper, 30);
         Player player = helper.makeMockPlayer(GameType.SURVIVAL);
         SimpleContainer chest = new SimpleContainer(27);
@@ -316,23 +317,45 @@ public class MenuGameTests {
         menu.setCarried(network.windowA());
 
         menu.clicked(0, 1, ClickType.PICKUP, player); // right click window onto plain
-        helper.assertTrue(chest.getItem(0).getCount() == 9, "slot must lose exactly one");
-        helper.assertTrue(menu.getCarried().getCount() == 31, "window must show pool 31");
+        helper.assertTrue(chest.getItem(0).getCount() == 11, "slot must gain exactly one");
+        helper.assertTrue(!chest.getItem(0).has(ModRegistry.QUANTUM_LINK.get()), "slot stays plain");
+        helper.assertTrue(menu.getCarried().getCount() == 29, "window must show pool 29");
 
-        menu.clicked(0, 1, ClickType.PICKUP, player); // again: one more into the pool
-        helper.assertTrue(chest.getItem(0).getCount() == 8, "slot loses another");
-        helper.assertTrue(menu.getCarried().getCount() == 32, "window must show pool 32");
-        helper.assertTrue(networks(helper).network(network.id()).pool == 32, "pool must be 32");
+        menu.clicked(0, 1, ClickType.PICKUP, player); // again: one more out of the pool
+        helper.assertTrue(chest.getItem(0).getCount() == 12, "slot must gain another");
+        helper.assertTrue(menu.getCarried().has(ModRegistry.QUANTUM_LINK.get()), "cursor keeps the window");
+        helper.assertTrue(menu.getCarried().getCount() == 28, "window must show pool 28");
+        helper.assertTrue(networks(helper).network(network.id()).pool == 28, "pool must be 28");
+        helper.succeed();
+    }
+
+    /** Right-click deposit of the LAST pooled item: the item lands plain, the network ends. */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void carriedWindowRightClickDepositsLastEndsNetwork(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 1);
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        SimpleContainer chest = new SimpleContainer(27);
+        chest.setItem(0, new ItemStack(Items.BREAD, 10));
+        ChestMenu menu = ChestMenu.threeRows(1, player.getInventory(), chest);
+        menu.setCarried(network.windowA());
+
+        menu.clicked(0, 1, ClickType.PICKUP, player);
+
+        helper.assertTrue(chest.getItem(0).getCount() == 11, "the last item lands in the slot");
+        helper.assertTrue(!chest.getItem(0).has(ModRegistry.QUANTUM_LINK.get()), "slot stays plain");
+        helper.assertTrue(menu.getCarried().isEmpty(), "cursor empties with the pool");
+        helper.assertTrue(networks(helper).network(network.id()) == null, "network ends honestly");
+        helper.assertTrue(network.windowB().isEmpty(), "sibling wiped");
         helper.succeed();
     }
 
     /**
-     * Rule 3: dragging (quick-craft) with a carried window collapses it to
-     * plain first, then vanilla distributes ordinary items — no linked copies
-     * are ever planted in slots (the "many copies with the same id" bug).
+     * Drag with a carried window distributes PLAIN items extracted from the
+     * pool, exactly like vanilla drag distributes a plain stack. Draining the
+     * whole pool ends the network honestly (full extraction).
      */
     @GameTest(template = "empty", templateNamespace = "quantumitems")
-    public static void dragDistributesPlainAndCollapses(GameTestHelper helper) {
+    public static void dragDrainingWholePoolEndsNetwork(GameTestHelper helper) {
         TestNetwork network = makeNetwork(helper, 6);
         Player player = helper.makeMockPlayer(GameType.SURVIVAL);
         SimpleContainer chest = new SimpleContainer(27);
@@ -352,8 +375,64 @@ public class MenuGameTests {
                 "the 6 pooled items split evenly, nothing lost");
         helper.assertTrue(!menu.getCarried().has(ModRegistry.QUANTUM_LINK.get()),
                 "no linked remainder on the cursor");
-        helper.assertTrue(networks(helper).network(network.id()) == null, "network cashed out by the drag");
-        helper.assertTrue(network.windowB().isEmpty(), "sibling window wiped by the cash-out");
+        helper.assertTrue(networks(helper).network(network.id()) == null,
+                "pool fully extracted -> network ends");
+        helper.assertTrue(network.windowB().isEmpty(), "sibling emptied with the pool");
+        helper.succeed();
+    }
+
+    /**
+     * A drag that leaves part of the pool keeps the window (and the network)
+     * on the cursor — dragging is just multiple extractions, never a collapse
+     * (regression: a slightly-wiggly right click used to destroy the network).
+     */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void dragPartialKeepsWindowOnCursor(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 8);
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        SimpleContainer chest = new SimpleContainer(27);
+        ChestMenu menu = ChestMenu.threeRows(1, player.getInventory(), chest);
+        menu.setCarried(network.windowA());
+
+        menu.clicked(-999, 0, ClickType.QUICK_CRAFT, player); // start left-drag
+        menu.clicked(0, 1, ClickType.QUICK_CRAFT, player);
+        menu.clicked(1, 1, ClickType.QUICK_CRAFT, player);
+        menu.clicked(2, 1, ClickType.QUICK_CRAFT, player);    // three slots: share = 8/3 = 2
+        menu.clicked(-999, 2, ClickType.QUICK_CRAFT, player); // release
+
+        for (int slot = 0; slot < 3; slot++) {
+            helper.assertTrue(chest.getItem(slot).getCount() == 2, "each slot gets its share of 2");
+            helper.assertTrue(!chest.getItem(slot).has(ModRegistry.QUANTUM_LINK.get()), "shares are plain");
+        }
+        ItemStack carried = menu.getCarried();
+        helper.assertTrue(carried.has(ModRegistry.QUANTUM_LINK.get()), "the window stays on the cursor");
+        helper.assertTrue(carried.getCount() == 2, "window shows the remaining pool 2");
+        helper.assertTrue(networks(helper).network(network.id()).pool == 2, "pool must be 2");
+        helper.assertTrue(network.windowB().getCount() == 2, "sibling tracks the pool");
+        helper.succeed();
+    }
+
+    /** Right-drag places one plain per slot, window stays with the rest. */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void rightDragPlacesOnePlainPerSlot(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 5);
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        SimpleContainer chest = new SimpleContainer(27);
+        ChestMenu menu = ChestMenu.threeRows(1, player.getInventory(), chest);
+        menu.setCarried(network.windowA());
+
+        menu.clicked(-999, 4, ClickType.QUICK_CRAFT, player); // start right-drag (type 1)
+        menu.clicked(0, 5, ClickType.QUICK_CRAFT, player);
+        menu.clicked(1, 5, ClickType.QUICK_CRAFT, player);
+        menu.clicked(-999, 6, ClickType.QUICK_CRAFT, player); // release
+
+        helper.assertTrue(chest.getItem(0).getCount() == 1 && chest.getItem(1).getCount() == 1,
+                "one plain item lands in each dragged slot");
+        helper.assertTrue(!chest.getItem(0).has(ModRegistry.QUANTUM_LINK.get())
+                && !chest.getItem(1).has(ModRegistry.QUANTUM_LINK.get()), "placed items are plain");
+        helper.assertTrue(menu.getCarried().has(ModRegistry.QUANTUM_LINK.get()), "window stays carried");
+        helper.assertTrue(menu.getCarried().getCount() == 3, "window shows the remaining pool 3");
+        helper.assertTrue(networks(helper).network(network.id()).pool == 3, "pool must be 3");
         helper.succeed();
     }
 

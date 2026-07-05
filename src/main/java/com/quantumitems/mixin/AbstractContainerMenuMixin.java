@@ -7,33 +7,55 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.gen.Invoker;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.util.Set;
+
 /**
- * Two things happen at the head of a container click on a carried window:
+ * Menu behaviour of a carried window, mirroring vanilla gestures:
  *
- * <ol>
- * <li><b>Anti-dupe.</b> The carried instance is not always the one the engine
- * has registered as canonical (a client round-trip can hand the server a fresh
- * window instance). Reconciling it first adopts it as canonical, so any count
- * change the click makes is applied to the pool instead of being mistaken for a
- * throwaway simulation copy.</li>
- * <li><b>A window is always a sink.</b> Vanilla already lets a carried plain
- * stack flow into a window slot (it grows the slot window → the pool). The
- * reverse — a carried window clicked onto a matching plain stack — would deposit
- * the window's items into the slot and, if the whole pool fits, drain it to zero
- * and dissolve the network. Instead the plain is absorbed into the pool, exactly
- * mirroring the other direction: left click takes the whole stack, right click
- * takes one, the window keeps its link, and the network never dies from a click.
- * A client mirror keeps prediction flicker-free.</li>
- * </ol>
+ * <ul>
+ * <li><b>Left click on a matching plain slot</b>: the slot's items flow into
+ * the pool and the window is laid down into the slot (cursor empties) — the
+ * exact feel of vanilla "click stack onto stack, they combine and land".
+ * If the pool cannot take everything (max stack cap), the leftover stays in
+ * the slot and the window stays on the cursor.</li>
+ * <li><b>Right click on a matching plain slot</b>: deposits ONE plain item
+ * into the slot, keeping the window (and the rest of the pool) on the
+ * cursor — vanilla place-one. Depositing the last pooled item ends the
+ * network honestly.</li>
+ * <li><b>Drag (quick-craft)</b>: distributes PLAIN items extracted from the
+ * pool across the touched slots (left drag — an even share, right drag — one
+ * each), exactly like vanilla drag, with the window and the remaining pool
+ * staying on the cursor. Draining the pool ends the network. A creative
+ * middle-clone drag cashes the window out first — cloning linked stacks is
+ * banned.</li>
+ * <li>Every click on a carried window first reconciles it (anti-dupe: a
+ * client round-trip can hand the server a fresh instance; adopting it as
+ * canonical keeps count changes flowing into the pool).</li>
+ * </ul>
+ *
+ * <p>Shift-click is handled separately in {@code moveItemStackTo} below.
  */
 @Mixin(AbstractContainerMenu.class)
 public abstract class AbstractContainerMenuMixin {
+
+    @Shadow
+    @Final
+    private Set<Slot> quickcraftSlots;
+
+    @Shadow
+    private int quickcraftType;
+
+    @Invoker("resetQuickcraft")
+    abstract void quantumitems$resetQuickcraft();
 
     @Inject(method = "clicked", at = @At("HEAD"), cancellable = true)
     private void quantumitems$windowClick(int slotId, int button, ClickType clickType, Player player,
@@ -55,16 +77,8 @@ public abstract class AbstractContainerMenuMixin {
             }
         }
 
-        // Rule 3: a drag distributes COPIES of the carried stack via raw count
-        // writes and setByPlayer — with a window that plants live linked clones
-        // of one member across slots. Collapse to plain the moment a drag
-        // involves a carried window; vanilla then distributes ordinary items.
         if (clickType == ClickType.QUICK_CRAFT) {
-            if (engine != null) {
-                engine.cashOutToPlain(carried);
-            } else {
-                carried.remove(ModRegistry.QUANTUM_LINK.get()); // client prediction mirror
-            }
+            quantumitems$windowDrag(self, button, engine, ci);
             return;
         }
 
@@ -78,21 +92,118 @@ public abstract class AbstractContainerMenuMixin {
                 || !quantumitems$matches(carried, inSlot)) {
             return; // empty / another window / different item: let vanilla handle it
         }
-        int requested = button == 0 ? Integer.MAX_VALUE : 1;
-        int absorbed = engine != null
-                ? engine.absorb(carried, inSlot, requested)
-                : quantumitems$clientAbsorb(carried, inSlot, requested);
-        if (absorbed > 0) {
-            slot.setChanged();
+
+        if (button == 1) {
+            // right click: deposit ONE plain into the slot, window stays carried
+            if (inSlot.getCount() < Math.min(inSlot.getMaxStackSize(), slot.getMaxStackSize(inSlot))) {
+                ItemStack one = quantumitems$extractPlain(self, carried, 1, engine, clientSide);
+                if (!one.isEmpty()) {
+                    inSlot.grow(one.getCount());
+                    slot.setChanged();
+                }
+            }
+        } else {
+            // left click: absorb the slot into the pool, then lay the window down
+            int absorbed = engine != null
+                    ? engine.absorb(carried, inSlot, Integer.MAX_VALUE)
+                    : quantumitems$clientAbsorb(carried, inSlot, Integer.MAX_VALUE);
+            if (absorbed > 0) {
+                slot.setChanged();
+            }
+            if (slot.getItem().isEmpty() && slot.mayPlace(carried)) {
+                slot.setByPlayer(carried);
+                self.setCarried(ItemStack.EMPTY);
+            }
         }
-        ci.cancel(); // a matching plain slot never gets a vanilla deposit of the window
+        ci.cancel();
     }
 
     /**
-     * Rule 4: shift-click (and every other {@code moveItemStackTo} user) may
-     * not merge-drain a window into existing plain stacks — vanilla's merge
-     * phase runs before its empty-slot phase, so a matching partial stack in
-     * the destination would siphon the pool and dissolve the network. When the
+     * Drag with a carried window: on release, each touched slot receives its
+     * vanilla share as PLAIN items extracted from the pool. The start/continue
+     * phases only track slots and pass through untouched.
+     */
+    private void quantumitems$windowDrag(AbstractContainerMenu self, int button,
+                                         QuantumEngine engine, CallbackInfo ci) {
+        int header = button & 3;
+        if (header != 2) {
+            return; // start / add-slot phases: vanilla just tracks
+        }
+        ItemStack carried = self.getCarried();
+        boolean clientSide = engine == null;
+        if (quickcraftType == 2) {
+            // creative middle-clone drag: cloning linked stacks is banned
+            if (engine != null) {
+                engine.cashOutToPlain(carried);
+            } else {
+                carried.remove(ModRegistry.QUANTUM_LINK.get());
+            }
+            return; // vanilla clones the now-plain stack
+        }
+        int share = quickcraftType == 1 ? 1
+                : quickcraftSlots.isEmpty() ? 0 : carried.getCount() / quickcraftSlots.size();
+        if (share > 0) {
+            for (Slot slot : quickcraftSlots) {
+                ItemStack inSlot = slot.getItem();
+                if (!AbstractContainerMenu.canItemQuickReplace(slot, carried, true)
+                        || !slot.mayPlace(carried)
+                        || inSlot.has(ModRegistry.QUANTUM_LINK.get())) {
+                    continue;
+                }
+                int room = Math.min(carried.getMaxStackSize(), slot.getMaxStackSize(carried))
+                        - inSlot.getCount();
+                int place = Math.min(Math.min(share, room), carried.getCount());
+                if (place <= 0) {
+                    continue;
+                }
+                ItemStack portion = quantumitems$extractPlain(self, carried, place, engine, clientSide);
+                if (portion.isEmpty()) {
+                    break; // pool exhausted
+                }
+                if (inSlot.isEmpty()) {
+                    slot.setByPlayer(portion);
+                } else {
+                    inSlot.grow(portion.getCount());
+                    slot.setChanged();
+                }
+                carried = self.getCarried(); // may have gone plain/empty on the last share
+                if (carried.isEmpty()) {
+                    break;
+                }
+            }
+        }
+        quantumitems$resetQuickcraft();
+        self.broadcastChanges();
+        ci.cancel();
+    }
+
+    /**
+     * Takes {@code amount} PLAIN items out of the carried window. Taking the
+     * final pooled items cashes the window out first (network ends, items
+     * conserved), so the extraction is a normal plain split. Returns what was
+     * taken; updates the carried stack (may become empty).
+     */
+    private static ItemStack quantumitems$extractPlain(AbstractContainerMenu self, ItemStack carried,
+                                                       int amount, QuantumEngine engine, boolean clientSide) {
+        if (amount >= carried.getCount()) {
+            if (engine != null) {
+                engine.cashOutToPlain(carried);
+            } else if (clientSide) {
+                carried.remove(ModRegistry.QUANTUM_LINK.get());
+            }
+        }
+        ItemStack taken = carried.split(amount); // window: engine split -> plain; plain: vanilla
+        if (self.getCarried().isEmpty()) {
+            self.setCarried(ItemStack.EMPTY);
+        }
+        return taken;
+    }
+
+    /**
+     * Shift-click (and every other {@code moveItemStackTo} user) may not
+     * merge-drain a window into existing plain stacks — vanilla's merge phase
+     * runs before its empty-slot phase, so a matching partial stack in the
+     * destination would siphon the pool and dissolve the network. When the
      * destination holds such a partial: relocate the window whole into an
      * empty slot if one exists (link intact), otherwise collapse it to plain
      * and let vanilla merge ordinary items. With no partial around, vanilla's
