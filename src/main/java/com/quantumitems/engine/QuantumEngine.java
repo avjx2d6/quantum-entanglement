@@ -510,6 +510,28 @@ public final class QuantumEngine {
     }
 
     /**
+     * Rule 5: a creative slot packet REPLACED a window with something that no
+     * longer carries the same link (a merged plain stack, another item, air).
+     * Creative is client-authoritative and items are free there — the honest
+     * reading is "this window ceased to exist": the member retires (pool and
+     * siblings live on; the last member takes the network with it). Without
+     * this the member lingered forever as a ghost network.
+     */
+    public void creativeSlotReplaced(ItemStack oldStack, ItemStack newStack) {
+        QuantumLinkData oldLink = oldStack.get(ModRegistry.QUANTUM_LINK.get());
+        if (oldLink == null) {
+            return;
+        }
+        QuantumLinkData newLink = newStack.get(ModRegistry.QUANTUM_LINK.get());
+        if (oldLink.equals(newLink)) {
+            return; // same member came back — creativeUpdate handles the count
+        }
+        debug("creative replaced window net#" + oldLink.networkId() + " m" + oldLink.memberId()
+                + " with " + (newStack.isEmpty() ? "air" : newStack.getItem()) + " -> member retires");
+        windowDestroyed(oldStack);
+    }
+
+    /**
      * Rule 1 cash-out: a window that is about to exist as a free item collapses
      * to plain here, taking the whole pool with it (siblings wiped, network
      * ended). A husk of a dead network/member is simply emptied. Item count is

@@ -193,6 +193,33 @@ public class Phase3GameTests {
         helper.succeed();
     }
 
+    /**
+     * Rule 5: a creative packet replacing a window slot with something that no
+     * longer carries the link retires that member — never a ghost network. The
+     * sibling lives on; replacing the last member ends the network.
+     */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void creativeReplaceRetiresMember(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 6);
+        QuantumEngine engine = QuantumEngine.onServerThread();
+
+        // the client merged the window into a plain stack and uploaded plain 25
+        engine.creativeSlotReplaced(network.windowA(), new ItemStack(Items.BREAD, 25));
+
+        QuantumNetworks.Network entry = networks(helper).network(network.id());
+        helper.assertTrue(entry != null, "network survives while a member remains");
+        helper.assertTrue(!entry.aliveMembers.contains(1), "replaced member must retire");
+        helper.assertTrue(entry.aliveMembers.contains(2), "sibling member lives on");
+        helper.assertTrue(entry.pool == 6, "pool untouched");
+        helper.assertTrue(network.windowB().getCount() == 6, "sibling window keeps working");
+
+        // now the client destroys the last window (X / air upload)
+        engine.creativeSlotReplaced(network.windowB(), ItemStack.EMPTY);
+        helper.assertTrue(networks(helper).network(network.id()) == null,
+                "last member replaced -> network ends, no ghost");
+        helper.succeed();
+    }
+
     /** Creative slot packets are direct pool edits: count down = extraction, up = conjuring. */
     @GameTest(template = "empty", templateNamespace = "quantumitems")
     public static void creativeUpdateEditsPool(GameTestHelper helper) {
