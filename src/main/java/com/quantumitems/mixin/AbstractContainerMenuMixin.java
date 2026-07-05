@@ -54,6 +54,19 @@ public abstract class AbstractContainerMenuMixin {
             }
         }
 
+        // Rule 3: a drag distributes COPIES of the carried stack via raw count
+        // writes and setByPlayer — with a window that plants live linked clones
+        // of one member across slots. Collapse to plain the moment a drag
+        // involves a carried window; vanilla then distributes ordinary items.
+        if (clickType == ClickType.QUICK_CRAFT) {
+            if (engine != null) {
+                engine.cashOutToPlain(carried);
+            } else {
+                carried.remove(ModRegistry.QUANTUM_LINK.get()); // client prediction mirror
+            }
+            return;
+        }
+
         // Only a normal left/right pickup onto a matching, non-empty plain slot.
         if (clickType != ClickType.PICKUP || slotId < 0 || slotId >= self.slots.size()) {
             return;

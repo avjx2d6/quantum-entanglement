@@ -326,6 +326,37 @@ public class MenuGameTests {
         helper.succeed();
     }
 
+    /**
+     * Rule 3: dragging (quick-craft) with a carried window collapses it to
+     * plain first, then vanilla distributes ordinary items — no linked copies
+     * are ever planted in slots (the "many copies with the same id" bug).
+     */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void dragDistributesPlainAndCollapses(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 6);
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        SimpleContainer chest = new SimpleContainer(27);
+        ChestMenu menu = ChestMenu.threeRows(1, player.getInventory(), chest);
+        menu.setCarried(network.windowA());
+
+        menu.clicked(-999, 0, ClickType.QUICK_CRAFT, player); // start left-drag
+        menu.clicked(0, 1, ClickType.QUICK_CRAFT, player);    // over slot 0
+        menu.clicked(1, 1, ClickType.QUICK_CRAFT, player);    // over slot 1
+        menu.clicked(-999, 2, ClickType.QUICK_CRAFT, player); // release
+
+        helper.assertTrue(!chest.getItem(0).has(ModRegistry.QUANTUM_LINK.get()),
+                "distributed stacks must be plain, not linked copies");
+        helper.assertTrue(!chest.getItem(1).has(ModRegistry.QUANTUM_LINK.get()),
+                "distributed stacks must be plain, not linked copies");
+        helper.assertTrue(chest.getItem(0).getCount() == 3 && chest.getItem(1).getCount() == 3,
+                "the 6 pooled items split evenly, nothing lost");
+        helper.assertTrue(!menu.getCarried().has(ModRegistry.QUANTUM_LINK.get()),
+                "no linked remainder on the cursor");
+        helper.assertTrue(networks(helper).network(network.id()) == null, "network cashed out by the drag");
+        helper.assertTrue(network.windowB().isEmpty(), "sibling window wiped by the cash-out");
+        helper.succeed();
+    }
+
     /** Shift-click through a real menu: the window travels whole, link intact. */
     @GameTest(template = "empty", templateNamespace = "quantumitems")
     public static void shiftClickMovesWindow(GameTestHelper helper) {
