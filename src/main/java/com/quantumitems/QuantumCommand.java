@@ -29,13 +29,43 @@ public final class QuantumCommand {
                         .then(Commands.literal("on").executes(ctx -> setDebug(ctx.getSource(), true)))
                         .then(Commands.literal("off").executes(ctx -> setDebug(ctx.getSource(), false))))
                 .then(Commands.literal("networks")
-                        .executes(ctx -> listNetworks(ctx.getSource()))));
+                        .executes(ctx -> listNetworks(ctx.getSource())))
+                .then(Commands.literal("remove")
+                        .then(Commands.argument("id", com.mojang.brigadier.arguments.IntegerArgumentType.integer(1))
+                                .executes(ctx -> removeNetwork(ctx.getSource(),
+                                        com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "id"))))));
     }
 
     private static int setDebug(CommandSourceStack src, boolean on) {
         QuantumDebug.setEnabled(on);
         src.sendSuccess(() -> Component.literal("Quantum debug " + (on ? "ON" : "OFF"))
                 .withStyle(on ? ChatFormatting.GREEN : ChatFormatting.RED), true);
+        return 1;
+    }
+
+    /**
+     * Removes a network by id — the cleanup tool for ghost networks (pool > 0
+     * with no live windows, left behind by old bugs). Any live windows of the
+     * network are emptied honestly via dissolve, so this is safe on real
+     * networks too (it destroys the pooled items, like an admin /clear).
+     */
+    private static int removeNetwork(CommandSourceStack src, int id) {
+        MinecraftServer server = src.getServer();
+        QuantumNetworks networks = QuantumNetworks.get(server);
+        QuantumNetworks.Network network = networks.network(id);
+        if (network == null) {
+            src.sendFailure(Component.literal("No network #" + id));
+            return 0;
+        }
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        int pool = network.pool;
+        if (engine != null) {
+            engine.dissolve(id, network, networks);
+        } else {
+            networks.removeNetwork(id);
+        }
+        src.sendSuccess(() -> Component.literal("Removed network #" + id + " (pool was " + pool + ")")
+                .withStyle(ChatFormatting.YELLOW), true);
         return 1;
     }
 

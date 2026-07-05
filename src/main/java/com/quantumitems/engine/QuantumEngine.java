@@ -32,8 +32,6 @@ public final class QuantumEngine {
     private final MinecraftServer server;
     /** key = networkId << 32 | memberId → canonical live instance of that window. */
     private final Map<Long, WeakReference<ItemStack>> canonical = new HashMap<>();
-    /** Windows currently lying on the ground, for forced entity-data syncs. */
-    private final Map<Long, WeakReference<ItemEntity>> groundEntities = new HashMap<>();
     /** Reentrancy guard: our own writes to stack counts must not re-enter pool logic. */
     private int internalWrites;
 
@@ -398,56 +396,6 @@ public final class QuantumEngine {
     }
 
     /**
-     * Ground windows: an ItemEntity's stack only reaches clients through
-     * SynchedEntityData, so count pushes into a ground window must be
-     * followed by a forced entity-data sync.
-     */
-    public void registerGroundEntity(QuantumLinkData link, ItemEntity entity) {
-        groundEntities.put(key(link.networkId(), link.memberId()), new WeakReference<>(entity));
-    }
-
-    /** Absorbs plain item entities lying next to a ground window. */
-    public void absorbNearbyPlains(ItemEntity windowEntity) {
-        ItemStack window = windowEntity.getItem();
-        if (!window.has(ModRegistry.QUANTUM_LINK.get())) {
-            return;
-        }
-        for (ItemEntity other : windowEntity.level().getEntitiesOfClass(ItemEntity.class,
-                windowEntity.getBoundingBox().inflate(1.0, 0.5, 1.0))) {
-            if (other == windowEntity || other.isRemoved()) {
-                continue;
-            }
-            ItemStack plain = other.getItem();
-            if (plain.isEmpty() || plain.has(ModRegistry.QUANTUM_LINK.get())) {
-                continue;
-            }
-            int absorbed = absorb(window, plain, Integer.MAX_VALUE);
-            if (absorbed > 0) {
-                if (plain.isEmpty()) {
-                    other.setItem(ItemStack.EMPTY);
-                    other.discard();
-                } else {
-                    other.setItem(plain.copy()); // forces entity-data sync of the leftover
-                }
-            }
-        }
-    }
-
-    /** Periodic pass over registered ground windows: vacuum neighbours, drop dead refs. */
-    public void sweepGroundWindows() {
-        groundEntities.values().removeIf(ref -> {
-            ItemEntity entity = ref.get();
-            return entity == null || entity.isRemoved();
-        });
-        for (WeakReference<ItemEntity> ref : List.copyOf(groundEntities.values())) {
-            ItemEntity entity = ref.get();
-            if (entity != null && !entity.isRemoved()) {
-                absorbNearbyPlains(entity);
-            }
-        }
-    }
-
-    /**
      * Crafting-consumption guard: taking a craft result consumes ingredients
      * through {@code removeItem(slot, 1)} → split. With pool == 1 that split
      * is a whole-take, and the returned window would be silently discarded by
@@ -488,7 +436,6 @@ public final class QuantumEngine {
             return; // a stale copy burned; the real window lives elsewhere
         }
         canonical.remove(key);
-        groundEntities.remove(key);
         network.aliveMembers.remove(Integer.valueOf(link.memberId()));
         if (network.aliveMembers.isEmpty()) {
             debug("windowDestroyed net#" + link.networkId() + " m" + link.memberId()
@@ -562,9 +509,7 @@ public final class QuantumEngine {
             ItemStack memberStack = ref != null ? ref.get() : null;
             if (memberStack != null) {
                 wipe(memberStack);
-                syncGround(key, memberStack);
             }
-            groundEntities.remove(key);
         }
         networks.removeNetwork(networkId);
     }
@@ -585,10 +530,8 @@ public final class QuantumEngine {
                 ItemStack memberStack = ref != null ? ref.get() : null;
                 if (memberStack != null) {
                     wipe(memberStack);
-                    syncGround(key, memberStack);
                 }
             }
-            groundEntities.remove(key);
         }
         networks.removeNetwork(link.networkId());
         internalWrites++;
@@ -624,23 +567,6 @@ public final class QuantumEngine {
             if (memberStack != source && !memberStack.isEmpty()) {
                 rawSetCount(memberStack, network.pool);
             }
-            syncGround(key, memberStack);
-        }
-    }
-
-    /** Forces the entity-data sync when a member's stack lives in an ItemEntity. */
-    private void syncGround(long key, ItemStack expected) {
-        WeakReference<ItemEntity> ref = groundEntities.get(key);
-        if (ref == null) {
-            return;
-        }
-        ItemEntity entity = ref.get();
-        if (entity == null || entity.isRemoved()) {
-            groundEntities.remove(key);
-            return;
-        }
-        if (entity.getItem() == expected) {
-            ((GroundWindowSync) entity).quantumitems$forceItemSync();
         }
     }
 

@@ -2,7 +2,6 @@ package com.quantumitems;
 
 import com.quantumitems.engine.QuantumEngine;
 import net.minecraft.world.Container;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -11,7 +10,6 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
-import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
 import net.neoforged.neoforge.event.entity.player.AnvilRepairEvent;
 import net.neoforged.neoforge.event.entity.player.ItemEntityPickupEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerContainerEvent;
@@ -73,7 +71,6 @@ public final class ServerEvents {
         for (Player player : event.getServer().getPlayerList().getPlayers()) {
             sweepPlayer(engine, player);
         }
-        engine.sweepGroundWindows();
     }
 
     public static void sweepPlayer(QuantumEngine engine, Player player) {
@@ -190,26 +187,6 @@ public final class ServerEvents {
             if (stack.has(ModRegistry.QUANTUM_LINK.get())) {
                 engine.precollapseIfSingleton(stack);
             }
-        }
-    }
-
-    /** A window destroyed on the ground (despawn, lava, void) retires its member. */
-    @SubscribeEvent
-    public static void onEntityLeave(EntityLeaveLevelEvent event) {
-        if (event.getLevel().isClientSide() || !(event.getEntity() instanceof ItemEntity itemEntity)) {
-            return;
-        }
-        Entity.RemovalReason reason = itemEntity.getRemovalReason();
-        if (reason == null || !reason.shouldDestroy()) {
-            return; // chunk unload etc. — the window persists
-        }
-        QuantumEngine engine = QuantumEngine.onServerThread();
-        if (engine == null) {
-            return;
-        }
-        ItemStack stack = itemEntity.getItem();
-        if (stack.has(ModRegistry.QUANTUM_LINK.get())) {
-            engine.windowDestroyed(stack);
         }
     }
 
