@@ -409,6 +409,72 @@ public class MenuGameTests {
     }
 
     /**
+     * Rule 4: shift-clicking a window while the destination holds a MATCHING
+     * PARTIAL plain stack must not merge-drain the pool into it (that dissolved
+     * the network). With an empty slot available the window relocates whole,
+     * link intact; the plain stack is left untouched.
+     */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void shiftClickWindowPrefersEmptySlotOverMerge(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 6);
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        player.getInventory().setItem(0, new ItemStack(Items.BREAD, 10)); // matching partial plain
+        SimpleContainer chest = new SimpleContainer(27);
+        chest.setItem(0, network.windowA());
+        ChestMenu menu = ChestMenu.threeRows(1, player.getInventory(), chest);
+
+        menu.clicked(0, 0, ClickType.QUICK_MOVE, player);
+
+        helper.assertTrue(chest.getItem(0).isEmpty(), "chest slot must be empty");
+        int plainTens = 0;
+        ItemStack movedWindow = ItemStack.EMPTY;
+        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+            ItemStack stack = player.getInventory().getItem(slot);
+            if (stack.has(ModRegistry.QUANTUM_LINK.get())) {
+                movedWindow = stack;
+            } else if (!stack.isEmpty()) {
+                helper.assertTrue(stack.getCount() == 10, "the partial plain stack must be untouched");
+                plainTens++;
+            }
+        }
+        helper.assertTrue(plainTens == 1, "exactly the one untouched plain stack");
+        helper.assertTrue(!movedWindow.isEmpty(), "the window must relocate whole into an empty slot");
+        helper.assertTrue(movedWindow.getCount() == 6, "window still shows the pool");
+        helper.assertTrue(networks(helper).network(network.id()) != null, "network must survive the shift-click");
+        helper.assertTrue(networks(helper).network(network.id()).pool == 6, "pool unchanged");
+        helper.assertTrue(network.windowB().getCount() == 6, "sibling window unchanged");
+        helper.succeed();
+    }
+
+    /**
+     * Rule 4, no-empty-slot arm: when the only way a shift-clicked window could
+     * move is merging into existing plain stacks, it collapses to plain first —
+     * predictable, and every item is conserved (10 + 6 = 16).
+     */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void shiftClickWindowNoRoomCollapsesToPlain(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 6);
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        for (int slot = 0; slot < 36; slot++) {
+            player.getInventory().setItem(slot, new ItemStack(Items.STICK, 64)); // no empty slots
+        }
+        player.getInventory().setItem(0, new ItemStack(Items.BREAD, 10)); // the only landing spot
+        SimpleContainer chest = new SimpleContainer(27);
+        chest.setItem(0, network.windowA());
+        ChestMenu menu = ChestMenu.threeRows(1, player.getInventory(), chest);
+
+        menu.clicked(0, 0, ClickType.QUICK_MOVE, player);
+
+        helper.assertTrue(chest.getItem(0).isEmpty(), "chest slot must be empty");
+        ItemStack landing = player.getInventory().getItem(0);
+        helper.assertTrue(!landing.has(ModRegistry.QUANTUM_LINK.get()), "landing stack stays plain");
+        helper.assertTrue(landing.getCount() == 16, "10 + 6 pooled items, all conserved");
+        helper.assertTrue(networks(helper).network(network.id()) == null, "network cashed out");
+        helper.assertTrue(network.windowB().isEmpty(), "sibling wiped by the cash-out");
+        helper.succeed();
+    }
+
+    /**
      * A pool of one must still be a real window you can carry: picking up a
      * single-item window keeps the link (whole-stack take relocates it), so
      * you can hold one linked item in the cursor just like two or more.

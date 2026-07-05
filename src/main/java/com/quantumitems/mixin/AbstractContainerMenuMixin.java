@@ -11,6 +11,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * Two things happen at the head of a container click on a carried window:
@@ -85,6 +86,66 @@ public abstract class AbstractContainerMenuMixin {
             slot.setChanged();
         }
         ci.cancel(); // a matching plain slot never gets a vanilla deposit of the window
+    }
+
+    /**
+     * Rule 4: shift-click (and every other {@code moveItemStackTo} user) may
+     * not merge-drain a window into existing plain stacks — vanilla's merge
+     * phase runs before its empty-slot phase, so a matching partial stack in
+     * the destination would siphon the pool and dissolve the network. When the
+     * destination holds such a partial: relocate the window whole into an
+     * empty slot if one exists (link intact), otherwise collapse it to plain
+     * and let vanilla merge ordinary items. With no partial around, vanilla's
+     * own empty-slot phase already relocates the window whole via split.
+     */
+    @Inject(method = "moveItemStackTo", at = @At("HEAD"), cancellable = true)
+    private void quantumitems$quickMoveWindow(ItemStack stack, int startIndex, int endIndex, boolean reverseDirection,
+                                              CallbackInfoReturnable<Boolean> cir) {
+        if (!stack.has(ModRegistry.QUANTUM_LINK.get()) || stack.isEmpty()) {
+            return;
+        }
+        AbstractContainerMenu self = (AbstractContainerMenu) (Object) this;
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        if (engine != null && engine.reconcile(stack) != QuantumEngine.Status.CANONICAL) {
+            return; // now plain or wiped — vanilla handles what is left
+        }
+        boolean partialInRange = false;
+        for (int i = startIndex; i < endIndex; i++) {
+            Slot slot = self.slots.get(i);
+            ItemStack inSlot = slot.getItem();
+            if (!inSlot.isEmpty() && !inSlot.has(ModRegistry.QUANTUM_LINK.get())
+                    && ItemStack.isSameItemSameComponents(stack, inSlot)
+                    && inSlot.getCount() < Math.min(inSlot.getMaxStackSize(), slot.getMaxStackSize(inSlot))) {
+                partialInRange = true;
+                break;
+            }
+        }
+        if (!partialInRange) {
+            return; // vanilla's empty-slot phase relocates the window whole
+        }
+        int emptyIndex = -1;
+        for (int i = reverseDirection ? endIndex - 1 : startIndex;
+                reverseDirection ? i >= startIndex : i < endIndex;
+                i += reverseDirection ? -1 : 1) {
+            Slot slot = self.slots.get(i);
+            if (slot.getItem().isEmpty() && slot.mayPlace(stack)) {
+                emptyIndex = i;
+                break;
+            }
+        }
+        if (emptyIndex >= 0) {
+            // relocate whole: copyAndClear routes through the engine on the
+            // server (canonical registry follows the moved instance)
+            self.slots.get(emptyIndex).setByPlayer(stack.copyAndClear());
+            cir.setReturnValue(true);
+        } else {
+            // only merge targets remain: collapse, vanilla merges plain
+            if (engine != null) {
+                engine.cashOutToPlain(stack);
+            } else {
+                stack.remove(ModRegistry.QUANTUM_LINK.get()); // client prediction mirror
+            }
+        }
     }
 
     private static boolean quantumitems$matches(ItemStack window, ItemStack plain) {
