@@ -412,6 +412,63 @@ public class MenuGameTests {
         helper.succeed();
     }
 
+    /**
+     * A left-drag over exactly ONE slot is vanilla's degenerate "place the
+     * stack" gesture — for a window that is a whole relocation, link intact,
+     * NOT a full extraction (regression: it cashed the network out).
+     */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void singleSlotDragPlacesWindowWhole(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 16);
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        SimpleContainer chest = new SimpleContainer(27);
+        ChestMenu menu = ChestMenu.threeRows(1, player.getInventory(), chest);
+        menu.setCarried(network.windowA());
+
+        menu.clicked(-999, 0, ClickType.QUICK_CRAFT, player); // start left-drag
+        menu.clicked(0, 1, ClickType.QUICK_CRAFT, player);    // over ONE empty slot
+        menu.clicked(-999, 2, ClickType.QUICK_CRAFT, player); // release
+
+        ItemStack placed = chest.getItem(0);
+        helper.assertTrue(placed.has(ModRegistry.QUANTUM_LINK.get()), "the window must land whole, link intact");
+        helper.assertTrue(placed.getCount() == 16, "whole pool travels with it");
+        helper.assertTrue(menu.getCarried().isEmpty(), "cursor must be empty");
+        helper.assertTrue(networks(helper).network(network.id()) != null, "network must survive");
+        helper.assertTrue(networks(helper).network(network.id()).pool == 16, "pool unchanged");
+        helper.assertTrue(network.windowB().getCount() == 16, "sibling unchanged");
+
+        // consuming from the landed instance still syncs — it is the live window
+        placed.shrink(4);
+        helper.assertTrue(network.windowB().getCount() == 12, "sibling must sync to 12");
+        helper.succeed();
+    }
+
+    /**
+     * A left-drag over ONE slot holding matching plain mirrors the left click:
+     * absorb the slot into the pool and lay the window down into it.
+     */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void singleSlotDragOntoPlainAbsorbsAndLands(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 10);
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        SimpleContainer chest = new SimpleContainer(27);
+        chest.setItem(0, new ItemStack(Items.BREAD, 20));
+        ChestMenu menu = ChestMenu.threeRows(1, player.getInventory(), chest);
+        menu.setCarried(network.windowA());
+
+        menu.clicked(-999, 0, ClickType.QUICK_CRAFT, player);
+        menu.clicked(0, 1, ClickType.QUICK_CRAFT, player);
+        menu.clicked(-999, 2, ClickType.QUICK_CRAFT, player);
+
+        ItemStack landed = chest.getItem(0);
+        helper.assertTrue(landed.has(ModRegistry.QUANTUM_LINK.get()), "the window must land in the slot");
+        helper.assertTrue(landed.getCount() == 30, "slot's 20 absorbed into the pool");
+        helper.assertTrue(menu.getCarried().isEmpty(), "cursor must be empty");
+        helper.assertTrue(networks(helper).network(network.id()).pool == 30, "pool must be 30");
+        helper.assertTrue(network.windowB().getCount() == 30, "sibling shows 30");
+        helper.succeed();
+    }
+
     /** Right-drag places one plain per slot, window stays with the rest. */
     @GameTest(template = "empty", templateNamespace = "quantumitems")
     public static void rightDragPlacesOnePlainPerSlot(GameTestHelper helper) {

@@ -140,6 +140,35 @@ public abstract class AbstractContainerMenuMixin {
             }
             return; // vanilla clones the now-plain stack
         }
+        // A left-drag over exactly ONE slot is vanilla's degenerate "place the
+        // stack" gesture, not a distribution — mirror the plain left click:
+        // empty slot -> the window relocates whole (link intact); matching
+        // plain -> absorb and lay the window down. Never a full extraction.
+        if (quickcraftType == 0 && quickcraftSlots.size() == 1) {
+            Slot only = quickcraftSlots.iterator().next();
+            ItemStack inSlot = only.getItem();
+            if (inSlot.isEmpty()) {
+                if (only.mayPlace(carried)) {
+                    only.setByPlayer(carried.copyAndClear()); // engine relocation on the server
+                    self.setCarried(ItemStack.EMPTY);
+                }
+            } else if (!inSlot.has(ModRegistry.QUANTUM_LINK.get()) && quantumitems$matches(carried, inSlot)) {
+                int absorbed = engine != null
+                        ? engine.absorb(carried, inSlot, Integer.MAX_VALUE)
+                        : quantumitems$clientAbsorb(carried, inSlot, Integer.MAX_VALUE);
+                if (absorbed > 0) {
+                    only.setChanged();
+                }
+                if (only.getItem().isEmpty() && only.mayPlace(carried)) {
+                    only.setByPlayer(carried);
+                    self.setCarried(ItemStack.EMPTY);
+                }
+            }
+            quantumitems$resetQuickcraft();
+            self.broadcastChanges();
+            ci.cancel();
+            return;
+        }
         int share = quickcraftType == 1 ? 1
                 : quickcraftSlots.isEmpty() ? 0 : carried.getCount() / quickcraftSlots.size();
         if (share > 0) {
