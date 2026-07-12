@@ -436,6 +436,57 @@ public class MenuGameTests {
         helper.succeed();
     }
 
+    /**
+     * Double-click collect (PICKUP_ALL) must NOT touch windows. Vanilla's sweep
+     * does safeTake + grow(count), discarding the taken stack object — a
+     * whole-take of a window added its count to the plain cursor while the
+     * network and its sibling lived on: a pool-sized dupe. Windows are storage
+     * anchors; collect gathers only loose plain stacks.
+     */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void pickupAllSkipsWindows(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 4);
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        SimpleContainer chest = new SimpleContainer(27);
+        chest.setItem(0, network.windowA());
+        chest.setItem(1, new ItemStack(Items.BREAD, 7)); // loose plain: this one gets collected
+        ChestMenu menu = ChestMenu.threeRows(1, player.getInventory(), chest);
+        menu.setCarried(new ItemStack(Items.BREAD, 1));
+
+        menu.clicked(10, 0, ClickType.PICKUP_ALL, player); // double-click on an empty slot
+
+        helper.assertTrue(menu.getCarried().getCount() == 8, "cursor collects only the loose plain (1+7)");
+        helper.assertTrue(chest.getItem(0).has(ModRegistry.QUANTUM_LINK.get()), "the window is untouched");
+        helper.assertTrue(chest.getItem(0).getCount() == 4, "window still shows its pool");
+        helper.assertTrue(networks(helper).network(network.id()).pool == 4, "pool untouched — no dupe");
+        helper.assertTrue(network.windowB().getCount() == 4, "sibling untouched");
+        helper.succeed();
+    }
+
+    /**
+     * Double-click with a WINDOW on the cursor absorbs loose matching plain
+     * into the pool (vanilla grow routes through the pool) — lock-in test.
+     */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void pickupAllIntoCarriedWindowAbsorbs(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 10);
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        SimpleContainer chest = new SimpleContainer(27);
+        chest.setItem(0, new ItemStack(Items.BREAD, 3));
+        chest.setItem(5, new ItemStack(Items.BREAD, 2));
+        ChestMenu menu = ChestMenu.threeRows(1, player.getInventory(), chest);
+        menu.setCarried(network.windowA());
+
+        menu.clicked(10, 0, ClickType.PICKUP_ALL, player);
+
+        helper.assertTrue(menu.getCarried().has(ModRegistry.QUANTUM_LINK.get()), "cursor keeps the window");
+        helper.assertTrue(menu.getCarried().getCount() == 15, "loose 3+2 absorbed into the pool");
+        helper.assertTrue(chest.getItem(0).isEmpty() && chest.getItem(5).isEmpty(), "loose stacks collected");
+        helper.assertTrue(networks(helper).network(network.id()).pool == 15, "pool must be 15");
+        helper.assertTrue(network.windowB().getCount() == 15, "sibling tracks the pool");
+        helper.succeed();
+    }
+
     /** Shift-click through a real menu: the window travels whole, link intact. */
     @GameTest(template = "empty", templateNamespace = "quantumitems")
     public static void shiftClickMovesWindow(GameTestHelper helper) {

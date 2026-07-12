@@ -200,6 +200,23 @@ public abstract class AbstractContainerMenuMixin {
     }
 
     /**
+     * Double-click collect (PICKUP_ALL) consults this per slot. Its sweep does
+     * {@code safeTake(...)} and then {@code carried.grow(taken.getCount())},
+     * DISCARDING the taken stack object — a whole-take of a window would add
+     * its count to the plain cursor while the network and its sibling live on:
+     * a pool-sized dupe. Windows are storage anchors; collect never takes from
+     * them. (A carried window still absorbs loose plain — those slots are not
+     * linked, so this guard does not fire for them.)
+     */
+    @Inject(method = "canTakeItemForPickAll", at = @At("HEAD"), cancellable = true)
+    private void quantumitems$pickAllSkipsWindows(ItemStack carried, Slot slot,
+                                                  CallbackInfoReturnable<Boolean> cir) {
+        if (slot.getItem().has(ModRegistry.QUANTUM_LINK.get())) {
+            cir.setReturnValue(false);
+        }
+    }
+
+    /**
      * Shift-click (and every other {@code moveItemStackTo} user) may not
      * merge-drain a window into existing plain stacks — vanilla's merge phase
      * runs before its empty-slot phase, so a matching partial stack in the
