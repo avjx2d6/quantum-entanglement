@@ -63,6 +63,32 @@ public abstract class ItemStackMixin {
     }
 
     /**
+     * {@code matches} is STATE IDENTITY — change detection (menu
+     * broadcastChanges compares live slots against remembered copies, hand
+     * re-equip animation, equipment sync). Two rules for windows:
+     * a window and a copy of the same member at the same count are the SAME
+     * state (otherwise the alias merge guard below leaks in here, the server
+     * resends the slot every tick and the held item twitches forever); and a
+     * link↔plain transition at the same count IS a change (otherwise a
+     * collapse that keeps the count never reaches the client).
+     */
+    @Inject(method = "matches(Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/world/item/ItemStack;)Z",
+            at = @At("HEAD"), cancellable = true)
+    private static void quantumitems$windowStateIdentity(ItemStack a, ItemStack b,
+                                                         CallbackInfoReturnable<Boolean> cir) {
+        boolean aLinked = !a.isEmpty() && a.has(ModRegistry.QUANTUM_LINK.get());
+        boolean bLinked = !b.isEmpty() && b.has(ModRegistry.QUANTUM_LINK.get());
+        if (aLinked != bLinked) {
+            cir.setReturnValue(false); // link appeared/vanished: always a real change
+        } else if (aLinked) {
+            cir.setReturnValue(a.getCount() == b.getCount()
+                    && ItemStack.isSameItem(a, b)
+                    && java.util.Objects.equals(a.get(ModRegistry.QUANTUM_LINK.get()),
+                            b.get(ModRegistry.QUANTUM_LINK.get())));
+        }
+    }
+
+    /**
      * Every component write funnels through {@code set} — durability
      * ({@code setDamageValue}), programmatic enchants, renames. A property
      * change on a window collapses the network IMMEDIATELY (the snapshot

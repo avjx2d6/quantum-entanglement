@@ -178,6 +178,30 @@ public class GroundGameTests {
     }
 
     /**
+     * ItemStack.matches drives change detection (menu broadcastChanges, hand
+     * re-equip animation, equipment sync) by comparing the live stack with a
+     * remembered COPY. A window vs its own copy must read UNCHANGED — the
+     * alias merge guard must not leak here, or the server resends the slot
+     * every tick and the held item twitches forever. And a window vs a plain
+     * stack at the same count must read CHANGED, or a same-count collapse
+     * never reaches the client.
+     */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void matchesTreatsCopyAsUnchangedAndCollapseAsChanged(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 6);
+
+        ItemStack remembered = network.windowA().copy(); // what lastSlots holds
+        helper.assertTrue(ItemStack.matches(network.windowA(), remembered),
+                "a window and its remembered copy are the same state — no per-tick resync");
+
+        ItemStack collapsedLook = network.windowA().copy();
+        collapsedLook.remove(ModRegistry.QUANTUM_LINK.get()); // collapse keeps the count
+        helper.assertTrue(!ItemStack.matches(network.windowA(), collapsedLook),
+                "losing the link at the same count IS a change — the client must be resynced");
+        helper.succeed();
+    }
+
+    /**
      * Two live instances of the SAME member (creative clone, /give copy, a
      * hook-bypassing stack copy) must never merge with each other — vanilla
      * sees them component-equal and a click/hopper merge would inflate the
