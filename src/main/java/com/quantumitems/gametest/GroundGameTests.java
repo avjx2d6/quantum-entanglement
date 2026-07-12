@@ -178,6 +178,38 @@ public class GroundGameTests {
     }
 
     /**
+     * Death drops: the whole inventory hits the ground through Player.drop ->
+     * ItemEntity spawn -> Rule 1 cash-out. Windows become plain, siblings are
+     * wiped, every item is conserved exactly once.
+     */
+    @GameTest(template = "box", templateNamespace = "quantumitems", timeoutTicks = 100)
+    public static void deathDropCashesOutWindows(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 6);
+        net.minecraft.server.level.ServerPlayer player = helper.makeMockServerPlayerInLevel();
+        var center = helper.absoluteVec(new net.minecraft.world.phys.Vec3(1.5, 2.0, 1.5));
+        player.moveTo(center.x, center.y, center.z, 0, 0);
+        player.getInventory().setItem(0, network.windowA());
+        player.getInventory().setItem(1, new ItemStack(Items.BREAD, 3));
+
+        player.getInventory().dropAll(); // what dropEquipment does on death
+        player.discard();
+
+        helper.runAfterDelay(5, () -> {
+            int bread = 0;
+            for (ItemEntity e : helper.getLevel().getEntitiesOfClass(ItemEntity.class,
+                    helper.getBounds().inflate(3.0))) {
+                helper.assertTrue(!e.getItem().has(ModRegistry.QUANTUM_LINK.get()),
+                        "no linked item may drop on death");
+                bread += e.getItem().getCount();
+            }
+            helper.assertTrue(bread == 9, "6 pooled + 3 plain = 9, conserved exactly once, got " + bread);
+            helper.assertTrue(networks(helper).network(network.id()) == null, "network cashed out");
+            helper.assertTrue(network.windowB().isEmpty(), "sibling wiped");
+            helper.succeed();
+        });
+    }
+
+    /**
      * ItemStack.matches drives change detection (menu broadcastChanges, hand
      * re-equip animation, equipment sync) by comparing the live stack with a
      * remembered COPY. A window vs its own copy must read UNCHANGED — the
