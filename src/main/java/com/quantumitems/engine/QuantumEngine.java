@@ -32,6 +32,14 @@ public final class QuantumEngine {
     private final MinecraftServer server;
     /** key = networkId << 32 | memberId → canonical live instance of that window. */
     private final Map<Long, WeakReference<ItemStack>> canonical = new HashMap<>();
+    /**
+     * key → the container last seen holding that member. Remote pool changes
+     * call {@code setChanged()} on it — that persists the fresh count and
+     * fires comparators reading the container (the wireless-redstone core).
+     * Refreshed at every reconcile touchpoint; a stale entry costs at most a
+     * harmless spurious setChanged.
+     */
+    private final Map<Long, WeakReference<net.minecraft.world.Container>> holders = new HashMap<>();
     /** Reentrancy guard: our own writes to stack counts must not re-enter pool logic. */
     private int internalWrites;
 
@@ -276,6 +284,7 @@ public final class QuantumEngine {
         }
         ItemStack window = moveWindow(stack, link);
         inventory.setItem(target, window);
+        trackHolder(window, inventory);
         return true;
     }
 
@@ -510,6 +519,8 @@ public final class QuantumEngine {
             if (memberStack != null) {
                 wipe(memberStack);
             }
+            notifyHolder(key);
+            holders.remove(key);
         }
         networks.removeNetwork(networkId);
     }
@@ -532,6 +543,8 @@ public final class QuantumEngine {
                     wipe(memberStack);
                 }
             }
+            notifyHolder(key);
+            holders.remove(key);
         }
         networks.removeNetwork(link.networkId());
         internalWrites++;
@@ -541,6 +554,28 @@ public final class QuantumEngine {
         } finally {
             internalWrites--;
         }
+    }
+
+    /** Remembers (weakly) which container currently holds a member's window. */
+    public void trackHolder(ItemStack stack, @Nullable net.minecraft.world.Container holder) {
+        QuantumLinkData link = stack.get(ModRegistry.QUANTUM_LINK.get());
+        if (link == null || holder == null) {
+            return;
+        }
+        holders.put(key(link.networkId(), link.memberId()), new WeakReference<>(holder));
+    }
+
+    /** setChanged() on a member's last known holder (persistence + comparators). */
+    private void notifyHolder(long key) {
+        WeakReference<net.minecraft.world.Container> ref = holders.get(key);
+        net.minecraft.world.Container holder = ref != null ? ref.get() : null;
+        if (holder == null) {
+            if (ref != null) {
+                holders.remove(key);
+            }
+            return;
+        }
+        holder.setChanged();
     }
 
     /** Registers a freshly entangled window as canonical. */
@@ -567,6 +602,7 @@ public final class QuantumEngine {
             if (memberStack != source && !memberStack.isEmpty()) {
                 rawSetCount(memberStack, network.pool);
             }
+            notifyHolder(key);
         }
     }
 

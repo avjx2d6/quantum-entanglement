@@ -53,6 +53,7 @@ public abstract class InvWrapperMixin {
         }
         ItemStack remainder = stack.copy();
         engine.absorb(inSlot, remainder, room); // grows the pool, shrinks the remainder
+        engine.trackHolder(inSlot, getInv());
         cir.setReturnValue(remainder.isEmpty() ? ItemStack.EMPTY : remainder);
     }
 }

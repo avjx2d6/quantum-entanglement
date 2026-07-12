@@ -99,6 +99,8 @@ public final class ServerEvents {
                 engine.reconcileScan(stack, seen);
                 if (stack.isEmpty()) {
                     slot.set(ItemStack.EMPTY);
+                } else {
+                    engine.trackHolder(stack, slot.container);
                 }
             }
         }
@@ -196,6 +198,8 @@ public final class ServerEvents {
             engine.reconcileScan(stack, seen);
             if (stack.isEmpty()) {
                 container.setItem(slot, ItemStack.EMPTY);
+            } else {
+                engine.trackHolder(stack, container);
             }
         }
     }

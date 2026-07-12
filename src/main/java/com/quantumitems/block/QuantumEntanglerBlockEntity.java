@@ -140,6 +140,8 @@ public class QuantumEntanglerBlockEntity extends BlockEntity implements Containe
         if (engine != null) {
             engine.adopt(outA);
             engine.adopt(outB);
+            engine.trackHolder(outA, this);
+            engine.trackHolder(outB, this);
         }
 
         items.set(SLOT_INPUT, ItemStack.EMPTY);

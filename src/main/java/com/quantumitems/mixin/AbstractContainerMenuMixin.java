@@ -113,6 +113,9 @@ public abstract class AbstractContainerMenuMixin {
             if (slot.getItem().isEmpty() && slot.mayPlace(carried)) {
                 slot.setByPlayer(carried);
                 self.setCarried(ItemStack.EMPTY);
+                if (engine != null) {
+                    engine.trackHolder(slot.getItem(), slot.container);
+                }
             }
         }
         ci.cancel();
@@ -151,6 +154,9 @@ public abstract class AbstractContainerMenuMixin {
                 if (only.mayPlace(carried)) {
                     only.setByPlayer(carried.copyAndClear()); // engine relocation on the server
                     self.setCarried(ItemStack.EMPTY);
+                    if (engine != null) {
+                        engine.trackHolder(only.getItem(), only.container);
+                    }
                 }
             } else if (!inSlot.has(ModRegistry.QUANTUM_LINK.get()) && quantumitems$matches(carried, inSlot)) {
                 int absorbed = engine != null
@@ -162,6 +168,9 @@ public abstract class AbstractContainerMenuMixin {
                 if (only.getItem().isEmpty() && only.mayPlace(carried)) {
                     only.setByPlayer(carried);
                     self.setCarried(ItemStack.EMPTY);
+                    if (engine != null) {
+                        engine.trackHolder(only.getItem(), only.container);
+                    }
                 }
             }
             quantumitems$resetQuickcraft();
@@ -293,7 +302,11 @@ public abstract class AbstractContainerMenuMixin {
         if (emptyIndex >= 0) {
             // relocate whole: copyAndClear routes through the engine on the
             // server (canonical registry follows the moved instance)
-            self.slots.get(emptyIndex).setByPlayer(stack.copyAndClear());
+            Slot target = self.slots.get(emptyIndex);
+            target.setByPlayer(stack.copyAndClear());
+            if (engine != null) {
+                engine.trackHolder(target.getItem(), target.container);
+            }
             cir.setReturnValue(true);
         } else {
             // only merge targets remain: collapse, vanilla merges plain

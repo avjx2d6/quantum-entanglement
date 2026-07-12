@@ -73,13 +73,18 @@ public abstract class VanillaInventoryCodeHooksMixin {
         IItemHandler handler = source.get().getKey();
         for (int i = 0; i < handler.getSlots(); i++) {
             ItemStack stack = handler.getStackInSlot(i);
+            if (!stack.has(ModRegistry.QUANTUM_LINK.get())) {
+                continue;
+            }
+            if (source.get().getValue() instanceof net.minecraft.world.Container container) {
+                engine.trackHolder(stack, container);
+            }
             // pool > 1 is left untouched — vanilla + the stacking hook pull plain
             // items that merge; only the last item would dupe. And only collapse
             // when the hopper can actually take it, so a full hopper merely
             // pointed at a singleton window never ends the network (or its
             // siblings) without a real transfer.
-            if (stack.has(ModRegistry.QUANTUM_LINK.get()) && stack.getCount() == 1
-                    && quantumitems$destHasRoom(dest, stack)) {
+            if (stack.getCount() == 1 && quantumitems$destHasRoom(dest, stack)) {
                 engine.precollapseIfSingleton(stack);
             }
         }
@@ -150,6 +155,7 @@ public abstract class VanillaInventoryCodeHooksMixin {
             cir.setReturnValue(false); // wiped/collapsed in place; retry next activation
             return;
         }
+        engine.trackHolder(inSlot, dropper);
         Direction facing = level.getBlockState(pos).getValue(DropperBlock.FACING);
         Optional<Pair<IItemHandler, Object>> attached = quantumitems$attachedHandler(level, pos, facing);
         if (attached.isEmpty()) {
@@ -201,6 +207,7 @@ public abstract class VanillaInventoryCodeHooksMixin {
                 if (engine.reconcile(inSlot) != QuantumEngine.Status.CANONICAL) {
                     continue; // wiped or collapsed in place
                 }
+                engine.trackHolder(inSlot, hopper);
                 // Automation moves only plain: the last pooled item collapses the
                 // window to plain first (so it never travels as a window), but
                 // only if the target can actually take it.
