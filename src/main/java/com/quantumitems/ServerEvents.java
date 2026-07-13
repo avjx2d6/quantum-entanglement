@@ -129,33 +129,14 @@ public final class ServerEvents {
             } else {
                 itemEntity.setItem(stack); // push the cashed-out plain to the entity's synced data
             }
-            return;
         }
-        // Reach into container items (a broken shulker box keeps its contents in
-        // component data): a window buried in there is invisible to sweeps and
-        // would lose its items on the next reconcile — cash it out in place, so
-        // the shulker carries honest plain items.
-        net.minecraft.world.item.component.ItemContainerContents contents =
-                stack.get(net.minecraft.core.component.DataComponents.CONTAINER);
-        if (contents == null) {
-            return;
-        }
-        boolean changed = false;
-        java.util.List<ItemStack> repacked = new java.util.ArrayList<>();
-        for (ItemStack inner : contents.nonEmptyItemsCopy()) {
-            if (inner.has(ModRegistry.QUANTUM_LINK.get())) {
-                engine.cashOutToPlain(inner);
-                changed = true;
-            }
-            if (!inner.isEmpty()) {
-                repacked.add(inner);
-            }
-        }
-        if (changed) {
-            stack.set(net.minecraft.core.component.DataComponents.CONTAINER,
-                    net.minecraft.world.item.component.ItemContainerContents.fromItems(repacked));
-            itemEntity.setItem(stack);
-        }
+        // Windows INSIDE container items (a broken shulker's component data,
+        // backpack NBT) are deliberately left alone: a sleeping window is the
+        // same situation as a window in an unloaded chunk — no live instance,
+        // possibly stale count, reconciled honestly at the next touch after it
+        // re-materializes. The pool authority makes sleeping safe: it can never
+        // dupe, and if the network ends while it sleeps, it wakes up empty
+        // because its items were already cashed out elsewhere.
     }
 
     /**

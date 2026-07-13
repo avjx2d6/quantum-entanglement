@@ -22,9 +22,13 @@ import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
- * Windows must never sleep inside item NBT (bundles, broken shulker boxes) —
- * a buried husk is invisible to sweeps and loses its items on the next
- * reconcile. Entering a container item is an honest extraction / cash-out.
+ * Container items and windows. BUNDLES are merge-happy loose-item bags:
+ * inserting into one is an honest extraction (plain inside, pool debited).
+ * SHULKERS preserve their contents through breaking — a window inside one
+ * SLEEPS: no live instance, possibly stale count, exactly like a window in an
+ * unloaded chunk. The pool authority makes sleeping safe: it reconciles
+ * honestly on wake-up, can never dupe, and if the network ends while it
+ * sleeps it wakes up empty because its items were cashed out elsewhere.
  */
 @PrefixGameTestTemplate(false)
 public class ContainerItemGameTests {
@@ -98,10 +102,16 @@ public class ContainerItemGameTests {
         helper.succeed();
     }
 
-    /** Breaking a shulker box with a window inside: the dropped item carries honest plain. */
+    /**
+     * A shulker box protects its contents through breaking, so it protects the
+     * link too: the window SLEEPS inside the dropped item (network alive), and
+     * on placement it wakes and reconciles to the CURRENT pool — even if the
+     * pool changed while it slept.
+     */
     @GameTest(template = "box", templateNamespace = "quantumitems", timeoutTicks = 100)
-    public static void shulkerBreakCashesOutContents(GameTestHelper helper) {
+    public static void shulkerCarriesSleepingWindow(GameTestHelper helper) {
         TestNetwork network = makeNetwork(helper, 6);
+        QuantumEngine engine = QuantumEngine.onServerThread();
         helper.setBlock(new BlockPos(1, 1, 1), Blocks.SHULKER_BOX);
         ShulkerBoxBlockEntity shulker = (ShulkerBoxBlockEntity) helper.getBlockEntity(new BlockPos(1, 1, 1));
         shulker.setItem(0, network.windowA());
@@ -119,15 +129,67 @@ public class ContainerItemGameTests {
             helper.assertTrue(!shulkerItem.isEmpty(), "the shulker box must drop as an item");
             ItemContainerContents contents = shulkerItem.get(DataComponents.CONTAINER);
             helper.assertTrue(contents != null, "the dropped shulker keeps its contents");
-            int bread = 0;
+            ItemStack sleeping = ItemStack.EMPTY;
             for (ItemStack inner : contents.nonEmptyItems()) {
-                helper.assertTrue(!inner.has(ModRegistry.QUANTUM_LINK.get()),
-                        "no window may sleep inside the shulker item");
-                bread += inner.getCount();
+                sleeping = inner;
             }
-            helper.assertTrue(bread == 6, "all 6 pooled items ride inside as plain, conserved");
-            helper.assertTrue(networks(helper).network(network.id()) == null, "network cashed out");
-            helper.assertTrue(network.windowB().isEmpty(), "sibling wiped");
+            helper.assertTrue(sleeping.has(ModRegistry.QUANTUM_LINK.get()),
+                    "the window sleeps inside with its link intact");
+            helper.assertTrue(networks(helper).network(network.id()) != null, "network survives the break");
+            helper.assertTrue(network.windowB().getCount() == 6, "sibling keeps working");
+
+            // the pool changes while the window sleeps: sibling absorbs 4 more
+            engine.absorb(network.windowB(), new ItemStack(Items.BREAD, 4), Integer.MAX_VALUE);
+            helper.assertTrue(networks(helper).network(network.id()).pool == 10, "pool is 10 now");
+
+            // wake up: place the shulker back and touch its content
+            helper.setBlock(new BlockPos(1, 2, 1), Blocks.SHULKER_BOX);
+            ShulkerBoxBlockEntity placed =
+                    (ShulkerBoxBlockEntity) helper.getBlockEntity(new BlockPos(1, 2, 1));
+            placed.applyComponentsFromItemStack(shulkerItem);
+            ItemStack awake = placed.getItem(0);
+            helper.assertTrue(awake.has(ModRegistry.QUANTUM_LINK.get()), "the woken stack is the window");
+            engine.reconcile(awake); // the first touch (open/hopper/sweep) does this
+            helper.assertTrue(awake.getCount() == 10, "the stale count heals to the CURRENT pool");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * The "empty surprise" is the mechanic itself, delayed: if the pool is
+     * consumed while a window sleeps in a shulker, the network ends and the
+     * sleeper wakes up empty — its items already materialized elsewhere.
+     */
+    @GameTest(template = "box", templateNamespace = "quantumitems", timeoutTicks = 100)
+    public static void sleepingWindowWakesEmptyAfterPoolDrained(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 5);
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        helper.setBlock(new BlockPos(1, 1, 1), Blocks.SHULKER_BOX);
+        ShulkerBoxBlockEntity shulker = (ShulkerBoxBlockEntity) helper.getBlockEntity(new BlockPos(1, 1, 1));
+        shulker.setItem(0, network.windowA());
+
+        helper.getLevel().destroyBlock(helper.absolutePos(new BlockPos(1, 1, 1)), true);
+
+        helper.runAfterDelay(10, () -> {
+            ItemStack shulkerItem = ItemStack.EMPTY;
+            for (ItemEntity e : helper.getLevel().getEntitiesOfClass(ItemEntity.class,
+                    helper.getBounds().inflate(2.0))) {
+                if (e.getItem().is(Items.SHULKER_BOX)) {
+                    shulkerItem = e.getItem();
+                }
+            }
+            helper.assertTrue(!shulkerItem.isEmpty(), "the shulker box must drop as an item");
+
+            network.windowB().shrink(5); // the whole pool is consumed elsewhere
+            helper.assertTrue(networks(helper).network(network.id()) == null, "network ends with the pool");
+
+            helper.setBlock(new BlockPos(1, 2, 1), Blocks.SHULKER_BOX);
+            ShulkerBoxBlockEntity placed =
+                    (ShulkerBoxBlockEntity) helper.getBlockEntity(new BlockPos(1, 2, 1));
+            placed.applyComponentsFromItemStack(shulkerItem);
+            ItemStack awake = placed.getItem(0);
+            engine.reconcile(awake); // first touch
+            helper.assertTrue(awake.isEmpty(), "the sleeper wakes empty — its items were spent elsewhere");
             helper.succeed();
         });
     }
