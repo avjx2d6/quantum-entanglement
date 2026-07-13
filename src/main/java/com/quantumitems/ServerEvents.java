@@ -111,14 +111,55 @@ public final class ServerEvents {
     }
 
     /**
+     * Windows waking up with the world must heal IMMEDIATELY, not at the first
+     * touch: a chunk that loads with a stale window count would feed wrong
+     * comparator signals until touched. Deferred one tick — inventories must
+     * never be mutated during deserialization itself.
+     */
+    @SubscribeEvent
+    public static void onChunkLoad(net.neoforged.neoforge.event.level.ChunkEvent.Load event) {
+        if (!(event.getLevel() instanceof net.minecraft.server.level.ServerLevel level)
+                || !(event.getChunk() instanceof net.minecraft.world.level.chunk.LevelChunk chunk)) {
+            return;
+        }
+        level.getServer().execute(() -> {
+            QuantumEngine engine = QuantumEngine.onServerThread();
+            if (engine == null
+                    || level.getChunkSource().getChunkNow(chunk.getPos().x, chunk.getPos().z) != chunk) {
+                return; // engine gone or the chunk unloaded again before the deferred tick
+            }
+            for (var blockEntity : chunk.getBlockEntities().values()) {
+                if (blockEntity instanceof Container container) {
+                    engine.reconcileContainer(container);
+                }
+            }
+        });
+    }
+
+    /**
      * Rule 1: a window may never exist as a free item. The instant one would
      * appear on the ground it cashes out to plain (whole pool, siblings wiped,
      * network ended); a dead husk is discarded. No linked item ever lies in the
      * world, so the ground-desync and item-loss that came with it are gone.
+     * Container ENTITIES (chest minecarts etc.) waking up heal the same way
+     * chunk block entities do.
      */
     @SubscribeEvent
     public static void onEntityJoin(EntityJoinLevelEvent event) {
-        if (event.getLevel().isClientSide() || !(event.getEntity() instanceof ItemEntity itemEntity)) {
+        if (event.getLevel().isClientSide()) {
+            return;
+        }
+        if (event.getEntity() instanceof Container container
+                && event.getLevel() instanceof net.minecraft.server.level.ServerLevel level) {
+            level.getServer().execute(() -> {
+                QuantumEngine deferredEngine = QuantumEngine.onServerThread();
+                if (deferredEngine != null && !event.getEntity().isRemoved()) {
+                    deferredEngine.reconcileContainer(container);
+                }
+            });
+            return;
+        }
+        if (!(event.getEntity() instanceof ItemEntity itemEntity)) {
             return;
         }
         QuantumEngine engine = QuantumEngine.onServerThread();

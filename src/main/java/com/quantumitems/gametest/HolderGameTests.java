@@ -56,6 +56,38 @@ public class HolderGameTests {
     }
 
     /**
+     * The chunk-load heal: a container waking up with a STALE window count
+     * (its canonical died with the unload, the pool changed meanwhile) is
+     * reconciled by the load scan — count healed, container marked changed
+     * (comparators!), holder registered so future remote changes reach it.
+     */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void loadScanHealsStaleContainer(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 16);
+        QuantumEngine engine = QuantumEngine.onServerThread();
+
+        SimpleContainer chest = new SimpleContainer(27);
+        chest.setItem(0, network.windowB());
+        engine.deregister(network.id(), 2); // "unloaded": the canonical ref died
+        network.windowA().shrink(8);        // the pool halves while it slept
+        helper.assertTrue(network.windowB().getCount() == 16, "the sleeping count is stale");
+
+        AtomicInteger changes = new AtomicInteger();
+        chest.addListener(container -> changes.incrementAndGet());
+
+        engine.reconcileContainer(chest); // what the chunk-load handler runs
+
+        helper.assertTrue(network.windowB().getCount() == 8, "the stale count heals to the pool");
+        helper.assertTrue(changes.get() > 0, "the heal must mark the container changed");
+
+        changes.set(0);
+        engine.absorb(network.windowA(), new ItemStack(Items.BREAD, 4), Integer.MAX_VALUE);
+        helper.assertTrue(network.windowB().getCount() == 12, "sibling tracks the pool again");
+        helper.assertTrue(changes.get() > 0, "the load scan must also register the holder");
+        helper.succeed();
+    }
+
+    /**
      * A window sits in a chest a player has opened (the open reconciles and
      * registers the holder). A REMOTE pool change — absorbing plain into the
      * OTHER window — must call setChanged() on that chest's container.

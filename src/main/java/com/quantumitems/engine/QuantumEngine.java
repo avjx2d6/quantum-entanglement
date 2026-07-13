@@ -569,6 +569,38 @@ public final class QuantumEngine {
         }
     }
 
+    /**
+     * Heals every window in a container: stale counts reconcile to the pool,
+     * dead husks are cleared, holders are registered, and the container is
+     * marked changed if anything moved — so comparators and persistence are
+     * correct immediately, not at the first touch. Runs deferred on chunk
+     * load / container-entity join (never during deserialization itself).
+     */
+    public void reconcileContainer(net.minecraft.world.Container container) {
+        Set<Long> seen = new java.util.HashSet<>();
+        boolean changed = false;
+        for (int i = 0; i < container.getContainerSize(); i++) {
+            ItemStack stack = container.getItem(i);
+            if (!stack.has(ModRegistry.QUANTUM_LINK.get())) {
+                continue;
+            }
+            int before = stack.getCount();
+            reconcileScan(stack, seen);
+            if (stack.isEmpty()) {
+                container.setItem(i, ItemStack.EMPTY);
+                changed = true;
+            } else {
+                trackHolder(stack, container);
+                if (stack.getCount() != before) {
+                    changed = true;
+                }
+            }
+        }
+        if (changed) {
+            container.setChanged();
+        }
+    }
+
     /** Remembers (weakly) which container currently holds a member's window. */
     public void trackHolder(ItemStack stack, @Nullable net.minecraft.world.Container holder) {
         QuantumLinkData link = stack.get(ModRegistry.QUANTUM_LINK.get());
