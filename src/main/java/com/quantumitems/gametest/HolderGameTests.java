@@ -92,6 +92,7 @@ public class HolderGameTests {
      * registers the holder). A REMOTE pool change — absorbing plain into the
      * OTHER window — must call setChanged() on that chest's container.
      */
+    @SuppressWarnings("removal") // no replacement exists yet for makeMockServerPlayerInLevel
     @GameTest(template = "empty", templateNamespace = "quantumitems")
     public static void remotePoolChangeMarksHolderChanged(GameTestHelper helper) {
         TestNetwork network = makeNetwork(helper, 10);

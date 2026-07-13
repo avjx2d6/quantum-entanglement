@@ -9,6 +9,7 @@
     "HopperBlockEntityMixin",
     "InvWrapperMixin",
     "InventoryMixin",
+    "ItemStackHandlerMixin",
     "ItemStackMixin",
     "ServerGamePacketListenerMixin",
     "SidedInvWrapperMixin",

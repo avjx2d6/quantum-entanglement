@@ -33,6 +33,44 @@ public abstract class SidedInvWrapperMixin {
     @Final
     protected Direction side;
 
+    /** Rule 2 for sided extraction: plain probes, plain partials, cash-out on whole takes. */
+    @Inject(method = "extractItem", at = @At("HEAD"), cancellable = true)
+    private void quantumitems$extractFromWindow(int slot, int amount, boolean simulate,
+                                                CallbackInfoReturnable<ItemStack> cir) {
+        if (amount <= 0) {
+            return;
+        }
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        if (engine == null) {
+            return;
+        }
+        int slot1 = SidedInvWrapper.getSlot(inv, slot, side);
+        if (slot1 == -1) {
+            return;
+        }
+        ItemStack inSlot = inv.getItem(slot1);
+        if (!inSlot.has(ModRegistry.QUANTUM_LINK.get())) {
+            return;
+        }
+        if (side != null && !inv.canTakeItemThroughFace(slot1, inSlot, side)) {
+            return; // the face refuses — vanilla returns EMPTY anyway
+        }
+        if (engine.reconcile(inSlot) != QuantumEngine.Status.CANONICAL) {
+            return;
+        }
+        engine.trackHolder(inSlot, inv);
+        int taking = Math.min(inSlot.getCount(), amount);
+        if (simulate) {
+            ItemStack probe = inSlot.copyWithCount(taking);
+            probe.remove(ModRegistry.QUANTUM_LINK.get());
+            cir.setReturnValue(probe);
+            return;
+        }
+        if (taking >= inSlot.getCount()) {
+            engine.cashOutToPlain(inSlot); // full extraction: plain out, network ends
+        }
+    }
+
     @Inject(method = "insertItem", at = @At("HEAD"), cancellable = true)
     private void quantumitems$insertIntoWindow(int slot, ItemStack stack, boolean simulate,
                                                CallbackInfoReturnable<ItemStack> cir) {

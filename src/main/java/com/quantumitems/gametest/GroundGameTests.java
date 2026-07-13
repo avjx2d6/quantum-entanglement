@@ -182,6 +182,7 @@ public class GroundGameTests {
      * ItemEntity spawn -> Rule 1 cash-out. Windows become plain, siblings are
      * wiped, every item is conserved exactly once.
      */
+    @SuppressWarnings("removal") // no replacement exists yet for makeMockServerPlayerInLevel
     @GameTest(template = "box", templateNamespace = "quantumitems", timeoutTicks = 100)
     public static void deathDropCashesOutWindows(GameTestHelper helper) {
         TestNetwork network = makeNetwork(helper, 6);

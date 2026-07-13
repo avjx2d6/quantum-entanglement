@@ -21,12 +21,50 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * <p>Intercepting here makes "push plain into a window" work for every transport
  * that inserts through the capability (hoppers, chutes, pipes): the plain items
  * flow into the pool instead, and the window stays a window.
+ *
+ * <p>{@code extractItem} is Rule 2 generalized to every capability consumer
+ * (Create chutes/funnels, pipes): extraction only ever yields PLAIN. Simulate
+ * returns a plain probe (a linked probe leaks into mod logic and its raw
+ * setCount spawns orphan fragments); a whole take cashes the window out first
+ * — a full extraction ends the network honestly instead of relocating the
+ * window into transport limbo. Partial takes already flow through split.
  */
 @Mixin(value = InvWrapper.class, remap = false)
 public abstract class InvWrapperMixin {
 
     @Shadow
     public abstract Container getInv();
+
+    @Inject(method = "extractItem", at = @At("HEAD"), cancellable = true)
+    private void quantumitems$extractFromWindow(int slot, int amount, boolean simulate,
+                                                CallbackInfoReturnable<ItemStack> cir) {
+        if (amount <= 0) {
+            return;
+        }
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        if (engine == null) {
+            return;
+        }
+        ItemStack inSlot = getInv().getItem(slot);
+        if (!inSlot.has(ModRegistry.QUANTUM_LINK.get())) {
+            return;
+        }
+        if (engine.reconcile(inSlot) != QuantumEngine.Status.CANONICAL) {
+            return; // now plain or wiped — vanilla handles what is left
+        }
+        engine.trackHolder(inSlot, getInv());
+        int taking = Math.min(inSlot.getCount(), amount);
+        if (simulate) {
+            ItemStack probe = inSlot.copyWithCount(taking);
+            probe.remove(ModRegistry.QUANTUM_LINK.get());
+            cir.setReturnValue(probe);
+            return;
+        }
+        if (taking >= inSlot.getCount()) {
+            engine.cashOutToPlain(inSlot); // full extraction: plain out, network ends
+        }
+        // partial (or now-plain whole): vanilla removeItem -> split yields plain
+    }
 
     @Inject(method = "insertItem", at = @At("HEAD"), cancellable = true)
     private void quantumitems$insertIntoWindow(int slot, ItemStack stack, boolean simulate,
