@@ -585,13 +585,18 @@ public final class QuantumEngine {
                 continue;
             }
             int before = stack.getCount();
+            QuantumLinkData link = stack.get(ModRegistry.QUANTUM_LINK.get());
             reconcileScan(stack, seen);
             if (stack.isEmpty()) {
+                debug("loadHeal net#" + link.networkId() + " m" + link.memberId()
+                        + ": dead husk cleared (was " + before + ")");
                 container.setItem(i, ItemStack.EMPTY);
                 changed = true;
             } else {
                 trackHolder(stack, container);
                 if (stack.getCount() != before) {
+                    debug("loadHeal net#" + link.networkId() + " m" + link.memberId()
+                            + ": count " + before + "->" + stack.getCount());
                     changed = true;
                 }
             }
