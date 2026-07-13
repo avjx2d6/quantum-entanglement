@@ -12,6 +12,7 @@
     "ItemStackHandlerMixin",
     "ItemStackMixin",
     "ServerGamePacketListenerMixin",
+    "ServerPlayerGameModeMixin",
     "SidedInvWrapperMixin",
     "VanillaInventoryCodeHooksMixin"
   ],

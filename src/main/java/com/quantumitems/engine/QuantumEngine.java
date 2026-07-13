@@ -42,6 +42,23 @@ public final class QuantumEngine {
     private final Map<Long, WeakReference<net.minecraft.world.Container>> holders = new HashMap<>();
     /** Reentrancy guard: our own writes to stack counts must not re-enter pool logic. */
     private int internalWrites;
+    /**
+     * Depth of player-gesture handling on the server thread (menu clicks,
+     * block right-clicks). Whole-take relocation — a window travelling with
+     * its link — is a PLAYER privilege; automation (machine ticks, Create
+     * arms, funnels) taking a whole window gets it cashed out to plain
+     * instead. A machine must never hold a window: its state breaks when a
+     * remote collapse empties the stack under it (the frozen-arm bug).
+     */
+    private int playerGestures;
+
+    public void beginPlayerGesture() {
+        playerGestures++;
+    }
+
+    public void endPlayerGesture() {
+        playerGestures--;
+    }
 
     private QuantumEngine(MinecraftServer server) {
         this.server = server;
@@ -209,6 +226,18 @@ public final class QuantumEngine {
      */
     @Nullable
     public ItemStack handleSplit(ItemStack stack, int amount) {
+        // A live copy of an existing window (simulation probes — Create arms
+        // poll with copy+split every tick): the pool is none of its business,
+        // and adopting it would steal canonicity from the real window (stale
+        // depot displays). Vanilla splits the copy locally.
+        QuantumLinkData earlyLink = stack.get(ModRegistry.QUANTUM_LINK.get());
+        if (earlyLink != null) {
+            WeakReference<ItemStack> ref = canonical.get(key(earlyLink.networkId(), earlyLink.memberId()));
+            ItemStack existing = ref != null ? ref.get() : null;
+            if (existing != null && existing != stack && !existing.isEmpty()) {
+                return ItemStack.EMPTY; // yield NOTHING: a copy must never mint items past the pool
+            }
+        }
         Status status = reconcile(stack);
         switch (status) {
             case PLAIN, COLLAPSED -> {
@@ -228,6 +257,12 @@ public final class QuantumEngine {
             return ItemStack.EMPTY;
         }
         if (taken >= network.pool) {
+            if (playerGestures <= 0) {
+                // automation taking the whole window: cash out — plain leaves,
+                // the network ends honestly, no machine ever holds a window
+                cashOutToPlain(stack);
+                return null; // vanilla splits the now-plain stack
+            }
             debug("split whole-take net#" + link.networkId() + " m" + link.memberId()
                     + " -> window relocates (pool " + network.pool + ")");
             return moveWindow(stack, link);
@@ -259,6 +294,14 @@ public final class QuantumEngine {
      */
     @Nullable
     public ItemStack handleCopyAndClear(ItemStack stack) {
+        QuantumLinkData earlyLink = stack.get(ModRegistry.QUANTUM_LINK.get());
+        if (earlyLink != null) {
+            WeakReference<ItemStack> ref = canonical.get(key(earlyLink.networkId(), earlyLink.memberId()));
+            ItemStack existing = ref != null ? ref.get() : null;
+            if (existing != null && existing != stack && !existing.isEmpty()) {
+                return ItemStack.EMPTY; // a live copy moves nothing; no canonicity theft, no minting
+            }
+        }
         Status status = reconcile(stack);
         return switch (status) {
             case PLAIN, COLLAPSED -> null;

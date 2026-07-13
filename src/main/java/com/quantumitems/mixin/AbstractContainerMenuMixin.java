@@ -57,6 +57,28 @@ public abstract class AbstractContainerMenuMixin {
     @Invoker("resetQuickcraft")
     abstract void quantumitems$resetQuickcraft();
 
+    /**
+     * Everything inside a menu click is a PLAYER gesture: whole-take splits
+     * relocate the window with its link. Outside a gesture (machine ticks)
+     * a whole take cashes out to plain instead — automation never holds a
+     * window. WrapMethod keeps the counter balanced even when handlers cancel.
+     */
+    @com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod(method = "clicked")
+    private void quantumitems$playerGestureScope(int slotId, int button, ClickType clickType, Player player,
+                                                 com.llamalad7.mixinextras.injector.wrapoperation.Operation<Void> original) {
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        if (engine == null) {
+            original.call(slotId, button, clickType, player);
+            return;
+        }
+        engine.beginPlayerGesture();
+        try {
+            original.call(slotId, button, clickType, player);
+        } finally {
+            engine.endPlayerGesture();
+        }
+    }
+
     @Inject(method = "clicked", at = @At("HEAD"), cancellable = true)
     private void quantumitems$windowClick(int slotId, int button, ClickType clickType, Player player,
                                           CallbackInfo ci) {

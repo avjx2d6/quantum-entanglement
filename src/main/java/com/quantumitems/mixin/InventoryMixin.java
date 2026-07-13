@@ -18,6 +18,29 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(Inventory.class)
 public abstract class InventoryMixin {
 
+    /**
+     * Returning items to the PLAYER inventory (menu-close cursor return,
+     * pickup overflow) splits internally — that is a player-owned operation
+     * by definition, so the whole-take must relocate the window, not cash it
+     * out as automation would.
+     */
+    @com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod(
+            method = "placeItemBackInInventory(Lnet/minecraft/world/item/ItemStack;Z)V")
+    private void quantumitems$placeBackGesture(ItemStack stack, boolean sendPacket,
+                                               com.llamalad7.mixinextras.injector.wrapoperation.Operation<Void> original) {
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        if (engine == null) {
+            original.call(stack, sendPacket);
+            return;
+        }
+        engine.beginPlayerGesture();
+        try {
+            original.call(stack, sendPacket);
+        } finally {
+            engine.endPlayerGesture();
+        }
+    }
+
     @Inject(method = "add(ILnet/minecraft/world/item/ItemStack;)Z", at = @At("HEAD"), cancellable = true)
     private void quantumitems$add(int slot, ItemStack stack, CallbackInfoReturnable<Boolean> cir) {
         QuantumEngine engine = QuantumEngine.onServerThread();

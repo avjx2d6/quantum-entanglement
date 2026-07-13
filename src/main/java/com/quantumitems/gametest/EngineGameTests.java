@@ -66,10 +66,18 @@ public class EngineGameTests {
         helper.succeed();
     }
 
+    /** Whole-take relocation is a PLAYER privilege: inside a gesture the link travels. */
     @GameTest(template = "empty", templateNamespace = "quantumitems")
-    public static void wholeTakeMovesWindow(GameTestHelper helper) {
+    public static void wholeTakeMovesWindowInPlayerGesture(GameTestHelper helper) {
         TestNetwork network = makeNetwork(helper, 30);
-        ItemStack moved = network.windowA().split(30);
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        engine.beginPlayerGesture(); // what the menu-click / block-use scopes do
+        ItemStack moved;
+        try {
+            moved = network.windowA().split(30);
+        } finally {
+            engine.endPlayerGesture();
+        }
 
         helper.assertTrue(moved.has(ModRegistry.QUANTUM_LINK.get()), "whole take must keep the link");
         helper.assertTrue(moved.getCount() == 30, "moved window must show the pool");
@@ -80,6 +88,48 @@ public class EngineGameTests {
         // the moved instance must now be the live window: consuming from it syncs
         moved.shrink(5);
         helper.assertTrue(network.windowB().getCount() == 25, "consumption from moved window must sync");
+        helper.succeed();
+    }
+
+    /**
+     * OUTSIDE a player gesture (machine ticks — Create arms, funnels) a whole
+     * take cashes out: automation receives plain and the network ends honestly.
+     * A machine must never hold a window (the frozen-arm bug: a remote collapse
+     * emptied the stack in an arm's claw and broke its state machine).
+     */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void wholeTakeByAutomationCashesOut(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 30);
+        ItemStack taken = network.windowA().split(30);
+
+        helper.assertTrue(!taken.has(ModRegistry.QUANTUM_LINK.get()), "automation receives plain");
+        helper.assertTrue(taken.getCount() == 30, "all 30 pooled items, conserved");
+        helper.assertTrue(networks(helper).network(network.id()) == null, "network ends honestly");
+        helper.assertTrue(network.windowB().isEmpty(), "sibling wiped with the cash-out");
+        helper.succeed();
+    }
+
+    /**
+     * A machine polling with copy+split (Create arms simulate every tick) must
+     * neither touch the pool nor STEAL CANONICITY from the real window — the
+     * theft made the real stack non-canonical, so pool pushes stopped reaching
+     * it (the stale depot display).
+     */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void copySplitDoesNotStealCanonicity(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 30);
+
+        ItemStack probe = network.windowA().copy();
+        probe.split(30); // the arm's poll
+
+        helper.assertTrue(networks(helper).network(network.id()) != null, "network untouched by the poll");
+        helper.assertTrue(networks(helper).network(network.id()).pool == 30, "pool untouched by the poll");
+        helper.assertTrue(network.windowA().getCount() == 30, "real window untouched");
+
+        // the real window must still be canonical: its writes reach the pool
+        network.windowA().shrink(5);
+        helper.assertTrue(networks(helper).network(network.id()).pool == 25, "the real window still drives the pool");
+        helper.assertTrue(network.windowB().getCount() == 25, "sibling still syncs");
         helper.succeed();
     }
 
@@ -146,21 +196,25 @@ public class EngineGameTests {
         helper.succeed();
     }
 
-    /** Extraction through several coexisting instances is bounded by the pool. */
+    /**
+     * A live copy of a window (creative clone, /give dupe) yields NOTHING:
+     * splitting it neither mints items nor disturbs the pool or canonicity.
+     * Only the real window extracts — the strongest no-dupe guarantee.
+     */
     @GameTest(template = "empty", templateNamespace = "quantumitems")
     public static void coexistingInstancesArePoolBounded(GameTestHelper helper) {
         TestNetwork network = makeNetwork(helper, 16);
         ItemStack clone = network.windowA().copy(); // creative-style clone
 
-        ItemStack fromClone = clone.split(6);       // adopts the clone
-        ItemStack fromOriginal = network.windowA().split(6); // adopts the original back
+        ItemStack fromClone = clone.split(6);
+        helper.assertTrue(fromClone.isEmpty(), "a clone must yield nothing — no minting past the pool");
+        helper.assertTrue(networks(helper).network(network.id()).pool == 16, "pool untouched by the clone");
 
-        helper.assertTrue(fromClone.getCount() == 6 && !fromClone.has(ModRegistry.QUANTUM_LINK.get()),
-                "first extraction gives 6 plain");
+        ItemStack fromOriginal = network.windowA().split(6); // the real window still extracts
         helper.assertTrue(fromOriginal.getCount() == 6 && !fromOriginal.has(ModRegistry.QUANTUM_LINK.get()),
-                "second extraction gives 6 plain");
-        helper.assertTrue(networks(helper).network(network.id()).pool == 4,
-                "pool must be 16 - 6 - 6 = 4: no duplication through clones");
+                "the real window gives 6 plain");
+        helper.assertTrue(networks(helper).network(network.id()).pool == 10,
+                "pool must be 16 - 6 = 10: only the real window extracts");
         helper.succeed();
     }
 

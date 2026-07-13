@@ -156,9 +156,13 @@ public class MenuGameTests {
         helper.succeed();
     }
 
-    /** Ctrl+Q: the whole window flies out with the link intact, pool untouched. */
+    /**
+     * Ctrl+Q: the whole pool flies out as PLAIN and the network ends — the
+     * drop is headed for the ground where Rule 1 would cash it out anyway;
+     * the unflagged whole-take now does it directly at the split.
+     */
     @GameTest(template = "empty", templateNamespace = "quantumitems")
-    public static void ctrlQDropMovesWholeWindow(GameTestHelper helper) {
+    public static void ctrlQDropCashesOutWholePool(GameTestHelper helper) {
         TestNetwork network = makeNetwork(helper, 25);
         Player player = helper.makeMockPlayer(GameType.SURVIVAL);
         player.getInventory().setItem(0, network.windowA());
@@ -166,14 +170,11 @@ public class MenuGameTests {
 
         ItemStack dropped = player.getInventory().removeFromSelected(true);
 
-        helper.assertTrue(dropped.has(ModRegistry.QUANTUM_LINK.get()), "whole drop keeps the link");
-        helper.assertTrue(dropped.getCount() == 25, "whole pool flies out");
+        helper.assertTrue(!dropped.has(ModRegistry.QUANTUM_LINK.get()), "the whole drop leaves plain");
+        helper.assertTrue(dropped.getCount() == 25, "whole pool flies out, conserved");
         helper.assertTrue(player.getInventory().getItem(0).isEmpty(), "hand slot must be empty");
-        helper.assertTrue(networks(helper).network(network.id()).pool == 25, "pool unchanged by the move");
-
-        // the dropped instance is the live window: consuming from it syncs
-        dropped.shrink(5);
-        helper.assertTrue(network.windowB().getCount() == 20, "other window must show 20");
+        helper.assertTrue(networks(helper).network(network.id()) == null, "network ends with the full drop");
+        helper.assertTrue(network.windowB().isEmpty(), "sibling wiped");
         helper.succeed();
     }
 
