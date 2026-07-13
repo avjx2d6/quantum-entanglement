@@ -25,11 +25,35 @@ public final class ClientEvents {
     public static final class GameBus {
         @SubscribeEvent
         public static void onItemTooltip(ItemTooltipEvent event) {
-            QuantumLinkData link = event.getItemStack().get(ModRegistry.QUANTUM_LINK.get());
+            var stack = event.getItemStack();
+            var tooltip = event.getToolTip();
+            QuantumLinkData link = stack.get(ModRegistry.QUANTUM_LINK.get());
             if (link != null) {
-                int insertAt = Math.min(1, event.getToolTip().size());
-                event.getToolTip().add(insertAt, link.tooltipLine());
+                int insertAt = Math.min(1, tooltip.size());
+                tooltip.add(insertAt, link.tooltipLine());
+                if (net.minecraft.client.gui.screens.Screen.hasShiftDown()) {
+                    tooltip.add(doctrine("tooltip.quantumitems.window.shared"));
+                    tooltip.add(doctrine("tooltip.quantumitems.window.ground"));
+                    tooltip.add(doctrine("tooltip.quantumitems.window.automation"));
+                    tooltip.add(doctrine("tooltip.quantumitems.window.shulker"));
+                } else {
+                    tooltip.add(insertAt + 1, net.minecraft.network.chat.Component
+                            .translatable("tooltip.quantumitems.window.hint")
+                            .withStyle(net.minecraft.ChatFormatting.DARK_GRAY));
+                }
+                return;
             }
+            if (stack.is(ModRegistry.QUANTUM_SHARD.get())) {
+                tooltip.add(doctrine("tooltip.quantumitems.shard.lore"));
+            } else if (stack.is(ModRegistry.QUANTUM_ENTANGLER_ITEM.get())) {
+                tooltip.add(doctrine("tooltip.quantumitems.entangler.usage"));
+                tooltip.add(doctrine("tooltip.quantumitems.entangler.expand"));
+            }
+        }
+
+        private static net.minecraft.network.chat.Component doctrine(String key) {
+            return net.minecraft.network.chat.Component.translatable(key)
+                    .withStyle(net.minecraft.ChatFormatting.GRAY, net.minecraft.ChatFormatting.ITALIC);
         }
     }
 }

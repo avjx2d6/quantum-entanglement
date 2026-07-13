@@ -2,5 +2,13 @@
   "itemGroup.quantumitems": "Квантовая запутанность",
   "block.quantumitems.quantum_entangler": "Квантовый запутыватель",
   "item.quantumitems.quantum_shard": "Квантовый осколок",
-  "tooltip.quantumitems.link_id": "Link ID: %s#%s"
+  "tooltip.quantumitems.link_id": "Link ID: %s#%s",
+  "tooltip.quantumitems.window.hint": "Зажмите Shift — правила запутанности",
+  "tooltip.quantumitems.window.shared": "Делит один запас предметов с близнецами: бери из любого — тратятся все.",
+  "tooltip.quantumitems.window.ground": "Касание земли рвёт связь: весь запас высыпается здесь.",
+  "tooltip.quantumitems.window.automation": "Механизмы извлекают обычные предметы; последний предмет завершает связь.",
+  "tooltip.quantumitems.window.shulker": "Спокойно спит в шалкеровом ящике. Что найдёшь при пробуждении — зависит от запаса.",
+  "tooltip.quantumitems.shard.lore": "Осколок чего-то нездешнего. Он помнит, каково быть в двух местах сразу.",
+  "tooltip.quantumitems.entangler.usage": "Запутывает стак в две связанные половины с общим запасом (расходует Квантовый осколок).",
+  "tooltip.quantumitems.entangler.expand": "Положите связанный стак снова, чтобы расширить сеть — до четырёх звеньев."
 }
