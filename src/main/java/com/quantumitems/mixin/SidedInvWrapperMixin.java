@@ -63,9 +63,11 @@ public abstract class SidedInvWrapperMixin {
             cir.setReturnValue(stack.getCount() > room ? stack.copyWithCount(stack.getCount() - room) : ItemStack.EMPTY);
             return;
         }
+        engine.trackHolder(inSlot, inv); // before absorb: the push must notify this holder too
         ItemStack remainder = stack.copy();
-        engine.absorb(inSlot, remainder, room); // grows the pool, shrinks the remainder
-        engine.trackHolder(inSlot, inv);
+        if (engine.absorb(inSlot, remainder, room) > 0) {
+            inv.setChanged(); // vanilla insertion would have marked the target changed
+        }
         cir.setReturnValue(remainder.isEmpty() ? ItemStack.EMPTY : remainder);
     }
 }

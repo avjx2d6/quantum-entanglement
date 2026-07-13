@@ -103,6 +103,37 @@ public class ContainerItemGameTests {
     }
 
     /**
+     * The GC heisenbug: a woken sleeper carries a STALE count, and the hopper
+     * SIMULATES extraction with copyWithCount before really extracting. When
+     * the old canonical instance has been garbage-collected, that orphan copy's
+     * setCount used to be adopted and its delta (new − staleSeen) applied to
+     * the pool — 1−16 = −15 floored the pool to zero and dissolved the network,
+     * destroying the sibling's items. A delta against a baseline that does not
+     * match the pool is meaningless and must never touch it.
+     */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void staleOrphanCopyNeverDrainsPool(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 16);
+        QuantumEngine engine = QuantumEngine.onServerThread();
+
+        // the window goes to sleep (shulker broken): its canonical ref dies
+        engine.deregister(network.id(), 1);
+        // the pool halves while it sleeps — windowA's count 16 is stale now
+        network.windowB().split(8);
+        helper.assertTrue(networks(helper).network(network.id()).pool == 8, "pool must be 8");
+
+        // wake-up: the hopper's SIMULATE path sizes an orphan linked copy
+        ItemStack simulated = network.windowA().copyWithCount(1);
+
+        helper.assertTrue(simulated.getCount() == 1, "the simulate copy gets its count");
+        helper.assertTrue(networks(helper).network(network.id()) != null,
+                "the network must survive an orphan copy's stale-baseline write");
+        helper.assertTrue(networks(helper).network(network.id()).pool == 8, "pool untouched");
+        helper.assertTrue(network.windowB().getCount() == 8, "sibling untouched");
+        helper.succeed();
+    }
+
+    /**
      * A shulker box protects its contents through breaking, so it protects the
      * link too: the window SLEEPS inside the dropped item (network alive), and
      * on placement it wakes and reconciles to the CURRENT pool — even if the

@@ -165,7 +165,18 @@ public final class QuantumEngine {
             return false;
         }
         if (existing != stack) {
-            canonical.put(key, new WeakReference<>(stack)); // adopt: no live competitor
+            if (seenCount != network.pool) {
+                // A count write against a STALE baseline: a woken sleeper (its
+                // canonical died with a broken shulker / chunk unload) or an
+                // orphan simulate copy. The intended delta is relative to a
+                // count the pool never had — applying it would corrupt or drain
+                // the pool (the GC heisenbug). Let vanilla size the instance;
+                // a real window heals at its next reconcile touch.
+                debug("setCount IGNORED, stale baseline: net#" + link.networkId() + " m" + link.memberId()
+                        + " seen=" + seenCount + " pool=" + network.pool + " new=" + newCount);
+                return false;
+            }
+            canonical.put(key, new WeakReference<>(stack)); // adopt: no live competitor, in-sync baseline
         }
         if (!componentsMatchSnapshot(stack, network)) {
             collapse(stack, link, network, networks);
@@ -174,6 +185,8 @@ public final class QuantumEngine {
         int delta = newCount - seenCount;
         int newPool = Math.max(0, network.pool + delta);
         if (newPool == 0) {
+            debug("setCount net#" + link.networkId() + " m" + link.memberId() + ": " + seenCount + "->" + newCount
+                    + " => pool 0, dissolving");
             dissolve(link.networkId(), network, networks);
         } else {
             debug("setCount net#" + link.networkId() + " m" + link.memberId() + ": " + seenCount + "->" + newCount

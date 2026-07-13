@@ -96,11 +96,15 @@ public final class ServerEvents {
         for (Slot slot : event.getContainer().slots) {
             ItemStack stack = slot.getItem();
             if (stack.has(ModRegistry.QUANTUM_LINK.get())) {
+                int before = stack.getCount();
                 engine.reconcileScan(stack, seen);
                 if (stack.isEmpty()) {
-                    slot.set(ItemStack.EMPTY);
+                    slot.set(ItemStack.EMPTY); // set() marks the slot changed
                 } else {
                     engine.trackHolder(stack, slot.container);
+                    if (stack.getCount() != before) {
+                        slot.setChanged(); // a silent heal must still reach disk + comparators
+                    }
                 }
             }
         }
@@ -202,11 +206,15 @@ public final class ServerEvents {
     private static void reconcileSlot(QuantumEngine engine, Container container, int slot, Set<Long> seen) {
         ItemStack stack = container.getItem(slot);
         if (stack.has(ModRegistry.QUANTUM_LINK.get())) {
+            int before = stack.getCount();
             engine.reconcileScan(stack, seen);
             if (stack.isEmpty()) {
                 container.setItem(slot, ItemStack.EMPTY);
             } else {
                 engine.trackHolder(stack, container);
+                if (stack.getCount() != before) {
+                    container.setChanged(); // a silent heal must still reach disk + comparators
+                }
             }
         }
     }
