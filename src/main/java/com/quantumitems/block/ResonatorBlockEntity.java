@@ -6,36 +6,74 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.WorldlyContainer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
 import javax.annotation.Nullable;
 
 /**
- * A resonator is a pedestal-slot of the ritual circle: exactly one stack,
- * placed and taken by hand only. It deliberately implements WorldlyContainer
- * with zero accessible faces and registers no item capability — hoppers,
- * droppers and pipes cannot see inside. "An artifact, not logistics" is a
- * physical property of the block, not a rule players must remember.
+ * A resonator is a pedestal-slot of the ritual circle, with Create-depot
+ * presentation: a stack laid down by a player SLIDES from their side onto
+ * the center (Create's TransportedItemStack math — beltPosition eases from
+ * .25 to .5 by a quarter of the remainder per tick, nudging the lay angle
+ * as it goes), ritual outputs materialize centered.
  *
- * It remains a Container so the quantum engine can track it as a holder:
- * windows resting here receive pool pushes and setChanged like any chest.
+ * Automation-proof by construction: WorldlyContainer with zero accessible
+ * faces and no item capability — hoppers, droppers and pipes cannot see
+ * inside. Still a Container, so the quantum engine tracks it as a holder.
  */
-public class ResonatorBlockEntity extends BlockEntity implements WorldlyContainer {
+public class ResonatorBlockEntity extends SyncedBlockEntity implements WorldlyContainer {
     private static final int[] NO_SLOTS = new int[0];
 
     private ItemStack item = ItemStack.EMPTY;
+    @Nullable
+    private Direction insertedFrom;
+    private float beltPosition = 0.5f;
+    private float prevBeltPosition = 0.5f;
+    private int angle;
 
     public ResonatorBlockEntity(BlockPos pos, BlockState state) {
         super(ModRegistry.RESONATOR_BE.get(), pos, state);
+        angle = Math.floorMod(pos.hashCode() * 31, 360);
     }
 
     public ItemStack displayedItem() {
         return item;
+    }
+
+    @Nullable
+    public Direction insertedFrom() {
+        return insertedFrom;
+    }
+
+    public float slideOffset(float partialTick) {
+        return net.minecraft.util.Mth.lerp(partialTick, prevBeltPosition, beltPosition);
+    }
+
+    public int layAngle() {
+        return angle;
+    }
+
+    /** Both sides tick the slide; the server owns the truth, the client animates it. */
+    public void tick() {
+        prevBeltPosition = beltPosition;
+        float diff = 0.5f - beltPosition;
+        if (diff > 1 / 512f) {
+            if (diff > 1 / 32f) {
+                angle += 1;
+            }
+            beltPosition += diff / 4f;
+        }
+    }
+
+    /** Player-facing insertion: the stack arrives from the player's side and slides in. */
+    public void layDown(ItemStack stack, Direction from) {
+        insertedFrom = from;
+        prevBeltPosition = 0.25f;
+        beltPosition = 0.25f;
+        setItem(0, stack);
     }
 
     /** The core locks its circle while a ritual runs; resonators ask before letting hands in. */
@@ -94,7 +132,7 @@ public class ResonatorBlockEntity extends BlockEntity implements WorldlyContaine
             return ItemStack.EMPTY;
         }
         ItemStack result = item.split(amount);
-        setChanged();
+        notifyUpdate();
         return result;
     }
 
@@ -111,12 +149,17 @@ public class ResonatorBlockEntity extends BlockEntity implements WorldlyContaine
             return;
         }
         item = stack;
+        if (stack.isEmpty()) {
+            insertedFrom = null;
+            prevBeltPosition = 0.5f;
+            beltPosition = 0.5f;
+        }
         QuantumEngine engine = QuantumEngine.onServerThread();
         if (engine != null && !stack.isEmpty()) {
             engine.reconcile(stack);
             engine.trackHolder(stack, this);
         }
-        setChanged();
+        notifyUpdate();
     }
 
     @Override
@@ -132,12 +175,12 @@ public class ResonatorBlockEntity extends BlockEntity implements WorldlyContaine
     @Override
     public void setChanged() {
         super.setChanged();
-        if (level != null && !level.isClientSide) {
-            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
-        }
+        // The engine pushes pool changes via setChanged (holder contract);
+        // the displayed count must follow to the client immediately.
+        sendData();
     }
 
-    // --- persistence + client sync (the displayed stack renders in-world) ---
+    // --- persistence + client sync ---
 
     @Override
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
@@ -145,22 +188,22 @@ public class ResonatorBlockEntity extends BlockEntity implements WorldlyContaine
         if (!item.isEmpty()) {
             tag.put("item", item.save(registries));
         }
+        if (insertedFrom != null) {
+            tag.putByte("insertedFrom", (byte) insertedFrom.get3DDataValue());
+        }
+        tag.putFloat("beltPosition", beltPosition);
+        tag.putInt("angle", angle);
     }
 
     @Override
     protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
         item = tag.contains("item") ? ItemStack.parseOptional(registries, tag.getCompound("item")) : ItemStack.EMPTY;
-    }
-
-    @Override
-    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
-        return saveWithoutMetadata(registries);
-    }
-
-    @Override
-    @Nullable
-    public ClientboundBlockEntityDataPacket getUpdatePacket() {
-        return ClientboundBlockEntityDataPacket.create(this);
+        insertedFrom = tag.contains("insertedFrom") ? Direction.from3DDataValue(tag.getByte("insertedFrom")) : null;
+        beltPosition = tag.contains("beltPosition") ? tag.getFloat("beltPosition") : 0.5f;
+        prevBeltPosition = beltPosition;
+        if (tag.contains("angle")) {
+            angle = tag.getInt("angle");
+        }
     }
 }

@@ -39,11 +39,13 @@ public class QuantumCoreBlock extends Block implements EntityBlock {
     @Override
     @Nullable
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
-        if (level.isClientSide || type != ModRegistry.QUANTUM_CORE_BE.get()) {
+        if (type != ModRegistry.QUANTUM_CORE_BE.get()) {
             return null;
         }
+        // Both sides: the client tick only advances the phase clock that
+        // drives the shard-spin animation; all logic stays server-side.
         return (tickLevel, pos, tickState, blockEntity) ->
-                QuantumCoreBlockEntity.serverTick(tickLevel, pos, tickState, (QuantumCoreBlockEntity) blockEntity);
+                QuantumCoreBlockEntity.tick(tickLevel, pos, tickState, (QuantumCoreBlockEntity) blockEntity);
     }
 
     @Override

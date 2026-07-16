@@ -10,14 +10,12 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3f;
@@ -41,7 +39,7 @@ import java.util.Set;
  * so a chunk unload mid-ritual can never leave a half-applied network; the
  * phases before and after are pure theater.
  */
-public class QuantumCoreBlockEntity extends BlockEntity {
+public class QuantumCoreBlockEntity extends SyncedBlockEntity {
     /** Corner offsets of the circle, in deterministic order (output windows fill in this order). */
     private static final BlockPos[] CORNERS = {
             new BlockPos(-2, 0, -2), new BlockPos(2, 0, -2),
@@ -138,8 +136,15 @@ public class QuantumCoreBlockEntity extends BlockEntity {
         return true;
     }
 
-    public static void serverTick(Level level, BlockPos pos, BlockState state, QuantumCoreBlockEntity core) {
+    public static void tick(Level level, BlockPos pos, BlockState state, QuantumCoreBlockEntity core) {
         if (core.phase == Phase.IDLE) {
+            return;
+        }
+        if (level.isClientSide) {
+            // The client advances the phase clock itself between sync packets
+            // (each phase transition resyncs it) — this is what drives the
+            // shard spin and any renderer animation.
+            core.phaseAge++;
             return;
         }
         ServerLevel serverLevel = (ServerLevel) level;
@@ -358,19 +363,6 @@ public class QuantumCoreBlockEntity extends BlockEntity {
     @Override
     public void setChanged() {
         super.setChanged();
-        if (level != null && !level.isClientSide) {
-            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
-        }
-    }
-
-    @Override
-    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
-        return saveWithoutMetadata(registries);
-    }
-
-    @Override
-    @Nullable
-    public ClientboundBlockEntityDataPacket getUpdatePacket() {
-        return ClientboundBlockEntityDataPacket.create(this);
+        sendData();
     }
 }

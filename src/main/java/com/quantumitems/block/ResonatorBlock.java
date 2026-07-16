@@ -39,6 +39,18 @@ public class ResonatorBlock extends Block implements EntityBlock {
     }
 
     @Override
+    @Nullable
+    public <T extends BlockEntity> net.minecraft.world.level.block.entity.BlockEntityTicker<T> getTicker(
+            Level level, BlockState state, net.minecraft.world.level.block.entity.BlockEntityType<T> type) {
+        if (type != com.quantumitems.ModRegistry.RESONATOR_BE.get()) {
+            return null;
+        }
+        // Both sides: the slide animation is Create-depot style, the client
+        // advances it between sync packets just like the server does.
+        return (tickLevel, pos, tickState, blockEntity) -> ((ResonatorBlockEntity) blockEntity).tick();
+    }
+
+    @Override
     protected ItemInteractionResult useItemOn(ItemStack heldStack, BlockState state, Level level, BlockPos pos,
                                               Player player, InteractionHand hand, BlockHitResult hitResult) {
         if (level.isClientSide) {
@@ -65,7 +77,7 @@ public class ResonatorBlock extends Block implements EntityBlock {
                     1.0f + level.getRandom().nextFloat());
         }
         if (!emptyHanded) {
-            resonator.setItem(0, heldStack);
+            resonator.layDown(heldStack, player.getDirection());
             player.setItemInHand(hand, ItemStack.EMPTY);
             level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_PLACE, SoundSource.BLOCKS, 0.7f, 1.2f);
         }

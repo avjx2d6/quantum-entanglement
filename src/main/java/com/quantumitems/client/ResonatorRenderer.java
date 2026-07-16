@@ -10,17 +10,23 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.client.renderer.entity.ItemRenderer;
 import net.minecraft.client.resources.model.BakedModel;
+import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
-import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.Vec3;
+
+import java.util.Random;
 
 /**
- * The laid-out stack LIES on the pedestal, Create-depot style (see
- * DepotRenderer): flat items rest rotated onto the top face and larger
- * counts render as a fanned pile (log2 layers), block items sit as slightly
- * scattered miniatures. The lay angle derives from the block position, so
- * every pedestal's stack rests a little differently — placed, not hovering.
+ * Faithful port of Create's DepotRenderer for a single held stack: the item
+ * LIES flat on the pedestal, slides in from the side the player stood on
+ * (offset = (.5 − beltPosition) toward the inserted-from side), larger
+ * counts pile up as fanned log2 layers, block items scatter as miniatures.
+ *
+ * One deliberate deviation: Create renders onto the depot's recessed tray
+ * (base height 15/16 with items sinking to the tray surface); our resonator
+ * is a full cube, so the base heights compensate to land items ON its top.
  */
 public class ResonatorRenderer implements BlockEntityRenderer<ResonatorBlockEntity> {
 
@@ -38,28 +44,41 @@ public class ResonatorRenderer implements BlockEntityRenderer<ResonatorBlockEnti
         BakedModel model = itemRenderer.getModel(stack, resonator.getLevel(), null, 0);
         boolean blockItem = model.isGui3d();
         int light = LevelRenderer.getLightColor(resonator.getLevel(), resonator.getBlockPos().above());
-        int layers = Mth.log2(stack.getCount()) / 2;
-        float baseAngle = (resonator.getBlockPos().hashCode() * 31) % 360;
-        RandomSource scatter = RandomSource.create(resonator.getBlockPos().asLong());
 
         poseStack.pushPose();
-        poseStack.translate(0.5, 1.0, 0.5);
-        poseStack.mulPose(Axis.YP.rotationDegrees(baseAngle));
-        for (int i = 0; i <= layers; i++) {
+        poseStack.translate(0.5f, blockItem ? 1.25f : 1.0f + 3 / 32f, 0.5f);
+
+        // Slide-in from the inserted side: Create's (.5 − beltPosition) offset.
+        Direction from = resonator.insertedFrom();
+        float offset = resonator.slideOffset(partialTick);
+        if (from != null && from.getAxis().isHorizontal()) {
+            Vec3 offsetVec = Vec3.atLowerCornerOf(from.getOpposite().getNormal()).scale(0.5f - offset);
+            poseStack.translate(offsetVec.x, offsetVec.y, offsetVec.z);
+        }
+
+        int angle = resonator.layAngle();
+        Random r = new Random(0);
+        int count = Mth.log2(stack.getCount()) / 2;
+
+        poseStack.mulPose(Axis.YP.rotationDegrees(angle));
+        for (int i = 0; i <= count; i++) {
             poseStack.pushPose();
             if (blockItem) {
-                poseStack.translate(scatter.nextFloat() * 0.0625f * i, 0.25f + i * 0.02f,
-                        scatter.nextFloat() * 0.0625f * i);
-                poseStack.scale(0.5f, 0.5f, 0.5f);
-            } else {
-                poseStack.mulPose(Axis.YP.rotationDegrees(i * 10f));
-                poseStack.translate(0, 0.018f + i * 0.031f, 0);
-                poseStack.scale(0.5f, 0.5f, 0.5f);
+                poseStack.translate(r.nextFloat() * 0.0625f * i, 0, r.nextFloat() * 0.0625f * i);
+            }
+            poseStack.scale(0.5f, 0.5f, 0.5f);
+            if (!blockItem) {
+                poseStack.translate(0, -3 / 16f, 0);
                 poseStack.mulPose(Axis.XP.rotationDegrees(90));
             }
             itemRenderer.render(stack, ItemDisplayContext.FIXED, false, poseStack, buffers,
                     light, packedOverlay, model);
             poseStack.popPose();
+
+            if (!blockItem) {
+                poseStack.mulPose(Axis.YP.rotationDegrees(10));
+            }
+            poseStack.translate(0, blockItem ? 1 / 64d : 1 / 16d, 0);
         }
         poseStack.popPose();
     }
