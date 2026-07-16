@@ -194,32 +194,30 @@ public class QuantumCoreBlockEntity extends BlockEntity {
 
     /** Particle streams resonators → above the core; colors follow the phase script. */
     private void emitTheater(ServerLevel level) {
-        if (phaseAge % 2 != 0) {
-            return;
-        }
         Vec3 focus = Vec3.atCenterOf(worldPosition).add(0, 1.1, 0);
         for (BlockPos corner : CORNERS) {
             BlockPos resonatorPos = worldPosition.offset(corner);
             boolean occupied = level.getBlockEntity(resonatorPos) instanceof ResonatorBlockEntity resonator
                     && !resonator.isEmpty();
             Vec3 from = Vec3.atCenterOf(resonatorPos).add(0, 0.8, 0);
-            double t = level.random.nextDouble();
-            Vec3 point = from.lerp(focus, t);
-            switch (phase) {
-                case CHARGING -> level.sendParticles(new DustParticleOptions(COLOR_CHARGE, 1.0f),
-                        point.x, point.y, point.z, 1, 0.05, 0.05, 0.05, 0);
-                case JUDGEMENT -> level.sendParticles(
-                        new DustParticleOptions(occupied ? COLOR_INPUT : COLOR_CHARGE, 1.0f),
-                        point.x, point.y, point.z, 2, 0.05, 0.05, 0.05, 0);
-                case SUCCESS -> level.sendParticles(ParticleTypes.END_ROD,
-                        point.x, point.y, point.z, 1, 0.1, 0.1, 0.1, 0.02);
-                case FAILURE -> {
-                    level.sendParticles(new DustParticleOptions(COLOR_FAIL, 1.2f),
-                            point.x, point.y, point.z, 2, 0.08, 0.08, 0.08, 0);
-                    level.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE,
-                            focus.x, focus.y, focus.z, 1, 0.1, 0.1, 0.1, 0.01);
-                }
-                default -> {
+            for (int sample = 0; sample < 2; sample++) {
+                Vec3 point = from.lerp(focus, level.random.nextDouble());
+                switch (phase) {
+                    case CHARGING -> level.sendParticles(new DustParticleOptions(COLOR_CHARGE, 1.0f),
+                            point.x, point.y, point.z, 1, 0.05, 0.05, 0.05, 0);
+                    case JUDGEMENT -> level.sendParticles(
+                            new DustParticleOptions(occupied ? COLOR_INPUT : COLOR_CHARGE, 1.0f),
+                            point.x, point.y, point.z, 2, 0.05, 0.05, 0.05, 0);
+                    case SUCCESS -> level.sendParticles(ParticleTypes.END_ROD,
+                            point.x, point.y, point.z, 1, 0.1, 0.1, 0.1, 0.02);
+                    case FAILURE -> {
+                        level.sendParticles(new DustParticleOptions(COLOR_FAIL, 1.2f),
+                                point.x, point.y, point.z, 2, 0.08, 0.08, 0.08, 0);
+                        level.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE,
+                                focus.x, focus.y, focus.z, 1, 0.1, 0.1, 0.1, 0.01);
+                    }
+                    default -> {
+                    }
                 }
             }
         }

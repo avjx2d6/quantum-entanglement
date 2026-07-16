@@ -4,7 +4,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
 import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -18,10 +17,15 @@ import net.minecraft.world.phys.BlockHitResult;
 import javax.annotation.Nullable;
 
 /**
- * Hand-only pedestal of the ritual circle. Right-click with a stack lays the
- * whole stack down (windows travel whole — a player gesture); right-click
- * with an empty hand takes it back whole. While the core runs a ritual the
- * circle is locked: nothing goes in or out.
+ * Hand-only pedestal of the ritual circle, with Create-depot interaction
+ * semantics (see SharedDepotBlockMethods#onUse): ONE unified click handler
+ * that first hands back whatever lies on the pedestal, then lays down what
+ * you held. Empty hand = take, full hand = swap; it never returns FAIL for
+ * an occupied pedestal — that would suppress vanilla's useWithoutItem
+ * fallback and brick the empty-hand take (the playtest bug).
+ *
+ * The give-back goes through Inventory.placeItemBackInInventory, which our
+ * mixin wraps in a player gesture: a window travels whole, link intact.
  */
 public class ResonatorBlock extends Block implements EntityBlock {
     public ResonatorBlock(Properties properties) {
@@ -48,36 +52,24 @@ public class ResonatorBlock extends Block implements EntityBlock {
                     net.minecraft.network.chat.Component.translatable("message.quantumitems.ritual_locked"), true);
             return ItemInteractionResult.FAIL;
         }
-        if (!resonator.isEmpty()) {
-            return ItemInteractionResult.FAIL; // occupied: take with an empty hand first
+        boolean emptyHanded = heldStack.isEmpty();
+        ItemStack laidOut = resonator.getItem(0);
+        if (emptyHanded && laidOut.isEmpty()) {
+            return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }
-        resonator.setItem(0, heldStack);
-        player.setItemInHand(hand, ItemStack.EMPTY);
-        level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_PLACE, SoundSource.BLOCKS, 0.7f, 1.2f);
+        if (!laidOut.isEmpty()) {
+            resonator.removeItemNoUpdate(0);
+            resonator.setChanged();
+            player.getInventory().placeItemBackInInventory(laidOut);
+            level.playSound(null, pos, SoundEvents.ITEM_PICKUP, SoundSource.PLAYERS, 0.2f,
+                    1.0f + level.getRandom().nextFloat());
+        }
+        if (!emptyHanded) {
+            resonator.setItem(0, heldStack);
+            player.setItemInHand(hand, ItemStack.EMPTY);
+            level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_PLACE, SoundSource.BLOCKS, 0.7f, 1.2f);
+        }
         return ItemInteractionResult.SUCCESS;
-    }
-
-    @Override
-    protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player,
-                                               BlockHitResult hitResult) {
-        if (level.isClientSide) {
-            return InteractionResult.SUCCESS;
-        }
-        if (!(level.getBlockEntity(pos) instanceof ResonatorBlockEntity resonator) || resonator.isEmpty()) {
-            return InteractionResult.PASS;
-        }
-        if (resonator.isLockedByRitual()) {
-            player.displayClientMessage(
-                    net.minecraft.network.chat.Component.translatable("message.quantumitems.ritual_locked"), true);
-            return InteractionResult.FAIL;
-        }
-        ItemStack stack = resonator.removeItemNoUpdate(0);
-        resonator.setChanged();
-        if (!player.getInventory().add(stack)) {
-            player.drop(stack, false);
-        }
-        level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_HIT, SoundSource.BLOCKS, 0.7f, 0.9f);
-        return InteractionResult.SUCCESS;
     }
 
     @Override

@@ -46,14 +46,9 @@ public final class ClientEvents {
             if (stack.is(ModRegistry.QUANTUM_SHARD.get())) {
                 tooltip.add(doctrine("tooltip.quantumitems.shard.lore"));
                 tooltip.add(doctrine("tooltip.quantumitems.shard.source"));
-            } else if (stack.is(ModRegistry.QUANTUM_CORE_ITEM.get())) {
-                tooltip.add(doctrine("tooltip.quantumitems.core.usage"));
-                tooltip.add(doctrine("tooltip.quantumitems.core.structure"));
-            } else if (stack.is(ModRegistry.RESONATOR_ITEM.get())) {
-                tooltip.add(doctrine("tooltip.quantumitems.resonator.usage"));
-            } else if (stack.is(ModRegistry.ENTANGLED_EYE.get())) {
-                tooltip.add(doctrine("tooltip.quantumitems.entangled_eye.lore"));
             }
+            // Core/resonator/eye tooltips deliberately absent for now: the
+            // author wants mechanics corrected first, labels designed later.
         }
 
         private static net.minecraft.network.chat.Component doctrine(String key) {

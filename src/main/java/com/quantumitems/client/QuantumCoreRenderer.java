@@ -32,17 +32,19 @@ public class QuantumCoreRenderer implements BlockEntityRenderer<QuantumCoreBlock
             return;
         }
         float age = core.phaseAge() + partialTick;
-        // Spin accelerates through CHARGING and stays frantic in JUDGEMENT.
-        float speed = switch (core.phase()) {
-            case CHARGING -> 2.0f + 16.0f * age / QuantumCoreBlockEntity.CHARGING_TICKS;
-            case JUDGEMENT -> 20.0f;
-            default -> 1.0f;
+        // Continuous angle: the piecewise INTEGRAL of the speed ramp, so the
+        // rotation never jumps when the phase (and thus the speed) changes.
+        float chargeEnd = 2.0f * QuantumCoreBlockEntity.CHARGING_TICKS + 8.0f * QuantumCoreBlockEntity.CHARGING_TICKS;
+        float angle = switch (core.phase()) {
+            case CHARGING -> 2.0f * age + 8.0f * age * age / QuantumCoreBlockEntity.CHARGING_TICKS;
+            case JUDGEMENT -> chargeEnd + 18.0f * age;
+            default -> 2.0f * age;
         };
         float time = core.getLevel().getGameTime() + partialTick;
         int light = LevelRenderer.getLightColor(core.getLevel(), core.getBlockPos().above());
         poseStack.pushPose();
         poseStack.translate(0.5, 1.35 + Mth.sin(time / 10.0f) * 0.04f, 0.5);
-        poseStack.mulPose(Axis.YP.rotationDegrees(time * speed));
+        poseStack.mulPose(Axis.YP.rotationDegrees(angle));
         poseStack.scale(0.7f, 0.7f, 0.7f);
         itemRenderer.renderStatic(shard, ItemDisplayContext.GROUND, light, packedOverlay,
                 poseStack, buffers, core.getLevel(), 0);

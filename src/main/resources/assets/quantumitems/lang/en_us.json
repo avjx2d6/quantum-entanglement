@@ -12,10 +12,6 @@
   "tooltip.quantumitems.window.shulker": "Sleeps safely inside a shulker box. What you find on waking depends on the pool.",
   "tooltip.quantumitems.shard.lore": "A splinter of somewhere else. It remembers being two places at once.",
   "tooltip.quantumitems.shard.source": "Found where the old city sleeps in the dark.",
-  "tooltip.quantumitems.core.usage": "Place a Quantum Shard here to begin the ritual. The shard burns either way.",
-  "tooltip.quantumitems.core.structure": "Demands a 5x5 amethyst floor with Resonators on the corners.",
-  "tooltip.quantumitems.resonator.usage": "Lay a stack here by hand. Machines cannot reach inside.",
-  "tooltip.quantumitems.entangled_eye.lore": "It looks in two directions at once, and both are yours.",
   "message.quantumitems.ritual_locked": "The ritual is in progress - nothing may enter or leave the circle.",
   "message.quantumitems.structure_incomplete": "The circle is incomplete: 5x5 amethyst floor, Resonators on the corners."
 }

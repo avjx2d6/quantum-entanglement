@@ -12,10 +12,6 @@
   "tooltip.quantumitems.window.shulker": "Спокойно спит в шалкеровом ящике. Что найдёшь при пробуждении — зависит от запаса.",
   "tooltip.quantumitems.shard.lore": "Осколок чего-то нездешнего. Он помнит, каково быть в двух местах сразу.",
   "tooltip.quantumitems.shard.source": "Находится там, где древний город спит во тьме.",
-  "tooltip.quantumitems.core.usage": "Положите Квантовый осколок, чтобы начать ритуал. Осколок сгорает в любом случае.",
-  "tooltip.quantumitems.core.structure": "Требует пол 5x5 из аметистовых блоков и Резонаторы по углам.",
-  "tooltip.quantumitems.resonator.usage": "Выложите стак сюда рукой. Механизмам внутрь не дотянуться.",
-  "tooltip.quantumitems.entangled_eye.lore": "Оно смотрит в две стороны сразу — и обе твои.",
   "message.quantumitems.ritual_locked": "Идёт ритуал — ничто не может войти в круг или покинуть его.",
   "message.quantumitems.structure_incomplete": "Круг не завершён: пол 5x5 из аметиста, Резонаторы по углам."
 }
