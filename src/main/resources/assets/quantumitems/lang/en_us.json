@@ -9,6 +9,7 @@
   "tooltip.quantumitems.window.automation": "Machines extract ordinary items; taking the last one ends the link.",
   "tooltip.quantumitems.window.shulker": "Sleeps safely inside a shulker box. What you find on waking depends on the pool.",
   "tooltip.quantumitems.shard.lore": "A splinter of somewhere else. It remembers being two places at once.",
+  "tooltip.quantumitems.shard.source": "Found where the old city sleeps in the dark.",
   "tooltip.quantumitems.entangler.usage": "Entangles a stack into two linked halves sharing one pool (consumes a Quantum Shard).",
   "tooltip.quantumitems.entangler.expand": "Feed a linked stack back in to grow the network, up to four links."
 }

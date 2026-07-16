@@ -9,6 +9,7 @@
   "tooltip.quantumitems.window.automation": "Механизмы извлекают обычные предметы; последний предмет завершает связь.",
   "tooltip.quantumitems.window.shulker": "Спокойно спит в шалкеровом ящике. Что найдёшь при пробуждении — зависит от запаса.",
   "tooltip.quantumitems.shard.lore": "Осколок чего-то нездешнего. Он помнит, каково быть в двух местах сразу.",
+  "tooltip.quantumitems.shard.source": "Находится там, где древний город спит во тьме.",
   "tooltip.quantumitems.entangler.usage": "Запутывает стак в две связанные половины с общим запасом (расходует Квантовый осколок).",
   "tooltip.quantumitems.entangler.expand": "Положите связанный стак снова, чтобы расширить сеть — до четырёх звеньев."
 }

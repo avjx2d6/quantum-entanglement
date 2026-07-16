@@ -45,6 +45,7 @@ public final class ClientEvents {
             }
             if (stack.is(ModRegistry.QUANTUM_SHARD.get())) {
                 tooltip.add(doctrine("tooltip.quantumitems.shard.lore"));
+                tooltip.add(doctrine("tooltip.quantumitems.shard.source"));
             } else if (stack.is(ModRegistry.QUANTUM_ENTANGLER_ITEM.get())) {
                 tooltip.add(doctrine("tooltip.quantumitems.entangler.usage"));
                 tooltip.add(doctrine("tooltip.quantumitems.entangler.expand"));

@@ -1,7 +1,9 @@
 package com.quantumitems;
 
+import com.mojang.serialization.MapCodec;
 import com.quantumitems.block.QuantumEntanglerBlock;
 import com.quantumitems.block.QuantumEntanglerBlockEntity;
+import com.quantumitems.loot.AddItemLootModifier;
 import com.quantumitems.menu.QuantumEntanglerMenu;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
@@ -19,6 +21,8 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
+import net.neoforged.neoforge.common.loot.IGlobalLootModifier;
+import net.neoforged.neoforge.registries.NeoForgeRegistries;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -38,6 +42,8 @@ public final class ModRegistry {
             DeferredRegister.create(Registries.MENU, QuantumItemsMod.MOD_ID);
     private static final DeferredRegister<CreativeModeTab> CREATIVE_TABS =
             DeferredRegister.create(Registries.CREATIVE_MODE_TAB, QuantumItemsMod.MOD_ID);
+    private static final DeferredRegister<MapCodec<? extends IGlobalLootModifier>> LOOT_MODIFIERS =
+            DeferredRegister.create(NeoForgeRegistries.Keys.GLOBAL_LOOT_MODIFIER_SERIALIZERS, QuantumItemsMod.MOD_ID);
 
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<QuantumLinkData>> QUANTUM_LINK =
             DATA_COMPONENTS.register("quantum_link", () -> DataComponentType.<QuantumLinkData>builder()
@@ -67,6 +73,9 @@ public final class ModRegistry {
             MENUS.register("quantum_entangler",
                     () -> IMenuTypeExtension.create(QuantumEntanglerMenu::fromNetwork));
 
+    public static final DeferredHolder<MapCodec<? extends IGlobalLootModifier>, MapCodec<AddItemLootModifier>> ADD_ITEM_LOOT =
+            LOOT_MODIFIERS.register("add_item", () -> AddItemLootModifier.CODEC);
+
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> TAB =
             CREATIVE_TABS.register("main", () -> CreativeModeTab.builder()
                     .title(Component.translatable("itemGroup.quantumitems"))
@@ -84,5 +93,6 @@ public final class ModRegistry {
         BLOCK_ENTITIES.register(modBus);
         MENUS.register(modBus);
         CREATIVE_TABS.register(modBus);
+        LOOT_MODIFIERS.register(modBus);
     }
 }
