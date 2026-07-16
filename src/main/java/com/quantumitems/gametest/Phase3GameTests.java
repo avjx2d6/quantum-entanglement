@@ -122,11 +122,19 @@ public class Phase3GameTests {
         helper.succeed();
     }
 
-    /** A destroyed window retires its member; the pool survives in the others. */
+    /**
+     * A destroyed window retires its member; the pool survives in the others.
+     * Three members here on purpose: retiring down to ONE survivor now
+     * collapses it to plain (lone-member anomaly, see AnomalyGameTests).
+     */
     @GameTest(template = "empty", templateNamespace = "quantumitems")
     public static void windowDeathRetiresMember(GameTestHelper helper) {
         TestNetwork network = makeNetwork(helper, 20);
         QuantumEngine engine = QuantumEngine.onServerThread();
+        int memberC = networks(helper).addMember(network.id());
+        ItemStack windowC = network.windowA().copy();
+        windowC.set(ModRegistry.QUANTUM_LINK.get(), new QuantumLinkData(network.id(), memberC));
+        engine.adopt(windowC);
 
         engine.windowDestroyed(network.windowA());
 
@@ -135,6 +143,7 @@ public class Phase3GameTests {
         helper.assertTrue(entry.pool == 20, "pool untouched — a window burned, not the items");
         helper.assertTrue(!entry.aliveMembers.contains(1), "member #1 must retire");
         helper.assertTrue(entry.aliveMembers.contains(2), "member #2 must remain");
+        helper.assertTrue(entry.aliveMembers.contains(memberC), "member #3 must remain");
         helper.succeed();
     }
 
@@ -195,28 +204,36 @@ public class Phase3GameTests {
 
     /**
      * Rule 5: a creative packet replacing a window slot with something that no
-     * longer carries the link retires that member — never a ghost network. The
-     * sibling lives on; replacing the last member ends the network.
+     * longer carries the link retires that member — never a ghost network.
+     * Siblings live on; and once retirement leaves a LONE survivor, it
+     * collapses to plain right there (items conserved, no half-ghosts).
      */
     @GameTest(template = "empty", templateNamespace = "quantumitems")
     public static void creativeReplaceRetiresMember(GameTestHelper helper) {
         TestNetwork network = makeNetwork(helper, 6);
         QuantumEngine engine = QuantumEngine.onServerThread();
+        int memberC = networks(helper).addMember(network.id());
+        ItemStack windowC = network.windowA().copy();
+        windowC.set(ModRegistry.QUANTUM_LINK.get(), new QuantumLinkData(network.id(), memberC));
+        engine.adopt(windowC);
 
-        // the client merged the window into a plain stack and uploaded plain 25
+        // the client merged window #1 into a plain stack and uploaded plain 25
         engine.creativeSlotReplaced(network.windowA(), new ItemStack(Items.BREAD, 25));
 
         QuantumNetworks.Network entry = networks(helper).network(network.id());
-        helper.assertTrue(entry != null, "network survives while a member remains");
+        helper.assertTrue(entry != null, "network survives while members remain");
         helper.assertTrue(!entry.aliveMembers.contains(1), "replaced member must retire");
         helper.assertTrue(entry.aliveMembers.contains(2), "sibling member lives on");
         helper.assertTrue(entry.pool == 6, "pool untouched");
         helper.assertTrue(network.windowB().getCount() == 6, "sibling window keeps working");
 
-        // now the client destroys the last window (X / air upload)
+        // destroying window #2 leaves windowC alone -> it collapses to plain
         engine.creativeSlotReplaced(network.windowB(), ItemStack.EMPTY);
         helper.assertTrue(networks(helper).network(network.id()) == null,
-                "last member replaced -> network ends, no ghost");
+                "lone survivor -> network ends, no ghost");
+        helper.assertTrue(!windowC.has(ModRegistry.QUANTUM_LINK.get()),
+                "lone survivor must be plain now");
+        helper.assertTrue(windowC.getCount() == 6, "items conserved through the collapse");
         helper.succeed();
     }
 

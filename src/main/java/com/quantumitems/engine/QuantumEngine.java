@@ -125,6 +125,12 @@ public final class QuantumEngine {
             collapse(stack, link, network, networks);
             return Status.COLLAPSED;
         }
+        if (network.aliveMembers.size() == 1) {
+            // Lone-member anomaly surfacing (woken sleeper of a creative-torn
+            // network): collapse to plain, count = pool. See collapseIfLoneMember.
+            collapse(stack, link, network, networks);
+            return Status.COLLAPSED;
+        }
         if (stack.getCount() != network.pool) {
             rawSetCount(stack, network.pool);
         }
@@ -510,6 +516,35 @@ public final class QuantumEngine {
             debug("windowDestroyed net#" + link.networkId() + " m" + link.memberId()
                     + " retired, members left " + network.aliveMembers);
             networks.setDirty();
+            collapseIfLoneMember(link.networkId(), network, networks);
+        }
+    }
+
+    /**
+     * A single-member network is an anomaly (creation yields two windows and
+     * survival never retires members — only creative edits do). The doctrine's
+     * universal fallback applies: the lone window collapses to plain. A live
+     * survivor collapses right here; an untracked one (asleep in item NBT, or
+     * creative-deleted) must NOT have its network removed blindly — a sleeper
+     * would wipe to zero on wake-up — so it collapses at first touch instead
+     * (see the lone-member check in {@link #reconcile}).
+     */
+    private void collapseIfLoneMember(int networkId, QuantumNetworks.Network network, QuantumNetworks networks) {
+        if (network.aliveMembers.size() != 1) {
+            return;
+        }
+        int survivorId = network.aliveMembers.first();
+        WeakReference<ItemStack> ref = canonical.get(key(networkId, survivorId));
+        ItemStack survivor = ref != null ? ref.get() : null;
+        if (survivor == null || survivor.isEmpty()) {
+            debug("net#" + networkId + " down to lone m" + survivorId
+                    + " with no live instance -> collapse deferred to first touch");
+            return;
+        }
+        debug("net#" + networkId + " down to lone m" + survivorId + " -> collapse to plain");
+        QuantumLinkData link = survivor.get(ModRegistry.QUANTUM_LINK.get());
+        if (link != null) {
+            collapse(survivor, link, network, networks);
         }
     }
 
