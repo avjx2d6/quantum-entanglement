@@ -1,7 +1,9 @@
 {
   "itemGroup.quantumitems": "Quantum Entanglement",
-  "block.quantumitems.quantum_entangler": "Quantum Entangler",
+  "block.quantumitems.quantum_core": "Quantum Core",
+  "block.quantumitems.resonator": "Resonator",
   "item.quantumitems.quantum_shard": "Quantum Shard",
+  "item.quantumitems.entangled_eye": "Entangled Eye",
   "tooltip.quantumitems.link_id": "Link ID: %s#%s",
   "tooltip.quantumitems.window.hint": "Hold Shift for entanglement rules",
   "tooltip.quantumitems.window.shared": "Shares one pool of items with its twins - use any, drain all.",
@@ -10,6 +12,10 @@
   "tooltip.quantumitems.window.shulker": "Sleeps safely inside a shulker box. What you find on waking depends on the pool.",
   "tooltip.quantumitems.shard.lore": "A splinter of somewhere else. It remembers being two places at once.",
   "tooltip.quantumitems.shard.source": "Found where the old city sleeps in the dark.",
-  "tooltip.quantumitems.entangler.usage": "Entangles a stack into two linked halves sharing one pool (consumes a Quantum Shard).",
-  "tooltip.quantumitems.entangler.expand": "Feed a linked stack back in to grow the network, up to four links."
+  "tooltip.quantumitems.core.usage": "Place a Quantum Shard here to begin the ritual. The shard burns either way.",
+  "tooltip.quantumitems.core.structure": "Demands a 5x5 amethyst floor with Resonators on the corners.",
+  "tooltip.quantumitems.resonator.usage": "Lay a stack here by hand. Machines cannot reach inside.",
+  "tooltip.quantumitems.entangled_eye.lore": "It looks in two directions at once, and both are yours.",
+  "message.quantumitems.ritual_locked": "The ritual is in progress - nothing may enter or leave the circle.",
+  "message.quantumitems.structure_incomplete": "The circle is incomplete: 5x5 amethyst floor, Resonators on the corners."
 }

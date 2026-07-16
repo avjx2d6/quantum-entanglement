@@ -6,7 +6,7 @@
       "entries": [
         {
           "type": "minecraft:item",
-          "name": "quantumitems:quantum_entangler"
+          "name": "quantumitems:resonator"
         }
       ],
       "conditions": [
@@ -16,5 +16,5 @@
       ]
     }
   ],
-  "random_sequence": "quantumitems:blocks/quantum_entangler"
+  "random_sequence": "quantumitems:blocks/resonator"
 }

@@ -6,19 +6,10 @@ import com.quantumitems.QuantumLinkData;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.event.entity.player.ItemTooltipEvent;
 
 public final class ClientEvents {
     private ClientEvents() {
-    }
-
-    @EventBusSubscriber(modid = QuantumItemsMod.MOD_ID, value = Dist.CLIENT)
-    public static final class ModBus {
-        @SubscribeEvent
-        public static void registerScreens(RegisterMenuScreensEvent event) {
-            event.register(ModRegistry.QUANTUM_ENTANGLER_MENU.get(), QuantumEntanglerScreen::new);
-        }
     }
 
     @EventBusSubscriber(modid = QuantumItemsMod.MOD_ID, value = Dist.CLIENT)
@@ -46,9 +37,13 @@ public final class ClientEvents {
             if (stack.is(ModRegistry.QUANTUM_SHARD.get())) {
                 tooltip.add(doctrine("tooltip.quantumitems.shard.lore"));
                 tooltip.add(doctrine("tooltip.quantumitems.shard.source"));
-            } else if (stack.is(ModRegistry.QUANTUM_ENTANGLER_ITEM.get())) {
-                tooltip.add(doctrine("tooltip.quantumitems.entangler.usage"));
-                tooltip.add(doctrine("tooltip.quantumitems.entangler.expand"));
+            } else if (stack.is(ModRegistry.QUANTUM_CORE_ITEM.get())) {
+                tooltip.add(doctrine("tooltip.quantumitems.core.usage"));
+                tooltip.add(doctrine("tooltip.quantumitems.core.structure"));
+            } else if (stack.is(ModRegistry.RESONATOR_ITEM.get())) {
+                tooltip.add(doctrine("tooltip.quantumitems.resonator.usage"));
+            } else if (stack.is(ModRegistry.ENTANGLED_EYE.get())) {
+                tooltip.add(doctrine("tooltip.quantumitems.entangled_eye.lore"));
             }
         }
 

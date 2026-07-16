@@ -1,7 +1,9 @@
 {
   "itemGroup.quantumitems": "Квантовая запутанность",
-  "block.quantumitems.quantum_entangler": "Квантовый запутыватель",
+  "block.quantumitems.quantum_core": "Квантовое ядро",
+  "block.quantumitems.resonator": "Резонатор",
   "item.quantumitems.quantum_shard": "Квантовый осколок",
+  "item.quantumitems.entangled_eye": "Запутанное око",
   "tooltip.quantumitems.link_id": "Link ID: %s#%s",
   "tooltip.quantumitems.window.hint": "Зажмите Shift — правила запутанности",
   "tooltip.quantumitems.window.shared": "Делит один запас предметов с близнецами: бери из любого — тратятся все.",
@@ -10,6 +12,10 @@
   "tooltip.quantumitems.window.shulker": "Спокойно спит в шалкеровом ящике. Что найдёшь при пробуждении — зависит от запаса.",
   "tooltip.quantumitems.shard.lore": "Осколок чего-то нездешнего. Он помнит, каково быть в двух местах сразу.",
   "tooltip.quantumitems.shard.source": "Находится там, где древний город спит во тьме.",
-  "tooltip.quantumitems.entangler.usage": "Запутывает стак в две связанные половины с общим запасом (расходует Квантовый осколок).",
-  "tooltip.quantumitems.entangler.expand": "Положите связанный стак снова, чтобы расширить сеть — до четырёх звеньев."
+  "tooltip.quantumitems.core.usage": "Положите Квантовый осколок, чтобы начать ритуал. Осколок сгорает в любом случае.",
+  "tooltip.quantumitems.core.structure": "Требует пол 5x5 из аметистовых блоков и Резонаторы по углам.",
+  "tooltip.quantumitems.resonator.usage": "Выложите стак сюда рукой. Механизмам внутрь не дотянуться.",
+  "tooltip.quantumitems.entangled_eye.lore": "Оно смотрит в две стороны сразу — и обе твои.",
+  "message.quantumitems.ritual_locked": "Идёт ритуал — ничто не может войти в круг или покинуть его.",
+  "message.quantumitems.structure_incomplete": "Круг не завершён: пол 5x5 из аметиста, Резонаторы по углам."
 }

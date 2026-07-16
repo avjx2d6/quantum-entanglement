@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:block/cube_all",
   "textures": {
-    "all": "quantumitems:block/quantum_entangler"
+    "all": "quantumitems:block/quantum_core"
   }
 }

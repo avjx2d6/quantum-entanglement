@@ -1,15 +1,14 @@
 package com.quantumitems;
 
 import com.mojang.serialization.MapCodec;
-import com.quantumitems.block.QuantumEntanglerBlock;
-import com.quantumitems.block.QuantumEntanglerBlockEntity;
+import com.quantumitems.block.QuantumCoreBlock;
+import com.quantumitems.block.QuantumCoreBlockEntity;
+import com.quantumitems.block.ResonatorBlock;
+import com.quantumitems.block.ResonatorBlockEntity;
 import com.quantumitems.loot.AddItemLootModifier;
-import com.quantumitems.menu.QuantumEntanglerMenu;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.flag.FeatureFlags;
-import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
@@ -20,13 +19,12 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
 import net.neoforged.bus.api.IEventBus;
-import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
 import net.neoforged.neoforge.common.loot.IGlobalLootModifier;
-import net.neoforged.neoforge.registries.NeoForgeRegistries;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.neoforge.registries.NeoForgeRegistries;
 
 public final class ModRegistry {
     private ModRegistry() {
@@ -38,8 +36,6 @@ public final class ModRegistry {
     private static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(QuantumItemsMod.MOD_ID);
     private static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES =
             DeferredRegister.create(Registries.BLOCK_ENTITY_TYPE, QuantumItemsMod.MOD_ID);
-    private static final DeferredRegister<MenuType<?>> MENUS =
-            DeferredRegister.create(Registries.MENU, QuantumItemsMod.MOD_ID);
     private static final DeferredRegister<CreativeModeTab> CREATIVE_TABS =
             DeferredRegister.create(Registries.CREATIVE_MODE_TAB, QuantumItemsMod.MOD_ID);
     private static final DeferredRegister<MapCodec<? extends IGlobalLootModifier>> LOOT_MODIFIERS =
@@ -51,27 +47,41 @@ public final class ModRegistry {
                     .networkSynchronized(QuantumLinkData.STREAM_CODEC)
                     .build());
 
-    public static final DeferredBlock<QuantumEntanglerBlock> QUANTUM_ENTANGLER =
-            BLOCKS.registerBlock("quantum_entangler", QuantumEntanglerBlock::new,
+    public static final DeferredBlock<QuantumCoreBlock> QUANTUM_CORE =
+            BLOCKS.registerBlock("quantum_core", QuantumCoreBlock::new,
                     BlockBehaviour.Properties.of()
                             .mapColor(MapColor.COLOR_PURPLE)
                             .strength(4.0f, 1200.0f)
                             .requiresCorrectToolForDrops()
                             .sound(SoundType.METAL));
 
-    public static final DeferredItem<BlockItem> QUANTUM_ENTANGLER_ITEM =
-            ITEMS.registerSimpleBlockItem(QUANTUM_ENTANGLER);
+    public static final DeferredBlock<ResonatorBlock> RESONATOR =
+            BLOCKS.registerBlock("resonator", ResonatorBlock::new,
+                    BlockBehaviour.Properties.of()
+                            .mapColor(MapColor.COLOR_PURPLE)
+                            .strength(3.0f, 1200.0f)
+                            .requiresCorrectToolForDrops()
+                            .sound(SoundType.AMETHYST));
+
+    public static final DeferredItem<BlockItem> QUANTUM_CORE_ITEM =
+            ITEMS.registerSimpleBlockItem(QUANTUM_CORE);
+
+    public static final DeferredItem<BlockItem> RESONATOR_ITEM =
+            ITEMS.registerSimpleBlockItem(RESONATOR);
 
     public static final DeferredItem<Item> QUANTUM_SHARD =
             ITEMS.registerSimpleItem("quantum_shard", new Item.Properties().rarity(Rarity.RARE));
 
-    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<QuantumEntanglerBlockEntity>> QUANTUM_ENTANGLER_BE =
-            BLOCK_ENTITIES.register("quantum_entangler",
-                    () -> BlockEntityType.Builder.of(QuantumEntanglerBlockEntity::new, QUANTUM_ENTANGLER.get()).build(null));
+    public static final DeferredItem<Item> ENTANGLED_EYE =
+            ITEMS.registerSimpleItem("entangled_eye", new Item.Properties().rarity(Rarity.UNCOMMON));
 
-    public static final DeferredHolder<MenuType<?>, MenuType<QuantumEntanglerMenu>> QUANTUM_ENTANGLER_MENU =
-            MENUS.register("quantum_entangler",
-                    () -> IMenuTypeExtension.create(QuantumEntanglerMenu::fromNetwork));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<QuantumCoreBlockEntity>> QUANTUM_CORE_BE =
+            BLOCK_ENTITIES.register("quantum_core",
+                    () -> BlockEntityType.Builder.of(QuantumCoreBlockEntity::new, QUANTUM_CORE.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ResonatorBlockEntity>> RESONATOR_BE =
+            BLOCK_ENTITIES.register("resonator",
+                    () -> BlockEntityType.Builder.of(ResonatorBlockEntity::new, RESONATOR.get()).build(null));
 
     public static final DeferredHolder<MapCodec<? extends IGlobalLootModifier>, MapCodec<AddItemLootModifier>> ADD_ITEM_LOOT =
             LOOT_MODIFIERS.register("add_item", () -> AddItemLootModifier.CODEC);
@@ -82,7 +92,9 @@ public final class ModRegistry {
                     .icon(() -> new ItemStack(QUANTUM_SHARD.get()))
                     .displayItems((parameters, output) -> {
                         output.accept(QUANTUM_SHARD.get());
-                        output.accept(QUANTUM_ENTANGLER_ITEM.get());
+                        output.accept(ENTANGLED_EYE.get());
+                        output.accept(RESONATOR_ITEM.get());
+                        output.accept(QUANTUM_CORE_ITEM.get());
                     })
                     .build());
 
@@ -91,7 +103,6 @@ public final class ModRegistry {
         BLOCKS.register(modBus);
         ITEMS.register(modBus);
         BLOCK_ENTITIES.register(modBus);
-        MENUS.register(modBus);
         CREATIVE_TABS.register(modBus);
         LOOT_MODIFIERS.register(modBus);
     }
