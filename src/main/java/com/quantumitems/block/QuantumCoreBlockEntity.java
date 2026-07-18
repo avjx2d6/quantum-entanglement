@@ -117,23 +117,38 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
     }
 
     /**
-     * Placing a shard commits the ritual. Returns false only when the machine
-     * itself is not built (no shard is taken then) — every in-ritual problem
-     * is a red FAILURE that still burns the shard.
+     * Placing a shard on a COMPLETE circle commits the ritual immediately;
+     * every in-ritual problem is a red FAILURE that still burns the shard.
+     * On an incomplete circle the shard simply lies on the core like an item
+     * on a resonator — inert, retrievable with an empty hand, no ritual and
+     * no fuel spent. Finish the machine, re-place the shard, and it fires.
      */
-    public boolean startRitual(ItemStack shardStack) {
-        if (level == null || level.isClientSide || phase != Phase.IDLE || !shardStack.is(ModRegistry.QUANTUM_SHARD.get())) {
-            return false;
-        }
-        if (!isStructureValid()) {
+    public boolean placeShard(ItemStack shardStack) {
+        if (level == null || level.isClientSide || phase != Phase.IDLE || !shard.isEmpty()
+                || !shardStack.is(ModRegistry.QUANTUM_SHARD.get())) {
             return false;
         }
         shard = shardStack.split(1);
-        phase = Phase.CHARGING;
-        phaseAge = 0;
+        if (isStructureValid()) {
+            phase = Phase.CHARGING;
+            phaseAge = 0;
+            level.playSound(null, worldPosition, SoundEvents.AMETHYST_BLOCK_RESONATE, SoundSource.BLOCKS, 1.0f, 0.8f);
+        } else {
+            level.playSound(null, worldPosition, SoundEvents.AMETHYST_BLOCK_PLACE, SoundSource.BLOCKS, 0.7f, 1.2f);
+        }
         setChanged();
-        level.playSound(null, worldPosition, SoundEvents.AMETHYST_BLOCK_RESONATE, SoundSource.BLOCKS, 1.0f, 0.8f);
         return true;
+    }
+
+    /** Empty-hand pickup of an inert (idle) shard; a committed ritual never gives it back. */
+    public ItemStack takeShard() {
+        if (level == null || level.isClientSide || phase != Phase.IDLE || shard.isEmpty()) {
+            return ItemStack.EMPTY;
+        }
+        ItemStack result = shard;
+        shard = ItemStack.EMPTY;
+        setChanged();
+        return result;
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, QuantumCoreBlockEntity core) {

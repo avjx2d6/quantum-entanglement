@@ -17,11 +17,11 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 /**
  * A single-member network is an anomaly: creation always yields two windows
  * and survival has no member-retirement path (only creative edits retire
- * members). The doctrine's universal fallback applies — the lone window
- * collapses to plain (count = pool, network dissolves). If the survivor has
- * no live instance (asleep in a shulker or creative-deleted), the network
- * must NOT be deleted blindly — that would zero the sleeper on wake-up;
- * instead the collapse happens at first touch, in reconcile.
+ * members). The author's ruling: a member that vanished anomalously either
+ * died with the items or left the network taking them along — either way
+ * the remaining clone must not keep serving the pool, so the network is
+ * DELETED and the survivor wipes to zero (live one immediately, a sleeper
+ * on wake-up via the ordinary dead-network reconciliation).
  */
 @PrefixGameTestTemplate(false)
 public class AnomalyGameTests {
@@ -35,7 +35,7 @@ public class AnomalyGameTests {
     }
 
     @GameTest(template = "box", templateNamespace = "quantumitems", timeoutTicks = 100)
-    public void retirementLeavingOneMemberCollapsesLiveSurvivor(GameTestHelper helper) {
+    public void retirementLeavingOneMemberDeletesNetworkAndSurvivor(GameTestHelper helper) {
         QuantumNetworks networks = QuantumNetworks.get(helper.getLevel().getServer());
         QuantumEngine engine = QuantumEngine.onServerThread();
         ItemStack plain = new ItemStack(Items.BREAD, 10);
@@ -49,20 +49,17 @@ public class AnomalyGameTests {
 
         engine.windowDestroyed(windowB); // creative-style retirement of m2
 
-        if (windowA.has(ModRegistry.QUANTUM_LINK.get())) {
-            helper.fail("Lone survivor must collapse to plain, still linked: " + windowA);
-        }
-        if (windowA.getCount() != 10) {
-            helper.fail("Collapse must conserve the pool, got " + windowA.getCount());
-        }
         if (networks.network(id) != null) {
-            helper.fail("Single-member network must dissolve");
+            helper.fail("Single-member network must be deleted outright");
+        }
+        if (!windowA.isEmpty()) {
+            helper.fail("Lone survivor must wipe with its network, got " + windowA);
         }
         helper.succeed();
     }
 
     @GameTest(template = "box", templateNamespace = "quantumitems", timeoutTicks = 100)
-    public void sleepingSurvivorCollapsesAtFirstTouchNotBefore(GameTestHelper helper) {
+    public void sleepingSurvivorWipesOnWakeUp(GameTestHelper helper) {
         QuantumNetworks networks = QuantumNetworks.get(helper.getLevel().getServer());
         QuantumEngine engine = QuantumEngine.onServerThread();
         ItemStack plain = new ItemStack(Items.BREAD, 10);
@@ -76,22 +73,36 @@ public class AnomalyGameTests {
 
         engine.windowDestroyed(windowB);
 
-        QuantumNetworks.Network network = networks.network(id);
-        if (network == null) {
-            helper.fail("Network with an untracked survivor must NOT be deleted "
-                    + "(a sleeper would wipe to zero on wake-up — item loss)");
-        }
-        if (!network.aliveMembers.equals(java.util.Set.of(1))) {
-            helper.fail("Expected lone member m1, got " + network.aliveMembers);
-        }
-
-        // The sleeper wakes: first touch reconciles — and collapses it to plain.
-        engine.reconcile(sleeper);
-        if (sleeper.has(ModRegistry.QUANTUM_LINK.get()) || sleeper.getCount() != 10) {
-            helper.fail("Woken lone survivor must collapse to plain x10, got " + sleeper);
-        }
         if (networks.network(id) != null) {
-            helper.fail("Network must dissolve once the lone survivor collapses");
+            helper.fail("Anomalous network must be deleted even with a sleeping survivor");
+        }
+        // The sleeper wakes: dead networkId -> ordinary reconciliation wipes it.
+        engine.reconcile(sleeper);
+        if (!sleeper.isEmpty()) {
+            helper.fail("Woken anomalous clone must wipe to zero, got " + sleeper);
+        }
+        helper.succeed();
+    }
+
+    /** Saves predating the rule get cleaned at boot; reconcile is the safety net. */
+    @GameTest(template = "box", templateNamespace = "quantumitems", timeoutTicks = 100)
+    public void preexistingLoneNetworkDiesOnFirstTouch(GameTestHelper helper) {
+        QuantumNetworks networks = QuantumNetworks.get(helper.getLevel().getServer());
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        ItemStack plain = new ItemStack(Items.BREAD, 10);
+        int id = networks.createNetwork(plain);
+        QuantumNetworks.Network network = networks.network(id);
+        network.aliveMembers.remove(Integer.valueOf(2)); // simulate an old-save anomaly
+        ItemStack lone = plain.copy();
+        lone.set(ModRegistry.QUANTUM_LINK.get(), new QuantumLinkData(id, 1));
+
+        engine.reconcile(lone);
+
+        if (networks.network(id) != null) {
+            helper.fail("Lone-member network must die at first touch");
+        }
+        if (!lone.isEmpty()) {
+            helper.fail("Anomalous clone must wipe, got " + lone);
         }
         helper.succeed();
     }

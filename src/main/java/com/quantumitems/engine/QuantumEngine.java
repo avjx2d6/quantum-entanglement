@@ -66,6 +66,30 @@ public final class QuantumEngine {
 
     public static void start(MinecraftServer server) {
         instance = new QuantumEngine(server);
+        instance.sweepLoneMemberNetworks();
+    }
+
+    /**
+     * Boot-time cleanup of lone-member anomalies left in saves from before
+     * the rule existed. Safe by the same ruling that created the rule: the
+     * network dies; if its last window still sleeps in item NBT somewhere,
+     * wake-up reconciliation sees a dead networkId and wipes it — which is
+     * now the intended fate of an anomalous clone.
+     */
+    private void sweepLoneMemberNetworks() {
+        QuantumNetworks networks = QuantumNetworks.get(server);
+        var loneIds = networks.all().entrySet().stream()
+                .filter(entry -> entry.getValue().aliveMembers.size() <= 1)
+                .map(Map.Entry::getKey)
+                .toList();
+        for (int networkId : loneIds) {
+            QuantumNetworks.Network network = networks.network(networkId);
+            if (network != null) {
+                debug("boot sweep: net#" + networkId + " has " + network.aliveMembers.size()
+                        + " member(s) -> anomaly, network deleted");
+                dissolve(networkId, network, networks);
+            }
+        }
     }
 
     public static void stop() {
@@ -126,10 +150,11 @@ public final class QuantumEngine {
             return Status.COLLAPSED;
         }
         if (network.aliveMembers.size() == 1) {
-            // Lone-member anomaly surfacing (woken sleeper of a creative-torn
-            // network): collapse to plain, count = pool. See collapseIfLoneMember.
-            collapse(stack, link, network, networks);
-            return Status.COLLAPSED;
+            // Lone-member anomaly surfacing (save predating the cleanup): the
+            // network is deleted and this last clone wipes with it — the
+            // vanished sibling either died with the items or left with them.
+            dissolve(link.networkId(), network, networks);
+            return Status.DEAD;
         }
         if (stack.getCount() != network.pool) {
             rawSetCount(stack, network.pool);
@@ -522,30 +547,23 @@ public final class QuantumEngine {
 
     /**
      * A single-member network is an anomaly (creation yields two windows and
-     * survival never retires members — only creative edits do). The doctrine's
-     * universal fallback applies: the lone window collapses to plain. A live
-     * survivor collapses right here; an untracked one (asleep in item NBT, or
-     * creative-deleted) must NOT have its network removed blindly — a sleeper
-     * would wipe to zero on wake-up — so it collapses at first touch instead
-     * (see the lone-member check in {@link #reconcile}).
+     * survival never retires members — only creative edits do). A member that
+     * vanished anomalously either ceased to exist with its items or left the
+     * network taking them along — in both readings the remaining clone must
+     * NOT keep serving the pool, so the whole network is deleted and the
+     * survivor wipes to zero (author's ruling, playtest 2026-07-16). A live
+     * survivor dies right here; an untracked one (asleep in item NBT) dies at
+     * first touch instead — see the lone-member check in {@link #reconcile} —
+     * because dissolving with a registered member is exactly what wake-up
+     * reconciliation already treats as "dead network -> wipe".
      */
     private void collapseIfLoneMember(int networkId, QuantumNetworks.Network network, QuantumNetworks networks) {
         if (network.aliveMembers.size() != 1) {
             return;
         }
         int survivorId = network.aliveMembers.first();
-        WeakReference<ItemStack> ref = canonical.get(key(networkId, survivorId));
-        ItemStack survivor = ref != null ? ref.get() : null;
-        if (survivor == null || survivor.isEmpty()) {
-            debug("net#" + networkId + " down to lone m" + survivorId
-                    + " with no live instance -> collapse deferred to first touch");
-            return;
-        }
-        debug("net#" + networkId + " down to lone m" + survivorId + " -> collapse to plain");
-        QuantumLinkData link = survivor.get(ModRegistry.QUANTUM_LINK.get());
-        if (link != null) {
-            collapse(survivor, link, network, networks);
-        }
+        debug("net#" + networkId + " down to lone m" + survivorId + " -> anomaly, network deleted");
+        dissolve(networkId, network, networks);
     }
 
     /** Transfers window identity from the current instance to a fresh copy. */

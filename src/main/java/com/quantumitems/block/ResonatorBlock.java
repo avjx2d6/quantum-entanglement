@@ -24,8 +24,8 @@ import javax.annotation.Nullable;
  * an occupied pedestal — that would suppress vanilla's useWithoutItem
  * fallback and brick the empty-hand take (the playtest bug).
  *
- * The give-back goes through Inventory.placeItemBackInInventory, which our
- * mixin wraps in a player gesture: a window travels whole, link intact.
+ * The exchange moves whole ItemStack instances between hand and pedestal —
+ * a player gesture by nature: a window travels whole, link intact.
  */
 public class ResonatorBlock extends Block implements EntityBlock {
     public ResonatorBlock(Properties properties) {
@@ -60,27 +60,26 @@ public class ResonatorBlock extends Block implements EntityBlock {
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }
         if (resonator.isLockedByRitual()) {
-            player.displayClientMessage(
-                    net.minecraft.network.chat.Component.translatable("message.quantumitems.ritual_locked"), true);
-            return ItemInteractionResult.FAIL;
+            return ItemInteractionResult.FAIL; // silent: the theater already says a ritual is running
         }
         boolean emptyHanded = heldStack.isEmpty();
         ItemStack laidOut = resonator.getItem(0);
         if (emptyHanded && laidOut.isEmpty()) {
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }
+        // Hand ↔ pedestal exchange: what lay there goes INTO THE HAND (not
+        // scattered into the inventory), what was held lies down.
         if (!laidOut.isEmpty()) {
             resonator.removeItemNoUpdate(0);
             resonator.setChanged();
-            player.getInventory().placeItemBackInInventory(laidOut);
             level.playSound(null, pos, SoundEvents.ITEM_PICKUP, SoundSource.PLAYERS, 0.2f,
                     1.0f + level.getRandom().nextFloat());
         }
         if (!emptyHanded) {
             resonator.layDown(heldStack, player.getDirection());
-            player.setItemInHand(hand, ItemStack.EMPTY);
             level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_PLACE, SoundSource.BLOCKS, 0.7f, 1.2f);
         }
+        player.setItemInHand(hand, laidOut);
         return ItemInteractionResult.SUCCESS;
     }
 

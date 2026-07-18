@@ -11,7 +11,5 @@
   "tooltip.quantumitems.window.automation": "Machines extract ordinary items; taking the last one ends the link.",
   "tooltip.quantumitems.window.shulker": "Sleeps safely inside a shulker box. What you find on waking depends on the pool.",
   "tooltip.quantumitems.shard.lore": "A splinter of somewhere else. It remembers being two places at once.",
-  "tooltip.quantumitems.shard.source": "Found where the old city sleeps in the dark.",
-  "message.quantumitems.ritual_locked": "The ritual is in progress - nothing may enter or leave the circle.",
-  "message.quantumitems.structure_incomplete": "The circle is incomplete: 5x5 amethyst floor, Resonators on the corners."
+  "tooltip.quantumitems.shard.source": "Found where the old city sleeps in the dark."
 }

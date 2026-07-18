@@ -2,7 +2,6 @@ package com.quantumitems.block;
 
 import com.quantumitems.ModRegistry;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -51,7 +50,8 @@ public class QuantumCoreBlock extends Block implements EntityBlock {
     @Override
     protected ItemInteractionResult useItemOn(ItemStack heldStack, BlockState state, Level level, BlockPos pos,
                                               Player player, InteractionHand hand, BlockHitResult hitResult) {
-        if (!heldStack.is(ModRegistry.QUANTUM_SHARD.get())) {
+        boolean emptyHanded = heldStack.isEmpty();
+        if (!emptyHanded && !heldStack.is(ModRegistry.QUANTUM_SHARD.get())) {
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }
         if (level.isClientSide) {
@@ -61,14 +61,19 @@ public class QuantumCoreBlock extends Block implements EntityBlock {
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }
         if (core.isRitualRunning()) {
-            player.displayClientMessage(Component.translatable("message.quantumitems.ritual_locked"), true);
-            return ItemInteractionResult.FAIL;
+            return ItemInteractionResult.FAIL; // silent: the theater speaks for itself
         }
-        if (!core.startRitual(heldStack)) {
-            player.displayClientMessage(Component.translatable("message.quantumitems.structure_incomplete"), true);
-            return ItemInteractionResult.FAIL;
+        if (emptyHanded) {
+            ItemStack idleShard = core.takeShard();
+            if (idleShard.isEmpty()) {
+                return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+            }
+            player.setItemInHand(hand, idleShard);
+            level.playSound(null, pos, net.minecraft.sounds.SoundEvents.ITEM_PICKUP,
+                    net.minecraft.sounds.SoundSource.PLAYERS, 0.2f, 1.0f + level.getRandom().nextFloat());
+            return ItemInteractionResult.SUCCESS;
         }
-        return ItemInteractionResult.SUCCESS;
+        return core.placeShard(heldStack) ? ItemInteractionResult.SUCCESS : ItemInteractionResult.FAIL;
     }
 
     @Override

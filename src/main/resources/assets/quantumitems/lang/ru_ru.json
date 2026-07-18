@@ -11,7 +11,5 @@
   "tooltip.quantumitems.window.automation": "Механизмы извлекают обычные предметы; последний предмет завершает связь.",
   "tooltip.quantumitems.window.shulker": "Спокойно спит в шалкеровом ящике. Что найдёшь при пробуждении — зависит от запаса.",
   "tooltip.quantumitems.shard.lore": "Осколок чего-то нездешнего. Он помнит, каково быть в двух местах сразу.",
-  "tooltip.quantumitems.shard.source": "Находится там, где древний город спит во тьме.",
-  "message.quantumitems.ritual_locked": "Идёт ритуал — ничто не может войти в круг или покинуть его.",
-  "message.quantumitems.structure_incomplete": "Круг не завершён: пол 5x5 из аметиста, Резонаторы по углам."
+  "tooltip.quantumitems.shard.source": "Находится там, где древний город спит во тьме."
 }

@@ -227,13 +227,12 @@ public class Phase3GameTests {
         helper.assertTrue(entry.pool == 6, "pool untouched");
         helper.assertTrue(network.windowB().getCount() == 6, "sibling window keeps working");
 
-        // destroying window #2 leaves windowC alone -> it collapses to plain
+        // destroying window #2 leaves windowC alone -> anomaly, network deleted
         engine.creativeSlotReplaced(network.windowB(), ItemStack.EMPTY);
         helper.assertTrue(networks(helper).network(network.id()) == null,
-                "lone survivor -> network ends, no ghost");
-        helper.assertTrue(!windowC.has(ModRegistry.QUANTUM_LINK.get()),
-                "lone survivor must be plain now");
-        helper.assertTrue(windowC.getCount() == 6, "items conserved through the collapse");
+                "lone survivor -> network deleted, no ghost");
+        helper.assertTrue(windowC.isEmpty(),
+                "anomalous clone wipes with its network, got " + windowC);
         helper.succeed();
     }
 

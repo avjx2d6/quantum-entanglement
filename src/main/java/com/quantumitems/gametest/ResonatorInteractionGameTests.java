@@ -65,19 +65,8 @@ public class ResonatorInteractionGameTests {
         return (ResonatorBlockEntity) helper.getBlockEntity(POS);
     }
 
-    private static int countInInventory(Player player, net.minecraft.world.item.Item item) {
-        int total = 0;
-        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
-            ItemStack stack = player.getInventory().getItem(i);
-            if (stack.is(item)) {
-                total += stack.getCount();
-            }
-        }
-        return total;
-    }
-
     @GameTest(template = "box", templateNamespace = "quantumitems", timeoutTicks = 100)
-    public void emptyHandTakesLaidOutStack(GameTestHelper helper) {
+    public void emptyHandTakesLaidOutStackIntoTheHand(GameTestHelper helper) {
         ResonatorBlockEntity resonator = resonator(helper);
         resonator.setItem(0, new ItemStack(Items.BREAD, 20));
         Player player = helper.makeMockPlayer(GameType.SURVIVAL);
@@ -86,8 +75,9 @@ public class ResonatorInteractionGameTests {
             helper.fail("Empty-hand click must take the stack back, resonator still holds "
                     + resonator.getItem(0));
         }
-        if (countInInventory(player, Items.BREAD) != 20) {
-            helper.fail("Taken stack did not reach the player inventory");
+        ItemStack inHand = player.getItemInHand(InteractionHand.MAIN_HAND);
+        if (!inHand.is(Items.BREAD) || inHand.getCount() != 20) {
+            helper.fail("Taken stack must land IN THE HAND, hand holds " + inHand);
         }
         helper.succeed();
     }
@@ -103,8 +93,9 @@ public class ResonatorInteractionGameTests {
         if (!laid.is(Items.BREAD) || laid.getCount() != 20) {
             helper.fail("Held stack should lie down whole, resonator holds " + laid);
         }
-        if (countInInventory(player, Items.APPLE) != 7) {
-            helper.fail("Previous stack should return to the player, like Create's depot");
+        ItemStack inHand = player.getItemInHand(InteractionHand.MAIN_HAND);
+        if (!inHand.is(Items.APPLE) || inHand.getCount() != 7) {
+            helper.fail("Swap must put the previous stack into the hand, hand holds " + inHand);
         }
         helper.succeed();
     }
@@ -124,20 +115,13 @@ public class ResonatorInteractionGameTests {
         Player player = helper.makeMockPlayer(GameType.SURVIVAL);
         interact(helper, player, POS);
 
-        ItemStack inInventory = ItemStack.EMPTY;
-        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
-            ItemStack stack = player.getInventory().getItem(i);
-            if (stack.is(Items.BREAD)) {
-                inInventory = stack;
-                break;
-            }
-        }
-        QuantumLinkData link = inInventory.get(ModRegistry.QUANTUM_LINK.get());
+        ItemStack inHand = player.getItemInHand(InteractionHand.MAIN_HAND);
+        QuantumLinkData link = inHand.get(ModRegistry.QUANTUM_LINK.get());
         if (link == null || link.networkId() != id) {
-            helper.fail("Window lost its link on a hand take: " + inInventory);
+            helper.fail("Window lost its link on a hand take: " + inHand);
         }
-        if (inInventory.getCount() != 15) {
-            helper.fail("Window count diverged: " + inInventory.getCount());
+        if (inHand.getCount() != 15) {
+            helper.fail("Window count diverged: " + inHand.getCount());
         }
         QuantumNetworks.Network network = networks.network(id);
         if (network == null || network.pool != 15) {

@@ -45,8 +45,11 @@ public class ResonatorRenderer implements BlockEntityRenderer<ResonatorBlockEnti
         boolean blockItem = model.isGui3d();
         int light = LevelRenderer.getLightColor(resonator.getLevel(), resonator.getBlockPos().above());
 
+        // Create's depot uses one base height (15/16) for all item kinds and
+        // lets the FIXED display transform land them on its tray; our top
+        // face sits 3/16 higher than the depot tray, hence 15/16 + 3/16.
         poseStack.pushPose();
-        poseStack.translate(0.5f, blockItem ? 1.25f : 1.0f + 3 / 32f, 0.5f);
+        poseStack.translate(0.5f, 15 / 16f + 3 / 16f, 0.5f);
 
         // Slide-in from the inserted side: Create's (.5 − beltPosition) offset.
         Direction from = resonator.insertedFrom();
@@ -78,7 +81,9 @@ public class ResonatorRenderer implements BlockEntityRenderer<ResonatorBlockEnti
             if (!blockItem) {
                 poseStack.mulPose(Axis.YP.rotationDegrees(10));
             }
-            poseStack.translate(0, blockItem ? 1 / 64d : 1 / 16d, 0);
+            // Tighter pile than Create's depot: our flat items carry no tray
+            // recess to sink into, so full 1/16 steps read as floating layers.
+            poseStack.translate(0, blockItem ? 1 / 64d : 1 / 32d, 0);
         }
         poseStack.popPose();
     }

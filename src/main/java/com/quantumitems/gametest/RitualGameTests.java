@@ -73,7 +73,7 @@ public class RitualGameTests {
     public void ritualCreatesNetworkFromPlainStack(GameTestHelper helper) {
         buildCircle(helper);
         resonator(helper, 0).setItem(0, new ItemStack(Items.BREAD, 20));
-        if (!core(helper).startRitual(new ItemStack(ModRegistry.QUANTUM_SHARD.get()))) {
+        if (!core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()))) {
             helper.fail("Ritual refused to start on a valid structure");
         }
         helper.runAfterDelay(VERDICT_TICKS, () -> {
@@ -109,7 +109,7 @@ public class RitualGameTests {
     @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 150)
     public void ritualBurnsShardOnEmptyCircle(GameTestHelper helper) {
         buildCircle(helper);
-        if (!core(helper).startRitual(new ItemStack(ModRegistry.QUANTUM_SHARD.get()))) {
+        if (!core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()))) {
             helper.fail("Commitment is commitment: the shard goes in even over an empty circle");
         }
         helper.runAfterDelay(VERDICT_TICKS, () -> {
@@ -128,15 +128,29 @@ public class RitualGameTests {
         });
     }
 
+    /** On an unfinished machine the shard just lies on the core, inert and retrievable. */
     @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 100)
-    public void coreRefusesShardWithoutStructure(GameTestHelper helper) {
+    public void shardLiesInertOnUnfinishedCore(GameTestHelper helper) {
         helper.setBlock(CORE, ModRegistry.QUANTUM_CORE.get()); // no floor, no resonators
-        ItemStack shard = new ItemStack(ModRegistry.QUANTUM_SHARD.get(), 3);
-        if (core(helper).startRitual(shard)) {
-            helper.fail("Ritual started without a structure");
+        ItemStack held = new ItemStack(ModRegistry.QUANTUM_SHARD.get(), 3);
+        if (!core(helper).placeShard(held)) {
+            helper.fail("Shard must lie on the core like on a resonator");
         }
-        if (shard.getCount() != 3) {
-            helper.fail("Shard consumed by a machine that does not exist");
+        if (held.getCount() != 2) {
+            helper.fail("Exactly one shard goes onto the core, hand has " + held.getCount());
+        }
+        if (core(helper).phase() != QuantumCoreBlockEntity.Phase.IDLE) {
+            helper.fail("No ritual may start without a structure, phase " + core(helper).phase());
+        }
+        if (core(helper).displayedShard().isEmpty()) {
+            helper.fail("The inert shard must be visible on the core");
+        }
+        ItemStack takenBack = core(helper).takeShard();
+        if (!takenBack.is(ModRegistry.QUANTUM_SHARD.get()) || takenBack.getCount() != 1) {
+            helper.fail("Empty-hand take must return the inert shard, got " + takenBack);
+        }
+        if (!core(helper).displayedShard().isEmpty()) {
+            helper.fail("Core must be empty after the take");
         }
         helper.succeed();
     }
@@ -149,7 +163,7 @@ public class RitualGameTests {
         int id = networks.createNetwork(plain);
         resonator(helper, 0).setItem(0, makeWindow(helper, id, 1, plain));
         resonator(helper, 1).setItem(0, makeWindow(helper, id, 2, plain));
-        if (!core(helper).startRitual(new ItemStack(ModRegistry.QUANTUM_SHARD.get()))) {
+        if (!core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()))) {
             helper.fail("Ritual refused to start");
         }
         helper.runAfterDelay(VERDICT_TICKS, () -> {
@@ -187,7 +201,7 @@ public class RitualGameTests {
         ItemStack window1 = makeWindow(helper, id, 1, plain);
         ItemStack window2 = makeWindow(helper, id, 2, plain); // stays "elsewhere in the world"
         resonator(helper, 0).setItem(0, window1);
-        core(helper).startRitual(new ItemStack(ModRegistry.QUANTUM_SHARD.get()));
+        core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()));
         helper.runAfterDelay(VERDICT_TICKS, () -> {
             QuantumNetworks.Network network = networks.network(id);
             if (network == null || network.aliveMembers.size() != 2) {
@@ -211,7 +225,7 @@ public class RitualGameTests {
         buildCircle(helper);
         resonator(helper, 0).setItem(0, new ItemStack(Items.BREAD, 5));
         resonator(helper, 1).setItem(0, new ItemStack(Items.APPLE, 7));
-        core(helper).startRitual(new ItemStack(ModRegistry.QUANTUM_SHARD.get()));
+        core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()));
         helper.runAfterDelay(VERDICT_TICKS, () -> {
             ItemStack a = resonator(helper, 0).getItem(0);
             ItemStack b = resonator(helper, 1).getItem(0);
@@ -229,7 +243,7 @@ public class RitualGameTests {
     public void ritualRefusesDamageableItems(GameTestHelper helper) {
         buildCircle(helper);
         resonator(helper, 0).setItem(0, new ItemStack(Items.IRON_PICKAXE));
-        core(helper).startRitual(new ItemStack(ModRegistry.QUANTUM_SHARD.get()));
+        core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()));
         helper.runAfterDelay(VERDICT_TICKS, () -> {
             ItemStack stack = resonator(helper, 0).getItem(0);
             if (stack.has(ModRegistry.QUANTUM_LINK.get())) {
@@ -246,7 +260,7 @@ public class RitualGameTests {
     public void circleIsLockedDuringRitual(GameTestHelper helper) {
         buildCircle(helper);
         resonator(helper, 0).setItem(0, new ItemStack(Items.BREAD, 20));
-        core(helper).startRitual(new ItemStack(ModRegistry.QUANTUM_SHARD.get()));
+        core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()));
         helper.runAfterDelay(10, () -> {
             if (!resonator(helper, 0).isLockedByRitual() || !resonator(helper, 3).isLockedByRitual()) {
                 helper.fail("Circle must be locked while the ritual runs");
@@ -272,7 +286,7 @@ public class RitualGameTests {
         for (int i = 0; i < 4; i++) {
             resonator(helper, i).setItem(0, makeWindow(helper, id, i + 1, plain));
         }
-        core(helper).startRitual(new ItemStack(ModRegistry.QUANTUM_SHARD.get()));
+        core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()));
         helper.runAfterDelay(VERDICT_TICKS, () -> {
             QuantumNetworks.Network network = networks.network(id);
             if (network == null || network.aliveMembers.size() != 4) {
