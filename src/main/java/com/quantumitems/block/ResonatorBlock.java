@@ -32,8 +32,22 @@ import javax.annotation.Nullable;
  * annoying in the depot itself, so our pedestal answers on any face.
  */
 public class ResonatorBlock extends Block implements EntityBlock {
+    private static final net.minecraft.world.phys.shapes.VoxelShape SHAPE =
+            net.minecraft.world.phys.shapes.Shapes.or(
+                    Block.box(1, 0, 1, 15, 3, 15),
+                    Block.box(2, 3, 2, 5, 13, 5), Block.box(11, 3, 2, 14, 13, 5),
+                    Block.box(2, 3, 11, 5, 13, 14), Block.box(11, 3, 11, 14, 13, 14),
+                    Block.box(1, 13, 1, 15, 16, 15));
+
     public ResonatorBlock(Properties properties) {
         super(properties);
+    }
+
+    @Override
+    protected net.minecraft.world.phys.shapes.VoxelShape getShape(
+            BlockState state, net.minecraft.world.level.BlockGetter level, BlockPos pos,
+            net.minecraft.world.phys.shapes.CollisionContext context) {
+        return SHAPE;
     }
 
     @Override

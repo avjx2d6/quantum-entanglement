@@ -53,6 +53,7 @@ public final class ModRegistry {
                             .mapColor(MapColor.COLOR_PURPLE)
                             .strength(4.0f, 1200.0f)
                             .requiresCorrectToolForDrops()
+                            .noOcclusion()
                             .sound(SoundType.METAL));
 
     public static final DeferredBlock<ResonatorBlock> RESONATOR =
@@ -61,6 +62,7 @@ public final class ModRegistry {
                             .mapColor(MapColor.COLOR_PURPLE)
                             .strength(3.0f, 1200.0f)
                             .requiresCorrectToolForDrops()
+                            .noOcclusion()
                             .sound(SoundType.AMETHYST));
 
     public static final DeferredItem<BlockItem> QUANTUM_CORE_ITEM =

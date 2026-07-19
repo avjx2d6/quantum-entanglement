@@ -51,7 +51,15 @@ public class RitualGameTests {
         for (BlockPos pos : RESONATORS) {
             helper.setBlock(pos, ModRegistry.RESONATOR.get());
         }
-        helper.setBlock(CORE, ModRegistry.QUANTUM_CORE.get());
+        placeCore(helper, CORE);
+    }
+
+    /** The core is two blocks tall (door pattern) — tests place both halves explicitly. */
+    private static void placeCore(GameTestHelper helper, BlockPos lowerPos) {
+        helper.setBlock(lowerPos, ModRegistry.QUANTUM_CORE.get().defaultBlockState());
+        helper.setBlock(lowerPos.above(), ModRegistry.QUANTUM_CORE.get().defaultBlockState()
+                .setValue(com.quantumitems.block.QuantumCoreBlock.HALF,
+                        net.minecraft.world.level.block.state.properties.DoubleBlockHalf.UPPER));
     }
 
     private static QuantumCoreBlockEntity core(GameTestHelper helper) {
@@ -131,7 +139,7 @@ public class RitualGameTests {
     /** On an unfinished machine the shard just lies on the core, inert and retrievable. */
     @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 100)
     public void shardLiesInertOnUnfinishedCore(GameTestHelper helper) {
-        helper.setBlock(CORE, ModRegistry.QUANTUM_CORE.get()); // no floor, no resonators
+        placeCore(helper, CORE); // both halves, but no floor and no resonators
         ItemStack held = new ItemStack(ModRegistry.QUANTUM_SHARD.get(), 3);
         if (!core(helper).placeShard(held)) {
             helper.fail("Shard must lie on the core like on a resonator");

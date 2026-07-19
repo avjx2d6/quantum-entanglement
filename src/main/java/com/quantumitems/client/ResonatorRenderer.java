@@ -29,6 +29,7 @@ import java.util.Random;
  * is a full cube, so the base heights compensate to land items ON its top.
  */
 public class ResonatorRenderer implements BlockEntityRenderer<ResonatorBlockEntity> {
+    private final ItemStack innerEye = new ItemStack(com.quantumitems.ModRegistry.EYE_OF_ELSEWHERE.get());
 
     public ResonatorRenderer(BlockEntityRendererProvider.Context context) {
     }
@@ -36,8 +37,12 @@ public class ResonatorRenderer implements BlockEntityRenderer<ResonatorBlockEnti
     @Override
     public void render(ResonatorBlockEntity resonator, float partialTick, PoseStack poseStack,
                        MultiBufferSource buffers, int packedLight, int packedOverlay) {
+        if (resonator.getLevel() == null) {
+            return;
+        }
+        renderInnerEye(resonator, partialTick, poseStack, buffers, packedOverlay);
         ItemStack stack = resonator.displayedItem();
-        if (stack.isEmpty() || resonator.getLevel() == null) {
+        if (stack.isEmpty()) {
             return;
         }
         ItemRenderer itemRenderer = Minecraft.getInstance().getItemRenderer();
@@ -85,6 +90,32 @@ public class ResonatorRenderer implements BlockEntityRenderer<ResonatorBlockEnti
             // recess to sink into, so full 1/16 steps read as floating layers.
             poseStack.translate(0, blockItem ? 1 / 64d : 1 / 32d, 0);
         }
+        poseStack.popPose();
+    }
+
+    /**
+     * The eye inside the hollow column: crossed sprites give it presence
+     * from every viewing angle through the wall gaps (real parallax). It
+     * drifts lazily in idle and wakes — faster, fullbright — while the
+     * circle is locked by a running ritual.
+     */
+    private void renderInnerEye(ResonatorBlockEntity resonator, float partialTick, PoseStack poseStack,
+                                MultiBufferSource buffers, int packedOverlay) {
+        ItemRenderer itemRenderer = Minecraft.getInstance().getItemRenderer();
+        float time = resonator.getLevel().getGameTime() + partialTick;
+        boolean awake = resonator.isLockedByRitual();
+        float speed = awake ? 8.0f : 1.0f;
+        int light = awake ? 0xF000F0
+                : LevelRenderer.getLightColor(resonator.getLevel(), resonator.getBlockPos());
+        poseStack.pushPose();
+        poseStack.translate(0.5, 0.5 + Mth.sin(time / 14.0f) * 0.03f, 0.5);
+        poseStack.mulPose(Axis.YP.rotationDegrees(time * speed));
+        poseStack.scale(0.4f, 0.4f, 0.4f);
+        itemRenderer.renderStatic(innerEye, ItemDisplayContext.FIXED, light, packedOverlay,
+                poseStack, buffers, resonator.getLevel(), 0);
+        poseStack.mulPose(Axis.YP.rotationDegrees(90));
+        itemRenderer.renderStatic(innerEye, ItemDisplayContext.FIXED, light, packedOverlay,
+                poseStack, buffers, resonator.getLevel(), 0);
         poseStack.popPose();
     }
 }

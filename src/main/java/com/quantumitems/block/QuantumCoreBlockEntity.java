@@ -96,9 +96,14 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         return false;
     }
 
-    /** 25 amethyst floor blocks one level down, resonators on the four corners. */
+    /** 25 amethyst floor blocks one level down, resonators on the four corners, own upper half intact. */
     public boolean isStructureValid() {
         if (level == null) {
+            return false;
+        }
+        BlockState upper = level.getBlockState(worldPosition.above());
+        if (!upper.is(ModRegistry.QUANTUM_CORE.get())
+                || upper.getValue(QuantumCoreBlock.HALF) != net.minecraft.world.level.block.state.properties.DoubleBlockHalf.UPPER) {
             return false;
         }
         for (int dx = -2; dx <= 2; dx++) {
@@ -183,7 +188,7 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
                         core.enterPhase(Phase.SUCCESS);
                         serverLevel.playSound(null, pos, SoundEvents.BEACON_ACTIVATE, SoundSource.BLOCKS, 1.0f, 1.4f);
                         serverLevel.playSound(null, pos, SoundEvents.PORTAL_TRIGGER, SoundSource.BLOCKS, 0.5f, 1.6f);
-                        serverLevel.sendParticles(ParticleTypes.FLASH, pos.getX() + 0.5, pos.getY() + 1.2, pos.getZ() + 0.5,
+                        serverLevel.sendParticles(ParticleTypes.FLASH, pos.getX() + 0.5, pos.getY() + 1.45, pos.getZ() + 0.5,
                                 1, 0, 0, 0, 0);
                     } else {
                         core.enterPhase(Phase.FAILURE);
@@ -214,7 +219,7 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
 
     /** Particle streams resonators → above the core; colors follow the phase script. */
     private void emitTheater(ServerLevel level) {
-        Vec3 focus = Vec3.atCenterOf(worldPosition).add(0, 1.1, 0);
+        Vec3 focus = Vec3.atCenterOf(worldPosition).add(0, 0.95, 0); // the shard inside the upper frame
         for (BlockPos corner : CORNERS) {
             BlockPos resonatorPos = worldPosition.offset(corner);
             boolean occupied = level.getBlockEntity(resonatorPos) instanceof ResonatorBlockEntity resonator

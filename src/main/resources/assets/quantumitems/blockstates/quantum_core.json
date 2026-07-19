@@ -1,5 +1,6 @@
 {
   "variants": {
-    "": { "model": "quantumitems:block/quantum_core" }
+    "half=lower": { "model": "quantumitems:block/quantum_core_lower" },
+    "half=upper": { "model": "quantumitems:block/quantum_core_upper" }
   }
 }
