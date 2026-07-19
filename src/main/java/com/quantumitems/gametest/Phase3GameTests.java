@@ -217,8 +217,10 @@ public class Phase3GameTests {
         windowC.set(ModRegistry.QUANTUM_LINK.get(), new QuantumLinkData(network.id(), memberC));
         engine.adopt(windowC);
 
-        // the client merged window #1 into a plain stack and uploaded plain 25
+        // the client merged window #1 into a plain stack and uploaded plain 25;
+        // retirement is deferred a few ticks (a MOVE would re-adopt and cancel)
         engine.creativeSlotReplaced(network.windowA(), new ItemStack(Items.BREAD, 25));
+        flushGrace(engine);
 
         QuantumNetworks.Network entry = networks(helper).network(network.id());
         helper.assertTrue(entry != null, "network survives while members remain");
@@ -229,10 +231,44 @@ public class Phase3GameTests {
 
         // destroying window #2 leaves windowC alone -> anomaly, network deleted
         engine.creativeSlotReplaced(network.windowB(), ItemStack.EMPTY);
+        flushGrace(engine);
         helper.assertTrue(networks(helper).network(network.id()) == null,
                 "lone survivor -> network deleted, no ghost");
         helper.assertTrue(windowC.isEmpty(),
                 "anomalous clone wipes with its network, got " + windowC);
+        helper.succeed();
+    }
+
+    /** Simulates the grace window passing without a re-adoption. */
+    private static void flushGrace(QuantumEngine engine) {
+        for (int i = 0; i < 5; i++) {
+            engine.flushCreativeRetirements();
+        }
+    }
+
+    /**
+     * A creative MOVE is two slot packets: the old slot cleared, the new slot
+     * set with an equal copy. The second packet re-adopts the member within
+     * the grace window — the network must survive a mere reshuffle.
+     */
+    @GameTest(template = "empty", templateNamespace = "quantumitems")
+    public static void creativeMoveDoesNotKillNetwork(GameTestHelper helper) {
+        TestNetwork network = makeNetwork(helper, 9);
+        QuantumEngine engine = QuantumEngine.onServerThread();
+
+        // packet 1: source slot now empty
+        engine.creativeSlotReplaced(network.windowA(), ItemStack.EMPTY);
+        // packet 2 (same tick): destination slot holds an equal copy
+        ItemStack movedCopy = network.windowA().copy();
+        engine.creativeUpdate(movedCopy);
+        flushGrace(engine);
+
+        QuantumNetworks.Network entry = networks(helper).network(network.id());
+        helper.assertTrue(entry != null, "network must survive a creative reshuffle");
+        helper.assertTrue(entry.aliveMembers.contains(1) && entry.aliveMembers.contains(2),
+                "both members must survive, got " + (entry == null ? "-" : entry.aliveMembers));
+        helper.assertTrue(entry.pool == 9, "pool untouched by the move");
+        helper.assertTrue(movedCopy.getCount() == 9, "moved window keeps showing the pool");
         helper.succeed();
     }
 

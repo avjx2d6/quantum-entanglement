@@ -26,6 +26,10 @@ import javax.annotation.Nullable;
  *
  * The exchange moves whole ItemStack instances between hand and pedestal —
  * a player gesture by nature: a window travels whole, link intact.
+ *
+ * Deliberate deviation from the depot: Create only reacts to clicks on the
+ * TOP face (ray.getDirection() != UP → PASS). The author finds that
+ * annoying in the depot itself, so our pedestal answers on any face.
  */
 public class ResonatorBlock extends Block implements EntityBlock {
     public ResonatorBlock(Properties properties) {

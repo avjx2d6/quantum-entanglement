@@ -144,6 +144,7 @@ public final class QuantumEngine {
         WeakReference<ItemStack> ref = canonical.get(key);
         if (ref == null || ref.get() != stack) {
             canonical.put(key, new WeakReference<>(stack));
+            pendingCreativeRetirements.remove(key);
         }
         if (!componentsMatchSnapshot(stack, network)) {
             collapse(stack, link, network, networks);
@@ -225,6 +226,7 @@ public final class QuantumEngine {
                 return false;
             }
             canonical.put(key, new WeakReference<>(stack)); // adopt: no live competitor, in-sync baseline
+            pendingCreativeRetirements.remove(key);
         }
         if (!componentsMatchSnapshot(stack, network)) {
             collapse(stack, link, network, networks);
@@ -478,6 +480,7 @@ public final class QuantumEngine {
             return;
         }
         canonical.put(key(link.networkId(), link.memberId()), new WeakReference<>(stack));
+        pendingCreativeRetirements.remove(key(link.networkId(), link.memberId()));
         if (!componentsMatchSnapshot(stack, network)) {
             collapse(stack, link, network, networks);
             return;
@@ -571,6 +574,7 @@ public final class QuantumEngine {
         ItemStack moved = stack.copy();
         wipe(stack);
         canonical.put(key(link.networkId(), link.memberId()), new WeakReference<>(moved));
+        pendingCreativeRetirements.remove(key(link.networkId(), link.memberId()));
         return moved;
     }
 
@@ -592,8 +596,49 @@ public final class QuantumEngine {
             return; // same member came back — creativeUpdate handles the count
         }
         debug("creative replaced window net#" + oldLink.networkId() + " m" + oldLink.memberId()
-                + " with " + (newStack.isEmpty() ? "air" : newStack.getItem()) + " -> member retires");
-        windowDestroyed(oldStack);
+                + " with " + (newStack.isEmpty() ? "air" : newStack.getItem()) + " -> retirement deferred");
+        // Deferred, not immediate: a creative MOVE is two slot packets (old
+        // slot cleared, new slot set) and the second one re-adopts the member,
+        // cancelling this. Only a member nobody re-adopts within the grace
+        // window was genuinely deleted.
+        pendingCreativeRetirements.put(key(oldLink.networkId(), oldLink.memberId()), CREATIVE_RETIREMENT_GRACE_TICKS);
+    }
+
+    private static final int CREATIVE_RETIREMENT_GRACE_TICKS = 3;
+    private final Map<Long, Integer> pendingCreativeRetirements = new HashMap<>();
+
+    /** Ticked from ServerEvents: retire creative-deleted members whose grace expired un-readopted. */
+    public void flushCreativeRetirements() {
+        if (pendingCreativeRetirements.isEmpty()) {
+            return;
+        }
+        var iterator = pendingCreativeRetirements.entrySet().iterator();
+        QuantumNetworks networks = QuantumNetworks.get(server);
+        while (iterator.hasNext()) {
+            var entry = iterator.next();
+            int ticksLeft = entry.getValue() - 1;
+            if (ticksLeft > 0) {
+                entry.setValue(ticksLeft);
+                continue;
+            }
+            iterator.remove();
+            long key = entry.getKey();
+            int networkId = (int) (key >>> 32);
+            int memberId = (int) key;
+            QuantumNetworks.Network network = networks.network(networkId);
+            if (network == null || !network.aliveMembers.contains(memberId)) {
+                continue;
+            }
+            debug("creative retirement net#" + networkId + " m" + memberId + " (grace expired)");
+            canonical.remove(key);
+            network.aliveMembers.remove(Integer.valueOf(memberId));
+            if (network.aliveMembers.isEmpty()) {
+                networks.removeNetwork(networkId);
+            } else {
+                networks.setDirty();
+                collapseIfLoneMember(networkId, network, networks);
+            }
+        }
     }
 
     /**
@@ -729,6 +774,7 @@ public final class QuantumEngine {
         QuantumLinkData link = stack.get(ModRegistry.QUANTUM_LINK.get());
         if (link != null) {
             canonical.put(key(link.networkId(), link.memberId()), new WeakReference<>(stack));
+            pendingCreativeRetirements.remove(key(link.networkId(), link.memberId()));
         }
     }
 

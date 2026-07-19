@@ -7,7 +7,7 @@ config = "quantumitems.mixins.json"
 
 [[mods]]
 modId = "quantumitems"
-version = "0.1.0"
+version = "${mod_version}"
 displayName = "Quantum Entanglement"
 description = '''Entangle item stacks into quantum networks that share a single pool of items across any distance.'''
 authors = "avjx2d6"

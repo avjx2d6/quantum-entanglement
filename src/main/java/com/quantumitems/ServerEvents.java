@@ -61,11 +61,12 @@ public final class ServerEvents {
      */
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
-        if (event.getServer().getTickCount() % 100 != 0) {
-            return;
-        }
         QuantumEngine engine = QuantumEngine.onServerThread();
         if (engine == null) {
+            return;
+        }
+        engine.flushCreativeRetirements();
+        if (event.getServer().getTickCount() % 100 != 0) {
             return;
         }
         for (Player player : event.getServer().getPlayerList().getPlayers()) {
