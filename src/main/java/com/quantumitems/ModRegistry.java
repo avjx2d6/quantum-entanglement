@@ -72,8 +72,8 @@ public final class ModRegistry {
     public static final DeferredItem<Item> QUANTUM_SHARD =
             ITEMS.registerSimpleItem("quantum_shard", new Item.Properties().rarity(Rarity.RARE));
 
-    public static final DeferredItem<Item> ENTANGLED_EYE =
-            ITEMS.registerSimpleItem("entangled_eye", new Item.Properties().rarity(Rarity.UNCOMMON));
+    public static final DeferredItem<Item> EYE_OF_ELSEWHERE =
+            ITEMS.registerSimpleItem("eye_of_elsewhere", new Item.Properties().rarity(Rarity.UNCOMMON));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<QuantumCoreBlockEntity>> QUANTUM_CORE_BE =
             BLOCK_ENTITIES.register("quantum_core",
@@ -92,7 +92,7 @@ public final class ModRegistry {
                     .icon(() -> new ItemStack(QUANTUM_SHARD.get()))
                     .displayItems((parameters, output) -> {
                         output.accept(QUANTUM_SHARD.get());
-                        output.accept(ENTANGLED_EYE.get());
+                        output.accept(EYE_OF_ELSEWHERE.get());
                         output.accept(RESONATOR_ITEM.get());
                         output.accept(QUANTUM_CORE_ITEM.get());
                     })

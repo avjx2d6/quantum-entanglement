@@ -8,7 +8,7 @@
   ],
   "key": {
     "A": { "item": "minecraft:amethyst_shard" },
-    "B": { "item": "quantumitems:entangled_eye" },
+    "B": { "item": "quantumitems:eye_of_elsewhere" },
     "D": { "item": "minecraft:polished_deepslate" }
   },
   "result": {

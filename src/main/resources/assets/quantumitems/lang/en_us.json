@@ -3,7 +3,6 @@
   "block.quantumitems.quantum_core": "Quantum Core",
   "block.quantumitems.resonator": "Resonator",
   "item.quantumitems.quantum_shard": "Quantum Shard",
-  "item.quantumitems.entangled_eye": "Entangled Eye",
   "tooltip.quantumitems.link_id": "Link ID: %s#%s",
   "tooltip.quantumitems.window.hint": "Hold Shift for entanglement rules",
   "tooltip.quantumitems.window.shared": "Shares one pool of items with its twins - use any, drain all.",
@@ -11,5 +10,6 @@
   "tooltip.quantumitems.window.automation": "Machines extract ordinary items; taking the last one ends the link.",
   "tooltip.quantumitems.window.shulker": "Sleeps safely inside a shulker box. What you find on waking depends on the pool.",
   "tooltip.quantumitems.shard.lore": "A splinter of somewhere else. It remembers being two places at once.",
-  "tooltip.quantumitems.shard.source": "Found where the old city sleeps in the dark."
+  "tooltip.quantumitems.shard.source": "Found where the old city sleeps in the dark.",
+  "item.quantumitems.eye_of_elsewhere": "Eye of Elsewhere"
 }

@@ -3,7 +3,6 @@
   "block.quantumitems.quantum_core": "Квантовое ядро",
   "block.quantumitems.resonator": "Резонатор",
   "item.quantumitems.quantum_shard": "Квантовый осколок",
-  "item.quantumitems.entangled_eye": "Запутанное око",
   "tooltip.quantumitems.link_id": "Link ID: %s#%s",
   "tooltip.quantumitems.window.hint": "Зажмите Shift — правила запутанности",
   "tooltip.quantumitems.window.shared": "Делит один запас предметов с близнецами: бери из любого — тратятся все.",
@@ -11,5 +10,6 @@
   "tooltip.quantumitems.window.automation": "Механизмы извлекают обычные предметы; последний предмет завершает связь.",
   "tooltip.quantumitems.window.shulker": "Спокойно спит в шалкеровом ящике. Что найдёшь при пробуждении — зависит от запаса.",
   "tooltip.quantumitems.shard.lore": "Осколок чего-то нездешнего. Он помнит, каково быть в двух местах сразу.",
-  "tooltip.quantumitems.shard.source": "Находится там, где древний город спит во тьме."
+  "tooltip.quantumitems.shard.source": "Находится там, где древний город спит во тьме.",
+  "item.quantumitems.eye_of_elsewhere": "Сквозное око"
 }
