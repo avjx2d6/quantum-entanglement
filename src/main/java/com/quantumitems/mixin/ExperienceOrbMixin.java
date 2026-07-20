@@ -40,11 +40,15 @@ public abstract class ExperienceOrbMixin {
     @Inject(method = "tick", at = @At("HEAD"))
     private void quantumitems$claimedOrbsIgnorePlayers(CallbackInfo ci) {
         Entity self = (Entity) (Object) this;
-        if (!self.getTags().contains(CLAIMED_TAG)) {
-            return;
+        boolean tagged = self.getTags().contains(CLAIMED_TAG);
+        // Entity tags do NOT sync to clients: the client's own orb simulation
+        // kept steering orbs toward the player (jitter + rubber-banding). The
+        // active-core tracker is populated by BOTH sides' BE ticks, so the
+        // suppression works identically on server and client.
+        if (tagged || com.quantumitems.engine.ActiveRitualCores.nearActiveCore(self.level(), self.position())) {
+            this.followingPlayer = null;
         }
-        this.followingPlayer = null;
-        if (self.tickCount % 60 == 0) {
+        if (tagged && self.tickCount % 60 == 0) {
             self.removeTag(CLAIMED_TAG); // an active core re-tags every tick
         }
     }

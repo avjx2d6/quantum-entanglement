@@ -187,6 +187,9 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, QuantumCoreBlockEntity core) {
+        boolean activePhases = core.phase == Phase.CONNECTING || core.phase == Phase.SCANNING
+                || core.phase == Phase.JUDGEMENT || core.phase == Phase.CRESCENDO;
+        com.quantumitems.engine.ActiveRitualCores.report(level, pos, activePhases);
         if (core.phase == Phase.IDLE) {
             return;
         }
@@ -199,18 +202,9 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         ServerLevel serverLevel = (ServerLevel) level;
         core.phaseAge++;
         core.emitTheater(serverLevel);
-        boolean activePhase = core.phase == Phase.CONNECTING || core.phase == Phase.SCANNING
-                || core.phase == Phase.JUDGEMENT || core.phase == Phase.CRESCENDO;
-        if (activePhase) {
+        if (activePhases) {
             core.drainExperience(serverLevel);
             core.pullExperienceOrbs(serverLevel);
-        }
-        // Steady hum under the scripted approach (the riser takes over at the crescendo).
-        if (core.phase == Phase.CONNECTING || core.phase == Phase.SCANNING || core.phase == Phase.JUDGEMENT) {
-            int cumAge = phaseOffset(core.phase) + core.phaseAge;
-            if (cumAge % 58 == 1) {
-                serverLevel.playSound(null, pos, ModRegistry.RITUAL_HUM.get(), SoundSource.BLOCKS, 0.9f, 1.0f);
-            }
         }
         switch (core.phase) {
             case CONNECTING -> {
@@ -617,5 +611,13 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
     public void setChanged() {
         super.setChanged();
         sendData();
+    }
+
+    @Override
+    public void setRemoved() {
+        if (level != null) {
+            com.quantumitems.engine.ActiveRitualCores.report(level, worldPosition, false);
+        }
+        super.setRemoved();
     }
 }
