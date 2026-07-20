@@ -148,7 +148,29 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
                 return false;
             }
         }
+        // No foreign blocks inside the circle: the two layers above the floor
+        // must be air everywhere except the machine's own blocks (author's
+        // request — the ritual space stays clean, beams never cross walls).
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) {
+                for (int dy = 0; dy <= 1; dy++) {
+                    if (isMachineBlock(dx, dy, dz)) {
+                        continue;
+                    }
+                    if (!level.getBlockState(worldPosition.offset(dx, dy, dz)).isAir()) {
+                        return false;
+                    }
+                }
+            }
+        }
         return true;
+    }
+
+    private static boolean isMachineBlock(int dx, int dy, int dz) {
+        if (dx == 0 && dz == 0) {
+            return true; // both core halves
+        }
+        return dy == 0 && Math.abs(dx) == 2 && Math.abs(dz) == 2; // resonators
     }
 
     /**

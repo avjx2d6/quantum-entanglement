@@ -375,4 +375,24 @@ public class RitualGameTests {
         }
         helper.succeed();
     }
+
+    /** A foreign block inside the circle invalidates the structure (author's rule). */
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 100)
+    public void foreignBlockInsideCircleInvalidatesStructure(GameTestHelper helper) {
+        buildCircle(helper);
+        helper.setBlock(CORE.offset(1, 0, 1), Blocks.STONE); // clutter inside the circle
+        ItemStack held = new ItemStack(ModRegistry.QUANTUM_SHARD.get());
+        core(helper).placeShard(held);
+        if (core(helper).phase() != QuantumCoreBlockEntity.Phase.IDLE) {
+            helper.fail("Cluttered circle must not launch, phase " + core(helper).phase());
+        }
+        helper.setBlock(CORE.offset(1, 0, 1), Blocks.AIR);
+        ItemStack second = new ItemStack(ModRegistry.QUANTUM_SHARD.get());
+        core(helper).takeShard();
+        core(helper).placeShard(second);
+        if (core(helper).phase() == QuantumCoreBlockEntity.Phase.IDLE) {
+            helper.fail("Clean circle must launch again");
+        }
+        helper.succeed();
+    }
 }
