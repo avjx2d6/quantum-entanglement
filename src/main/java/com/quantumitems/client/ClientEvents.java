@@ -19,6 +19,20 @@ public final class ClientEvents {
             event.registerBlockEntityRenderer(ModRegistry.RESONATOR_BE.get(), ResonatorRenderer::new);
             event.registerBlockEntityRenderer(ModRegistry.QUANTUM_CORE_BE.get(), QuantumCoreRenderer::new);
         }
+
+        @SubscribeEvent
+        public static void onClientSetup(net.neoforged.fml.event.lifecycle.FMLClientSetupEvent event) {
+            // Ponder is an optional dependency: only wire the guide up if it is
+            // present. Its own plugins register during this same event and
+            // PonderIndex.registerAll() runs later (load-complete), so adding
+            // our plugin here is picked up in time.
+            if (!net.neoforged.fml.ModList.get().isLoaded("ponder")) {
+                return;
+            }
+            event.enqueueWork(() ->
+                    net.createmod.ponder.foundation.PonderIndex.addPlugin(
+                            new com.quantumitems.client.ponder.QuantumPonderPlugin()));
+        }
     }
 
     @EventBusSubscriber(modid = QuantumItemsMod.MOD_ID, value = Dist.CLIENT)

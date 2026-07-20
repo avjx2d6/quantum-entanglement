@@ -11,5 +11,28 @@
   "tooltip.quantumitems.window.shulker": "Sleeps safely inside a shulker box. What you find on waking depends on the pool.",
   "tooltip.quantumitems.shard.lore": "A splinter of somewhere else. It remembers being two places at once.",
   "tooltip.quantumitems.shard.source": "Found where the old city sleeps in the dark.",
-  "item.quantumitems.eye_of_elsewhere": "Eye of Elsewhere"
+  "item.quantumitems.eye_of_elsewhere": "Eye of Elsewhere",
+
+  "quantumitems.ponder.tag.quantum_entanglement": "Quantum Entanglement",
+  "quantumitems.ponder.tag.quantum_entanglement.description": "Entangle stacks so distant windows share one pool of items.",
+
+  "quantumitems.ponder.circle.header": "Building the Ritual Circle",
+  "quantumitems.ponder.circle.text_1": "A five-by-five floor of Amethyst holds the ritual together",
+  "quantumitems.ponder.circle.text_2": "Four Resonators stand on the corners - pedestals that each hold one stack",
+  "quantumitems.ponder.circle.text_3": "The Quantum Core, two blocks tall, presides at the centre",
+  "quantumitems.ponder.circle.text_4": "Keep the circle clean: no stray blocks in the space above the floor",
+
+  "quantumitems.ponder.ritual.header": "Entangling the Stacks",
+  "quantumitems.ponder.ritual.text_1": "Lay one stack on every resonator - all four must match",
+  "quantumitems.ponder.ritual.text_2": "Place a Quantum Shard on the core to begin - it is consumed either way",
+  "quantumitems.ponder.ritual.text_3": "The core reaches out to each resonator in turn",
+  "quantumitems.ponder.ritual.text_4": "If the pattern holds, a golden verdict names the winning corner",
+  "quantumitems.ponder.ritual.text_5": "The circle builds to a crescendo, then the entanglement snaps into place",
+  "quantumitems.ponder.ritual.text_6": "Now those stacks are one pool, shared across any distance",
+  "quantumitems.ponder.ritual.text_7": "A broken pattern instead ends in a loud collapse - and the shard is still spent",
+
+  "quantumitems.ponder.shared_pool.header": "One Pool, Any Distance",
+  "quantumitems.ponder.shared_pool.text_1": "Two entangled windows can sit anywhere - even in chests at opposite ends",
+  "quantumitems.ponder.shared_pool.text_2": "They do not each hold items - they are two views of a single shared pool",
+  "quantumitems.ponder.shared_pool.text_3": "Take from one and the other empties too. Nothing is ever duplicated"
 }

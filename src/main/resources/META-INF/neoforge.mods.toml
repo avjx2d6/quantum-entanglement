@@ -25,3 +25,12 @@ type = "required"
 versionRange = "[1.21.1,1.22)"
 ordering = "NONE"
 side = "BOTH"
+
+# Ponder provides the in-game guide ("Ponder" on hover). Optional: without it
+# the mod runs unchanged, just no visual documentation. Client-only concern.
+[[dependencies.quantumitems]]
+modId = "ponder"
+type = "optional"
+versionRange = "[1.0.0,)"
+ordering = "AFTER"
+side = "CLIENT"

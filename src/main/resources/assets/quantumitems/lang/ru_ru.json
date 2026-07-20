@@ -11,5 +11,28 @@
   "tooltip.quantumitems.window.shulker": "Спокойно спит в шалкеровом ящике. Что найдёшь при пробуждении — зависит от запаса.",
   "tooltip.quantumitems.shard.lore": "Осколок чего-то нездешнего. Он помнит, каково быть в двух местах сразу.",
   "tooltip.quantumitems.shard.source": "Находится там, где древний город спит во тьме.",
-  "item.quantumitems.eye_of_elsewhere": "Сквозное око"
+  "item.quantumitems.eye_of_elsewhere": "Сквозное око",
+
+  "quantumitems.ponder.tag.quantum_entanglement": "Квантовая запутанность",
+  "quantumitems.ponder.tag.quantum_entanglement.description": "Запутайте стаки так, чтобы далёкие окна делили один общий запас предметов.",
+
+  "quantumitems.ponder.circle.header": "Постройка ритуального круга",
+  "quantumitems.ponder.circle.text_1": "Пол пять на пять из аметиста держит ритуал вместе",
+  "quantumitems.ponder.circle.text_2": "Четыре резонатора стоят по углам - каждый держит один стак",
+  "quantumitems.ponder.circle.text_3": "Квантовое ядро в два блока высотой правит в центре",
+  "quantumitems.ponder.circle.text_4": "Держите круг чистым: никаких лишних блоков в пространстве над полом",
+
+  "quantumitems.ponder.ritual.header": "Запутывание стаков",
+  "quantumitems.ponder.ritual.text_1": "Положите по стаку на каждый резонатор - все четыре должны совпадать",
+  "quantumitems.ponder.ritual.text_2": "Положите на ядро квантовый осколок, чтобы начать - он сгорит в любом случае",
+  "quantumitems.ponder.ritual.text_3": "Ядро тянется по очереди к каждому резонатору",
+  "quantumitems.ponder.ritual.text_4": "Если узор сложился, золотой вердикт называет победивший угол",
+  "quantumitems.ponder.ritual.text_5": "Круг нарастает до крещендо, и запутанность встаёт на место",
+  "quantumitems.ponder.ritual.text_6": "Теперь эти стаки - один запас, общий на любом расстоянии",
+  "quantumitems.ponder.ritual.text_7": "Неверный узор вместо этого рушится с грохотом - а осколок всё равно потрачен",
+
+  "quantumitems.ponder.shared_pool.header": "Один запас, любое расстояние",
+  "quantumitems.ponder.shared_pool.text_1": "Два запутанных окна можно поставить где угодно - даже в сундуки по разным концам",
+  "quantumitems.ponder.shared_pool.text_2": "Они не хранят предметы каждый по отдельности - это два вида на единый общий запас",
+  "quantumitems.ponder.shared_pool.text_3": "Возьми из одного - и другой тоже опустеет. Ничего никогда не дублируется"
 }

@@ -316,6 +316,29 @@ Ponder теперь **отдельная standalone-библиотека**: `Cre
 - **Рассказываем историю на уровне МИРА** (это ~80% концепции и родная стихия Ponder): сборка мультиблока → скорм шарда → вытянуть связанные копии → разложить по сундукам/бочкам в сцене → подпись «пул общий» → сломать связь → коллапс → автоматизация тянет plain. Несколько контейнеров + item-оверлеи + текст — Ponder делает это нативно.
 - **НЕ расширяем Ponder ради GUI-сценок.** Пиксельная хореография слотов курсора (впитывание/дроб/shift-клик) — край механики, уже покрытый тултипами и осваиваемый «руками». Модель Ponder — мир, а не GUI-скрин; тащить туда инвентарные скрины = драться с инструментом (высокая цена, низкая отдача). Вывод: **кастомного кода Ponder, скорее всего, не нужно вообще.**
 
+### D.1 Терминология библиотеки (по исходникам, авторитетно)
+
+- **Сцена (scene)** = один `PonderStoryBoard` — функция `program(SceneBuilder, SceneBuildingUtil)`, разыгрывается над одной схематикой `.nbt`. Заголовок — `scene.title(sceneId, "English")`.
+- **«Группа сцен»**, которую листаешь стрелками *Next Scene*, — это просто **все сториборды с одинаковым component** (предмет/блок). Отдельного объекта-группы нет; порядок задаётся `orderAfter/orderBefore`. Навёл на предмет → зажал клавишу Ponder → открылся список его сцен.
+- **Component** = `ResourceLocation` предмета/блока, к которому привязана сцена (`helper.addStoryBoard(component, "schematic", board, tags…)`).
+- **Tag** (`PonderTag`) = раздел в индексе Ponder (экран категорий с иконками); объединяет несколько компонентов под одним заголовком. `registerTag(...).addToIndex().item(icon).title().description().register()` + `addToTag(tag).add(component)`.
+- **Схематика** — стандартный vanilla `StructureTemplate` `.nbt` (GZIP; `size/palette/blocks/entities/DataVersion`), путь `assets/<ns>/ponder/<name>.nbt`.
+- **Тексты**: заголовок → ключ `<ns>.ponder.<sceneId>.header`; каждый `overlay().showText(...).text(...)` → `<ns>.ponder.<sceneId>.text_N` (N с 1, по порядку вызовов). В обычном режиме тянутся через `I18n` — прописаны вручную в `en_us/ru_ru`.
+- **Регистрация**: `implements PonderPlugin` (getModId/registerScenes/registerTags), `PonderIndex.addPlugin(...)` в `FMLClientSetupEvent` (Ponder делает `registerAll()` позже, на LoadComplete). Инструменты: `world()` (showSection/modifyBlock/createItemEntity/modifyBlockEntity — BE тикают в PonderLevel), `overlay()` (showText/showLine/showBigLine/showOutline с палитрой), `effects()` (emitParticles/indicateSuccess), `special()` (movePointOfInterest), тайминги `idle()`.
+
+### D.2 Реализовано (0.4.6, черновик до плейтеста)
+
+Зависимость `net.createmod.ponder:Ponder-NeoForge-1.21.1:1.0.69` (+ flywheel runtime) с `https://maven.createmod.net`; Ponder — **опциональная** зависимость в `neoforge.mods.toml` (без неё мод работает как раньше), регистрация плагина под `ModList.isLoaded("ponder")`. Catnip вшит в jar Ponder.
+
+Классы: `client/ponder/QuantumPonderPlugin` (тег `quantum_entanglement` + 3 сцены), `client/ponder/QuantumScenes` (сториборды). Схематики генерятся `scratchpad/gen_ponder_schematics.py` → `assets/quantumitems/ponder/{ritual_circle,shared_pool}.nbt`. Визуал ведётся **инструкциями Ponder**, а не реальным тикером ядра (ponder-мир — клиентский фасад; фазы/лучи/искры ставятся вручную для контроля тайминга).
+
+Готовы **первые 3 сцены** (план глав — §G.8, ниже расширен):
+1. **«Круг»** (на предмете ядра) — послойная сборка мультиблока (аметистовый пол → 4 резонатора → 2-блочное ядро) + предупреждение о чистоте круга.
+2. **«Запутывание»** (на шарде) — раскладка стаков, шард на ядро, поочерёдные входные линии → золотой вердикт → крещендо (glow↑, искры) → успех; отдельная реплика про провал + «шард сгорает всегда».
+3. **«Один запас»** (на оке) — два сундука по разным концам, яркая линия-связь, подпись «это два вида на единый пул, дюпов нет».
+
+Осталось (следующие заходы): сцены 4 «Хрупкость» (коллапс от изменения/земли), 5 «Машинам нельзя» (автоматизация = plain), 6 «Расширение и Око» (реко-герентность + вытяжка опыта); отполировать тайминги/камеру по плейтесту; при желании — реальная анимация раскладки на резонаторах (`modifyBlockEntity`).
+
 ## E. Текущий билд
 
 - Ветка разработки: `claude/mod-idea-discussion-vzkpvp`.

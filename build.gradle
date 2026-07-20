@@ -6,6 +6,21 @@ plugins {
 version = mod_version
 group = mod_group_id
 
+repositories {
+    // Ponder + its bundled Catnip, and Flywheel, live here.
+    maven {
+        name = 'CreateMod'
+        url = 'https://maven.createmod.net'
+    }
+}
+
+dependencies {
+    // Ponder ships Catnip inside the NeoForge jar; Flywheel is a client-only
+    // runtime dependency of the Ponder UI (side=CLIENT, inert on servers).
+    implementation "net.createmod.ponder:Ponder-NeoForge-${minecraft_version}:${ponder_version}"
+    runtimeOnly "dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}"
+}
+
 base {
     archivesName = mod_id
 }
