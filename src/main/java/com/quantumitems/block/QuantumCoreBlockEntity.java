@@ -170,6 +170,10 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         ServerLevel serverLevel = (ServerLevel) level;
         core.phaseAge++;
         core.emitTheater(serverLevel);
+        if (core.phase == Phase.CHARGING || core.phase == Phase.JUDGEMENT) {
+            core.drainExperience(serverLevel);
+            core.pullExperienceOrbs(serverLevel);
+        }
         switch (core.phase) {
             case CHARGING -> {
                 if (core.phaseAge % 8 == 0) {
@@ -245,6 +249,74 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
                     }
                 }
             }
+        }
+    }
+
+    // --- experience drain: the Observer drinks what you have seen ---
+
+    private static final double XP_RADIUS = 7.0;
+
+    private Vec3 observerEyePos() {
+        return Vec3.atCenterOf(worldPosition).add(0, 0.05, 0);
+    }
+
+    /**
+     * While the ritual runs, nearby players leak experience: a point at a
+     * time detaches as a REAL orb that the core then reels in. The closer
+     * you stand, the faster it bleeds. Conservation is structural — the
+     * deducted amount equals the orb's value, an absorbed orb is gone, a
+     * caught orb refunds itself through vanilla pickup. Creative and
+     * spectator players are exempt.
+     */
+    private void drainExperience(ServerLevel level) {
+        Vec3 eye = observerEyePos();
+        var box = new net.minecraft.world.phys.AABB(worldPosition).inflate(XP_RADIUS);
+        for (net.minecraft.world.entity.player.Player player
+                : level.getEntitiesOfClass(net.minecraft.world.entity.player.Player.class, box)) {
+            if (player.isCreative() || player.isSpectator()) {
+                continue;
+            }
+            double dist = player.position().distanceTo(eye);
+            if (dist > XP_RADIUS) {
+                continue;
+            }
+            int interval = dist < 2.5 ? 6 : dist < 5.0 ? 12 : 20;
+            if (phaseAge % interval != 0) {
+                continue;
+            }
+            if (player.experienceLevel <= 0 && player.experienceProgress <= 0.0f) {
+                continue; // nothing left to drink
+            }
+            player.giveExperiencePoints(-1);
+            player.takeXpDelay = 10; // head start for the orb, catching it stays possible
+            Vec3 toward = eye.subtract(player.position()).normalize().scale(0.8);
+            level.addFreshEntity(new net.minecraft.world.entity.ExperienceOrb(level,
+                    player.getX() + toward.x, player.getY() + 0.9, player.getZ() + toward.z, 1));
+        }
+    }
+
+    /**
+     * ALL experience orbs in radius — leaked, mob-dropped, thrown bottles —
+     * get reeled toward the Observer and vanish into it. Stronger pull
+     * closer to the core; the absolute velocity write overrides the orb's
+     * own follow-the-player urge.
+     */
+    private void pullExperienceOrbs(ServerLevel level) {
+        Vec3 eye = observerEyePos();
+        var box = new net.minecraft.world.phys.AABB(worldPosition).inflate(XP_RADIUS);
+        for (net.minecraft.world.entity.ExperienceOrb orb
+                : level.getEntitiesOfClass(net.minecraft.world.entity.ExperienceOrb.class, box)) {
+            Vec3 toEye = eye.subtract(orb.position());
+            double dist = toEye.length();
+            if (dist < 0.7) {
+                level.sendParticles(ParticleTypes.PORTAL, eye.x, eye.y, eye.z, 6, 0.1, 0.1, 0.1, 0.05);
+                level.playSound(null, worldPosition, SoundEvents.AMETHYST_BLOCK_CHIME,
+                        SoundSource.BLOCKS, 0.4f, 1.8f);
+                orb.discard();
+                continue;
+            }
+            double strength = 0.08 + 0.22 * (1.0 - dist / XP_RADIUS);
+            orb.setDeltaMovement(toEye.normalize().scale(strength));
         }
     }
 
