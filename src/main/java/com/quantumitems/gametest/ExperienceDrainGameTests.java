@@ -39,8 +39,7 @@ public class ExperienceDrainGameTests {
     private static final BlockPos[] RESONATORS = {
             new BlockPos(1, 2, 1), new BlockPos(5, 2, 1),
             new BlockPos(1, 2, 5), new BlockPos(5, 2, 5)};
-    private static final int RITUAL_TICKS = QuantumCoreBlockEntity.CHARGING_TICKS
-            + QuantumCoreBlockEntity.JUDGEMENT_TICKS + 5;
+    private static final int RITUAL_TICKS = QuantumCoreBlockEntity.ticksUntilCancel() + 5;
 
     private static void buildCircle(GameTestHelper helper) {
         for (int dx = -2; dx <= 2; dx++) {
@@ -60,7 +59,7 @@ public class ExperienceDrainGameTests {
         return (QuantumCoreBlockEntity) helper.getBlockEntity(CORE);
     }
 
-    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 200)
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 320)
     public void ritualDrainsNearbyPlayerExperience(GameTestHelper helper) {
         buildCircle(helper);
         // makeMockServerPlayerInLevel is locked to creative (stub connection
@@ -84,7 +83,7 @@ public class ExperienceDrainGameTests {
         });
     }
 
-    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 200)
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 320)
     public void ritualAbsorbsLooseOrbs(GameTestHelper helper) {
         buildCircle(helper);
         Vec3 orbPos = Vec3.atCenterOf(helper.absolutePos(CORE.offset(2, 1, 2)));

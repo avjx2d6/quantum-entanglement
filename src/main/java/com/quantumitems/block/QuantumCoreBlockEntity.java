@@ -28,16 +28,20 @@ import java.util.Set;
 
 /**
  * The controller of the ritual circle: a 5×5 amethyst-block floor, four
- * resonators on its corners, the core on its center block.
+ * resonators on its corners, the two-tall core in the center.
  *
  * The ritual is a strict commitment: lay everything out first, then place a
  * shard — it launches immediately and burns the shard whether it succeeds or
- * fails (the rules are taught, not refunded). From launch to verdict every
- * stack in the circle is locked.
+ * fails. From launch to the end every stack in the circle is locked.
  *
- * The actual entanglement math happens in ONE tick at the end of JUDGEMENT,
- * so a chunk unload mid-ritual can never leave a half-applied network; the
- * phases before and after are pure theater.
+ * Staging (author's script): beams CONNECT to the resonators one by one →
+ * the occupied (input) beams recolor one by one under a steady hum → the
+ * verdict: the planned OUTPUT beam turns gold, or a loud CANCEL kills the
+ * ritual → on success a rising Shepard tone builds, the core's glow steps
+ * up, the shard whips around → the beams BURST with a crack and it all goes
+ * dark. The entanglement math itself still happens in ONE tick (at the
+ * burst); the dry-run at the verdict cannot diverge because the circle is
+ * locked in between.
  */
 public class QuantumCoreBlockEntity extends SyncedBlockEntity {
     /** Corner offsets of the circle, in deterministic order (output windows fill in this order). */
@@ -46,7 +50,7 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
             new BlockPos(-2, 0, 2), new BlockPos(2, 0, 2)};
 
     public enum Phase {
-        IDLE, CHARGING, JUDGEMENT, SUCCESS, FAILURE;
+        IDLE, CONNECTING, SCANNING, JUDGEMENT, CRESCENDO, SUCCESS, FAILURE;
 
         static Phase byOrdinal(int ordinal) {
             Phase[] values = values();
@@ -54,18 +58,44 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         }
     }
 
-    public static final int CHARGING_TICKS = 40;
-    public static final int JUDGEMENT_TICKS = 20;
-    public static final int SUCCESS_TICKS = 20;
+    public static final int CONNECTING_TICKS = 60;   // one beam every 15 ticks
+    public static final int SCANNING_TICKS = 60;     // inputs recolor every 15 ticks
+    public static final int JUDGEMENT_TICKS = 25;    // gold output beam shows
+    public static final int CRESCENDO_TICKS = 60;    // riser, glow, spin-up
+    public static final int SUCCESS_TICKS = 25;
     public static final int FAILURE_TICKS = 30;
+    private static final int BEAM_STEP_TICKS = 15;
+
+    /** Tick (from launch) at which a doomed ritual cancels. */
+    public static int ticksUntilCancel() {
+        return CONNECTING_TICKS + SCANNING_TICKS;
+    }
+
+    /** Tick (from launch) at which a successful ritual applies (the burst). */
+    public static int ticksUntilApply() {
+        return CONNECTING_TICKS + SCANNING_TICKS + JUDGEMENT_TICKS + CRESCENDO_TICKS;
+    }
+
+    /** Cumulative age across the scripted phases — drives the hum cadence and renderers. */
+    public static int phaseOffset(Phase phase) {
+        return switch (phase) {
+            case SCANNING -> CONNECTING_TICKS;
+            case JUDGEMENT -> CONNECTING_TICKS + SCANNING_TICKS;
+            case CRESCENDO -> CONNECTING_TICKS + SCANNING_TICKS + JUDGEMENT_TICKS;
+            default -> 0;
+        };
+    }
 
     private static final Vector3f COLOR_CHARGE = new Vector3f(0.75f, 0.55f, 1.0f);
     private static final Vector3f COLOR_INPUT = new Vector3f(0.35f, 0.9f, 1.0f);
+    private static final Vector3f COLOR_OUTPUT = new Vector3f(1.0f, 0.84f, 0.3f);
     private static final Vector3f COLOR_FAIL = new Vector3f(1.0f, 0.2f, 0.15f);
 
     private Phase phase = Phase.IDLE;
     private int phaseAge;
     private ItemStack shard = ItemStack.EMPTY;
+    /** Corner index (0..3) the dry-run picked for the new window; -1 = none. */
+    private int plannedOutputCorner = -1;
 
     public QuantumCoreBlockEntity(BlockPos pos, BlockState state) {
         super(ModRegistry.QUANTUM_CORE_BE.get(), pos, state);
@@ -124,9 +154,8 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
     /**
      * Placing a shard on a COMPLETE circle commits the ritual immediately;
      * every in-ritual problem is a red FAILURE that still burns the shard.
-     * On an incomplete circle the shard simply lies on the core like an item
-     * on a resonator — inert, retrievable with an empty hand, no ritual and
-     * no fuel spent. Finish the machine, re-place the shard, and it fires.
+     * On an incomplete circle the shard simply lies on the core, inert and
+     * retrievable with an empty hand.
      */
     public boolean placeShard(ItemStack shardStack) {
         if (level == null || level.isClientSide || phase != Phase.IDLE || !shard.isEmpty()
@@ -135,8 +164,9 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         }
         shard = shardStack.split(1);
         if (isStructureValid()) {
-            phase = Phase.CHARGING;
+            phase = Phase.CONNECTING;
             phaseAge = 0;
+            plannedOutputCorner = -1;
             level.playSound(null, worldPosition, SoundEvents.AMETHYST_BLOCK_RESONATE, SoundSource.BLOCKS, 1.0f, 0.8f);
         } else {
             level.playSound(null, worldPosition, SoundEvents.AMETHYST_BLOCK_PLACE, SoundSource.BLOCKS, 0.7f, 1.2f);
@@ -162,41 +192,78 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         }
         if (level.isClientSide) {
             // The client advances the phase clock itself between sync packets
-            // (each phase transition resyncs it) — this is what drives the
-            // shard spin and any renderer animation.
+            // (each phase transition resyncs it) — this drives the renderers.
             core.phaseAge++;
             return;
         }
         ServerLevel serverLevel = (ServerLevel) level;
         core.phaseAge++;
         core.emitTheater(serverLevel);
-        if (core.phase == Phase.CHARGING || core.phase == Phase.JUDGEMENT) {
+        boolean activePhase = core.phase == Phase.CONNECTING || core.phase == Phase.SCANNING
+                || core.phase == Phase.JUDGEMENT || core.phase == Phase.CRESCENDO;
+        if (activePhase) {
             core.drainExperience(serverLevel);
             core.pullExperienceOrbs(serverLevel);
         }
+        // Steady hum under the scripted approach (the riser takes over at the crescendo).
+        if (core.phase == Phase.CONNECTING || core.phase == Phase.SCANNING || core.phase == Phase.JUDGEMENT) {
+            int cumAge = phaseOffset(core.phase) + core.phaseAge;
+            if (cumAge % 58 == 1) {
+                serverLevel.playSound(null, pos, ModRegistry.RITUAL_HUM.get(), SoundSource.BLOCKS, 0.9f, 1.0f);
+            }
+        }
         switch (core.phase) {
-            case CHARGING -> {
-                if (core.phaseAge % 8 == 0) {
-                    float pitch = 0.8f + 0.6f * core.phaseAge / CHARGING_TICKS;
-                    serverLevel.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.BLOCKS, 1.0f, pitch);
+            case CONNECTING -> {
+                if (core.phaseAge % BEAM_STEP_TICKS == 1 && core.phaseAge / BEAM_STEP_TICKS < 4) {
+                    int beam = core.phaseAge / BEAM_STEP_TICKS;
+                    serverLevel.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_PLACE, SoundSource.BLOCKS,
+                            1.0f, 0.55f + 0.1f * beam);
                 }
-                if (core.phaseAge >= CHARGING_TICKS) {
-                    core.enterPhase(Phase.JUDGEMENT);
+                if (core.phaseAge >= CONNECTING_TICKS) {
+                    core.enterPhase(Phase.SCANNING);
+                }
+            }
+            case SCANNING -> {
+                if (core.phaseAge % BEAM_STEP_TICKS == 1) {
+                    serverLevel.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.BLOCKS, 0.9f, 1.3f);
+                }
+                if (core.phaseAge >= SCANNING_TICKS) {
+                    core.plannedOutputCorner = core.performRitual(serverLevel, false);
+                    if (core.plannedOutputCorner < 0) {
+                        core.cancelRitual(serverLevel);
+                    } else {
+                        core.enterPhase(Phase.JUDGEMENT);
+                        serverLevel.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_RESONATE,
+                                SoundSource.BLOCKS, 1.0f, 1.5f);
+                    }
                 }
             }
             case JUDGEMENT -> {
                 if (core.phaseAge >= JUDGEMENT_TICKS) {
-                    boolean success = core.performRitual(serverLevel);
-                    core.shard = ItemStack.EMPTY; // burned on both outcomes: the rules are taught, not refunded
-                    if (success) {
+                    core.enterPhase(Phase.CRESCENDO);
+                    serverLevel.playSound(null, pos, ModRegistry.RITUAL_RISER.get(), SoundSource.BLOCKS, 1.2f, 1.0f);
+                }
+            }
+            case CRESCENDO -> {
+                if (core.phaseAge == 1) {
+                    core.setGlow(serverLevel, 1);
+                } else if (core.phaseAge == CRESCENDO_TICKS / 3) {
+                    core.setGlow(serverLevel, 2);
+                } else if (core.phaseAge == 2 * CRESCENDO_TICKS / 3) {
+                    core.setGlow(serverLevel, 3);
+                }
+                if (core.phaseAge >= CRESCENDO_TICKS) {
+                    int result = core.performRitual(serverLevel, true);
+                    core.shard = ItemStack.EMPTY; // burned: the rules are taught, not refunded
+                    core.setGlow(serverLevel, 0);
+                    core.releaseClaimedOrbs(serverLevel);
+                    if (result >= 0) {
+                        core.burst(serverLevel);
                         core.enterPhase(Phase.SUCCESS);
-                        serverLevel.playSound(null, pos, SoundEvents.BEACON_ACTIVATE, SoundSource.BLOCKS, 1.0f, 1.4f);
-                        serverLevel.playSound(null, pos, SoundEvents.PORTAL_TRIGGER, SoundSource.BLOCKS, 0.5f, 1.6f);
-                        serverLevel.sendParticles(ParticleTypes.FLASH, pos.getX() + 0.5, pos.getY() + 1.45, pos.getZ() + 0.5,
-                                1, 0, 0, 0, 0);
                     } else {
+                        // the locked circle should make this impossible; fail honestly if it happens
+                        serverLevel.playSound(null, pos, ModRegistry.RITUAL_CANCEL.get(), SoundSource.BLOCKS, 1.4f, 1.0f);
                         core.enterPhase(Phase.FAILURE);
-                        serverLevel.playSound(null, pos, SoundEvents.FIRE_EXTINGUISH, SoundSource.BLOCKS, 1.0f, 0.6f);
                     }
                 }
             }
@@ -215,39 +282,105 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         }
     }
 
+    /** The loud "отмена": burn the shard, kill the hum, go red. */
+    private void cancelRitual(ServerLevel level) {
+        shard = ItemStack.EMPTY;
+        setGlow(level, 0);
+        releaseClaimedOrbs(level);
+        level.playSound(null, worldPosition, ModRegistry.RITUAL_CANCEL.get(), SoundSource.BLOCKS, 1.4f, 1.0f);
+        enterPhase(Phase.FAILURE);
+    }
+
+    /** Beam lines explode outward, one sharp crack, then darkness. */
+    private void burst(ServerLevel level) {
+        Vec3 focus = beamFocus();
+        for (BlockPos corner : CORNERS) {
+            Vec3 from = Vec3.atCenterOf(worldPosition.offset(corner)).add(0, 0.8, 0);
+            for (int i = 0; i <= 12; i++) {
+                Vec3 point = from.lerp(focus, i / 12.0);
+                level.sendParticles(ParticleTypes.CRIT, point.x, point.y, point.z, 3, 0.15, 0.15, 0.15, 0.25);
+                level.sendParticles(ParticleTypes.END_ROD, point.x, point.y, point.z, 1, 0.1, 0.1, 0.1, 0.08);
+            }
+        }
+        level.sendParticles(ParticleTypes.FLASH, focus.x, focus.y, focus.z, 1, 0, 0, 0, 0);
+        level.playSound(null, worldPosition, ModRegistry.RITUAL_BURST.get(), SoundSource.BLOCKS, 1.6f, 1.0f);
+    }
+
     private void enterPhase(Phase next) {
         phase = next;
         phaseAge = 0;
         setChanged();
     }
 
-    /** Particle streams resonators → above the core; colors follow the phase script. */
+    /** Light emission steps up with the crescendo (GLOW blockstate on both halves). */
+    private void setGlow(ServerLevel level, int glow) {
+        for (BlockPos pos : new BlockPos[]{worldPosition, worldPosition.above()}) {
+            BlockState state = level.getBlockState(pos);
+            if (state.is(ModRegistry.QUANTUM_CORE.get()) && state.getValue(QuantumCoreBlock.GLOW) != glow) {
+                level.setBlock(pos, state.setValue(QuantumCoreBlock.GLOW, glow), 3);
+            }
+        }
+    }
+
+    private Vec3 beamFocus() {
+        return Vec3.atCenterOf(worldPosition).add(0, 0.95, 0); // the shard inside the upper frame
+    }
+
+    /**
+     * Beam script (author's storyboard): beams connect one by one, inputs
+     * recolor one by one, the planned output goes gold, the crescendo
+     * doubles the density, failure bleeds red.
+     */
     private void emitTheater(ServerLevel level) {
-        Vec3 focus = Vec3.atCenterOf(worldPosition).add(0, 0.95, 0); // the shard inside the upper frame
-        for (BlockPos corner : CORNERS) {
-            BlockPos resonatorPos = worldPosition.offset(corner);
+        Vec3 focus = beamFocus();
+        int connectedBeams = switch (phase) {
+            case CONNECTING -> Math.min(4, 1 + phaseAge / BEAM_STEP_TICKS);
+            case SCANNING, JUDGEMENT, CRESCENDO -> 4;
+            default -> 0;
+        };
+        int recoloredInputs = switch (phase) {
+            case SCANNING -> 1 + phaseAge / BEAM_STEP_TICKS;
+            case JUDGEMENT, CRESCENDO -> 4;
+            default -> 0;
+        };
+        int density = phase == Phase.CRESCENDO ? 4 : 2;
+        int inputSeen = 0;
+        for (int i = 0; i < CORNERS.length; i++) {
+            BlockPos resonatorPos = worldPosition.offset(CORNERS[i]);
             boolean occupied = level.getBlockEntity(resonatorPos) instanceof ResonatorBlockEntity resonator
                     && !resonator.isEmpty();
             Vec3 from = Vec3.atCenterOf(resonatorPos).add(0, 0.8, 0);
-            for (int sample = 0; sample < 2; sample++) {
+
+            if (phase == Phase.SUCCESS) {
+                level.sendParticles(ParticleTypes.END_ROD,
+                        from.x, from.y + 0.3, from.z, 1, 0.15, 0.2, 0.15, 0.01);
+                continue;
+            }
+            if (phase == Phase.FAILURE) {
                 Vec3 point = from.lerp(focus, level.random.nextDouble());
-                switch (phase) {
-                    case CHARGING -> level.sendParticles(new DustParticleOptions(COLOR_CHARGE, 1.0f),
-                            point.x, point.y, point.z, 1, 0.05, 0.05, 0.05, 0);
-                    case JUDGEMENT -> level.sendParticles(
-                            new DustParticleOptions(occupied ? COLOR_INPUT : COLOR_CHARGE, 1.0f),
-                            point.x, point.y, point.z, 2, 0.05, 0.05, 0.05, 0);
-                    case SUCCESS -> level.sendParticles(ParticleTypes.END_ROD,
-                            point.x, point.y, point.z, 1, 0.1, 0.1, 0.1, 0.02);
-                    case FAILURE -> {
-                        level.sendParticles(new DustParticleOptions(COLOR_FAIL, 1.2f),
-                                point.x, point.y, point.z, 2, 0.08, 0.08, 0.08, 0);
-                        level.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE,
-                                focus.x, focus.y, focus.z, 1, 0.1, 0.1, 0.1, 0.01);
-                    }
-                    default -> {
-                    }
+                level.sendParticles(new DustParticleOptions(COLOR_FAIL, 1.2f),
+                        point.x, point.y, point.z, 2, 0.08, 0.08, 0.08, 0);
+                level.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE,
+                        focus.x, focus.y, focus.z, 1, 0.1, 0.1, 0.1, 0.01);
+                continue;
+            }
+            if (i >= connectedBeams) {
+                continue;
+            }
+            Vector3f color = COLOR_CHARGE;
+            if (occupied) {
+                inputSeen++;
+                if (inputSeen <= recoloredInputs) {
+                    color = COLOR_INPUT;
                 }
+            }
+            if ((phase == Phase.JUDGEMENT || phase == Phase.CRESCENDO) && i == plannedOutputCorner) {
+                color = COLOR_OUTPUT;
+            }
+            for (int sample = 0; sample < density; sample++) {
+                Vec3 point = from.lerp(focus, level.random.nextDouble());
+                level.sendParticles(new DustParticleOptions(color, 1.0f),
+                        point.x, point.y, point.z, 1, 0.05, 0.05, 0.05, 0);
             }
         }
     }
@@ -255,6 +388,8 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
     // --- experience drain: the Observer drinks what you have seen ---
 
     private static final double XP_RADIUS = 7.0;
+    /** Mirrored in ExperienceOrbMixin — a claimed orb cannot be picked up. */
+    private static final String CLAIMED_TAG = "quantumitems_claimed";
 
     private Vec3 observerEyePos() {
         return Vec3.atCenterOf(worldPosition).add(0, 0.05, 0);
@@ -263,10 +398,8 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
     /**
      * While the ritual runs, nearby players leak experience: a point at a
      * time detaches as a REAL orb that the core then reels in. The closer
-     * you stand, the faster it bleeds. Conservation is structural — the
-     * deducted amount equals the orb's value, an absorbed orb is gone, a
-     * caught orb refunds itself through vanilla pickup. Creative and
-     * spectator players are exempt.
+     * you stand, the faster it bleeds. Creative and spectator players are
+     * exempt. Claimed orbs cannot be picked back up (author's ruling).
      */
     private void drainExperience(ServerLevel level) {
         Vec3 eye = observerEyePos();
@@ -288,7 +421,6 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
                 continue; // nothing left to drink
             }
             player.giveExperiencePoints(-1);
-            player.takeXpDelay = 10; // head start for the orb, catching it stays possible
             Vec3 toward = eye.subtract(player.position()).normalize().scale(0.8);
             level.addFreshEntity(new net.minecraft.world.entity.ExperienceOrb(level,
                     player.getX() + toward.x, player.getY() + 0.9, player.getZ() + toward.z, 1));
@@ -297,9 +429,9 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
 
     /**
      * ALL experience orbs in radius — leaked, mob-dropped, thrown bottles —
-     * get reeled toward the Observer and vanish into it. Stronger pull
-     * closer to the core; the absolute velocity write overrides the orb's
-     * own follow-the-player urge.
+     * drift slowly toward the Observer and vanish into it. Claimed orbs are
+     * un-pickable and their vanilla player attraction is switched off (see
+     * ExperienceOrbMixin); the claim self-heals if the core stops re-tagging.
      */
     private void pullExperienceOrbs(ServerLevel level) {
         Vec3 eye = observerEyePos();
@@ -308,15 +440,29 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
                 : level.getEntitiesOfClass(net.minecraft.world.entity.ExperienceOrb.class, box)) {
             Vec3 toEye = eye.subtract(orb.position());
             double dist = toEye.length();
-            if (dist < 0.7) {
+            // Absorb at the housing wall: the orb collides with the core's
+            // posts and can never physically reach the inner eye.
+            if (dist < 1.15) {
                 level.sendParticles(ParticleTypes.PORTAL, eye.x, eye.y, eye.z, 6, 0.1, 0.1, 0.1, 0.05);
                 level.playSound(null, worldPosition, SoundEvents.AMETHYST_BLOCK_CHIME,
                         SoundSource.BLOCKS, 0.4f, 1.8f);
                 orb.discard();
                 continue;
             }
-            double strength = 0.08 + 0.22 * (1.0 - dist / XP_RADIUS);
+            orb.addTag(CLAIMED_TAG);
+            ((com.quantumitems.mixin.ExperienceOrbMixin.FollowingAccessor) orb)
+                    .quantumitems$setFollowingPlayer(null);
+            double strength = 0.04 + 0.08 * (1.0 - dist / XP_RADIUS); // a slow, inevitable drift
             orb.setDeltaMovement(toEye.normalize().scale(strength));
+        }
+    }
+
+    /** Ritual over: leftover claimed orbs become ordinary orbs again. */
+    private void releaseClaimedOrbs(ServerLevel level) {
+        var box = new net.minecraft.world.phys.AABB(worldPosition).inflate(XP_RADIUS + 2);
+        for (net.minecraft.world.entity.ExperienceOrb orb
+                : level.getEntitiesOfClass(net.minecraft.world.entity.ExperienceOrb.class, box)) {
+            orb.removeTag(CLAIMED_TAG);
         }
     }
 
@@ -329,19 +475,22 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
     }
 
     /**
-     * The single-tick verdict + application. Every failure path returns false
-     * without touching any stack; the success paths mutate resonator contents
-     * only through whole-instance setItem (the engine adopts the canonicals).
+     * Verdict + (optionally) application in one pass. Returns the corner
+     * index (0..3) chosen for the output window, or -1 on failure. The dry
+     * run at the verdict and the applying run at the burst cannot diverge:
+     * the circle is locked in between. Failure paths never touch a stack;
+     * the success path mutates resonator contents only through
+     * whole-instance setItem (the engine adopts the canonicals).
      */
-    private boolean performRitual(ServerLevel level) {
+    private int performRitual(ServerLevel level, boolean apply) {
         if (!isStructureValid()) {
-            return false; // someone mined the machine mid-ritual
+            return -1; // someone mined the machine mid-ritual
         }
         List<ResonatorBlockEntity> circle = new ArrayList<>(4);
         for (BlockPos corner : CORNERS) {
             ResonatorBlockEntity resonator = resonatorAt(corner);
             if (resonator == null) {
-                return false;
+                return -1;
             }
             circle.add(resonator);
         }
@@ -358,8 +507,9 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
             }
         }
         if (occupied.isEmpty() || vacant.isEmpty()) {
-            return false;
+            return -1;
         }
+        int outputCorner = circle.indexOf(vacant.get(0));
 
         List<ResonatorBlockEntity> linked = occupied.stream()
                 .filter(r -> r.getItem(0).has(ModRegistry.QUANTUM_LINK.get()))
@@ -368,12 +518,15 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         if (linked.isEmpty()) {
             // Fresh entanglement: exactly one plain, stackable, undamageable input.
             if (occupied.size() != 1) {
-                return false;
+                return -1;
             }
             ResonatorBlockEntity inputResonator = occupied.get(0);
             ItemStack input = inputResonator.getItem(0);
             if (input.getMaxStackSize() <= 1 || input.isDamageableItem()) {
-                return false;
+                return -1;
+            }
+            if (!apply) {
+                return outputCorner;
             }
             int networkId = networks.createNetwork(input);
             ItemStack windowA = input.copy();
@@ -390,37 +543,43 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
             }
             QuantumDebug.log(level.getServer(), "ritual created net#" + networkId + " "
                     + input.getItem() + " x" + input.getCount() + " members[1, 2]");
-            return true;
+            return outputCorner;
         }
 
         // Expansion: EVERY live window of the network must be on the table —
         // recoherence is the price of growth, and it makes the member addition
         // fully local (all canonical instances sit in loaded BEs right here).
         if (linked.size() != occupied.size()) {
-            return false; // plain strays mixed in
+            return -1; // plain strays mixed in
         }
         QuantumLinkData first = linked.get(0).getItem(0).get(ModRegistry.QUANTUM_LINK.get());
         QuantumNetworks.Network network = networks.network(first.networkId());
         if (network == null || engine == null) {
-            return false;
+            return -1;
         }
         Set<Integer> presentMembers = new HashSet<>();
         for (ResonatorBlockEntity resonator : linked) {
             ItemStack window = resonator.getItem(0);
             QuantumLinkData link = window.get(ModRegistry.QUANTUM_LINK.get());
             if (link.networkId() != first.networkId() || !presentMembers.add(link.memberId())) {
-                return false; // foreign network or duplicated member
+                return -1; // foreign network or duplicated member
             }
             if (engine.reconcile(window) != QuantumEngine.Status.CANONICAL) {
-                return false;
+                return -1;
             }
         }
         if (!presentMembers.equals(network.aliveMembers)) {
-            return false; // some window of this network is elsewhere in the world
+            return -1; // some window of this network is elsewhere in the world
+        }
+        if (network.aliveMembers.size() >= QuantumNetworks.MAX_MEMBERS) {
+            return -1;
+        }
+        if (!apply) {
+            return outputCorner;
         }
         int member = networks.addMember(first.networkId());
         if (member < 0) {
-            return false;
+            return -1;
         }
         ItemStack newWindow = linked.get(0).getItem(0).copy();
         newWindow.set(ModRegistry.QUANTUM_LINK.get(), new QuantumLinkData(first.networkId(), member));
@@ -429,16 +588,17 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         engine.adopt(newWindow);
         engine.trackHolder(newWindow, target);
         QuantumDebug.log(level.getServer(), "ritual expanded net#" + first.networkId() + " +member " + member);
-        return true;
+        return outputCorner;
     }
 
-    // --- persistence + client sync (phase drives future renderer animation) ---
+    // --- persistence + client sync ---
 
     @Override
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
         tag.putInt("phase", phase.ordinal());
         tag.putInt("phaseAge", phaseAge);
+        tag.putInt("plannedOutput", plannedOutputCorner);
         if (!shard.isEmpty()) {
             tag.put("shard", shard.save(registries));
         }
@@ -449,6 +609,7 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         super.loadAdditional(tag, registries);
         phase = Phase.byOrdinal(tag.getInt("phase"));
         phaseAge = tag.getInt("phaseAge");
+        plannedOutputCorner = tag.contains("plannedOutput") ? tag.getInt("plannedOutput") : -1;
         shard = tag.contains("shard") ? ItemStack.parseOptional(registries, tag.getCompound("shard")) : ItemStack.EMPTY;
     }
 

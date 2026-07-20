@@ -40,6 +40,18 @@ public final class ModRegistry {
             DeferredRegister.create(Registries.CREATIVE_MODE_TAB, QuantumItemsMod.MOD_ID);
     private static final DeferredRegister<MapCodec<? extends IGlobalLootModifier>> LOOT_MODIFIERS =
             DeferredRegister.create(NeoForgeRegistries.Keys.GLOBAL_LOOT_MODIFIER_SERIALIZERS, QuantumItemsMod.MOD_ID);
+    private static final DeferredRegister<net.minecraft.sounds.SoundEvent> SOUNDS =
+            DeferredRegister.create(Registries.SOUND_EVENT, QuantumItemsMod.MOD_ID);
+
+    private static DeferredHolder<net.minecraft.sounds.SoundEvent, net.minecraft.sounds.SoundEvent> sound(String name) {
+        return SOUNDS.register(name, () -> net.minecraft.sounds.SoundEvent.createVariableRangeEvent(
+                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(QuantumItemsMod.MOD_ID, name)));
+    }
+
+    public static final DeferredHolder<net.minecraft.sounds.SoundEvent, net.minecraft.sounds.SoundEvent> RITUAL_HUM = sound("ritual_hum");
+    public static final DeferredHolder<net.minecraft.sounds.SoundEvent, net.minecraft.sounds.SoundEvent> RITUAL_RISER = sound("ritual_riser");
+    public static final DeferredHolder<net.minecraft.sounds.SoundEvent, net.minecraft.sounds.SoundEvent> RITUAL_BURST = sound("ritual_burst");
+    public static final DeferredHolder<net.minecraft.sounds.SoundEvent, net.minecraft.sounds.SoundEvent> RITUAL_CANCEL = sound("ritual_cancel");
 
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<QuantumLinkData>> QUANTUM_LINK =
             DATA_COMPONENTS.register("quantum_link", () -> DataComponentType.<QuantumLinkData>builder()
@@ -54,6 +66,7 @@ public final class ModRegistry {
                             .strength(4.0f, 1200.0f)
                             .requiresCorrectToolForDrops()
                             .noOcclusion()
+                            .lightLevel(state -> state.getValue(com.quantumitems.block.QuantumCoreBlock.GLOW) * 5)
                             .sound(SoundType.METAL));
 
     public static final DeferredBlock<ResonatorBlock> RESONATOR =
@@ -107,5 +120,6 @@ public final class ModRegistry {
         BLOCK_ENTITIES.register(modBus);
         CREATIVE_TABS.register(modBus);
         LOOT_MODIFIERS.register(modBus);
+        SOUNDS.register(modBus);
     }
 }

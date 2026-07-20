@@ -39,8 +39,9 @@ public class RitualGameTests {
     private static final BlockPos[] RESONATORS = {
             new BlockPos(1, 2, 1), new BlockPos(5, 2, 1),
             new BlockPos(1, 2, 5), new BlockPos(5, 2, 5)};
-    private static final int VERDICT_TICKS = QuantumCoreBlockEntity.CHARGING_TICKS
-            + QuantumCoreBlockEntity.JUDGEMENT_TICKS + 2;
+    /** A successful ritual applies at the burst; a doomed one cancels at the verdict. */
+    private static final int APPLY_TICKS = QuantumCoreBlockEntity.ticksUntilApply() + 4;
+    private static final int CANCEL_TICKS = QuantumCoreBlockEntity.ticksUntilCancel() + 4;
 
     private static void buildCircle(GameTestHelper helper) {
         for (int dx = -2; dx <= 2; dx++) {
@@ -77,14 +78,14 @@ public class RitualGameTests {
         return window;
     }
 
-    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 150)
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 320)
     public void ritualCreatesNetworkFromPlainStack(GameTestHelper helper) {
         buildCircle(helper);
         resonator(helper, 0).setItem(0, new ItemStack(Items.BREAD, 20));
         if (!core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()))) {
             helper.fail("Ritual refused to start on a valid structure");
         }
-        helper.runAfterDelay(VERDICT_TICKS, () -> {
+        helper.runAfterDelay(APPLY_TICKS, () -> {
             ItemStack a = resonator(helper, 0).getItem(0);
             ItemStack b = findSecondWindow(helper);
             QuantumLinkData linkA = a.get(ModRegistry.QUANTUM_LINK.get());
@@ -114,13 +115,13 @@ public class RitualGameTests {
         return ItemStack.EMPTY;
     }
 
-    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 150)
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 320)
     public void ritualBurnsShardOnEmptyCircle(GameTestHelper helper) {
         buildCircle(helper);
         if (!core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()))) {
             helper.fail("Commitment is commitment: the shard goes in even over an empty circle");
         }
-        helper.runAfterDelay(VERDICT_TICKS, () -> {
+        helper.runAfterDelay(CANCEL_TICKS, () -> {
             for (int i = 0; i < RESONATORS.length; i++) {
                 if (!resonator(helper, i).isEmpty()) {
                     helper.fail("Failed ritual must leave resonators untouched");
@@ -163,7 +164,7 @@ public class RitualGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 150)
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 320)
     public void ritualExpandsNetworkWhenAllWindowsPresent(GameTestHelper helper) {
         buildCircle(helper);
         QuantumNetworks networks = QuantumNetworks.get(helper.getLevel().getServer());
@@ -174,7 +175,7 @@ public class RitualGameTests {
         if (!core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()))) {
             helper.fail("Ritual refused to start");
         }
-        helper.runAfterDelay(VERDICT_TICKS, () -> {
+        helper.runAfterDelay(APPLY_TICKS, () -> {
             QuantumNetworks.Network network = networks.network(id);
             if (network == null || network.aliveMembers.size() != 3) {
                 helper.fail("Expected 3 members after expansion, network=" + network);
@@ -200,7 +201,7 @@ public class RitualGameTests {
         });
     }
 
-    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 150)
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 320)
     public void ritualFailsWhenAWindowIsMissing(GameTestHelper helper) {
         buildCircle(helper);
         QuantumNetworks networks = QuantumNetworks.get(helper.getLevel().getServer());
@@ -210,7 +211,7 @@ public class RitualGameTests {
         ItemStack window2 = makeWindow(helper, id, 2, plain); // stays "elsewhere in the world"
         resonator(helper, 0).setItem(0, window1);
         core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()));
-        helper.runAfterDelay(VERDICT_TICKS, () -> {
+        helper.runAfterDelay(CANCEL_TICKS, () -> {
             QuantumNetworks.Network network = networks.network(id);
             if (network == null || network.aliveMembers.size() != 2) {
                 helper.fail("Recoherence demands every window on the table; members=" +
@@ -228,13 +229,13 @@ public class RitualGameTests {
         });
     }
 
-    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 150)
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 320)
     public void ritualFailsOnTwoPlainStacks(GameTestHelper helper) {
         buildCircle(helper);
         resonator(helper, 0).setItem(0, new ItemStack(Items.BREAD, 5));
         resonator(helper, 1).setItem(0, new ItemStack(Items.APPLE, 7));
         core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()));
-        helper.runAfterDelay(VERDICT_TICKS, () -> {
+        helper.runAfterDelay(CANCEL_TICKS, () -> {
             ItemStack a = resonator(helper, 0).getItem(0);
             ItemStack b = resonator(helper, 1).getItem(0);
             if (a.has(ModRegistry.QUANTUM_LINK.get()) || b.has(ModRegistry.QUANTUM_LINK.get())) {
@@ -247,12 +248,12 @@ public class RitualGameTests {
         });
     }
 
-    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 150)
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 320)
     public void ritualRefusesDamageableItems(GameTestHelper helper) {
         buildCircle(helper);
         resonator(helper, 0).setItem(0, new ItemStack(Items.IRON_PICKAXE));
         core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()));
-        helper.runAfterDelay(VERDICT_TICKS, () -> {
+        helper.runAfterDelay(CANCEL_TICKS, () -> {
             ItemStack stack = resonator(helper, 0).getItem(0);
             if (stack.has(ModRegistry.QUANTUM_LINK.get())) {
                 helper.fail("Damageable item was entangled — first tool hit would collapse it");
@@ -264,7 +265,7 @@ public class RitualGameTests {
         });
     }
 
-    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 150)
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 320)
     public void circleIsLockedDuringRitual(GameTestHelper helper) {
         buildCircle(helper);
         resonator(helper, 0).setItem(0, new ItemStack(Items.BREAD, 20));
@@ -274,7 +275,7 @@ public class RitualGameTests {
                 helper.fail("Circle must be locked while the ritual runs");
             }
         });
-        helper.runAfterDelay(VERDICT_TICKS + QuantumCoreBlockEntity.SUCCESS_TICKS + 2, () -> {
+        helper.runAfterDelay(APPLY_TICKS + QuantumCoreBlockEntity.SUCCESS_TICKS + 2, () -> {
             if (resonator(helper, 0).isLockedByRitual()) {
                 helper.fail("Circle still locked after the ritual ended");
             }
@@ -283,7 +284,7 @@ public class RitualGameTests {
     }
 
     /** A full network occupies all four resonators — no vacancy, the cap is visible. */
-    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 150)
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 320)
     public void fullNetworkCannotExpand(GameTestHelper helper) {
         buildCircle(helper);
         QuantumNetworks networks = QuantumNetworks.get(helper.getLevel().getServer());
@@ -295,7 +296,7 @@ public class RitualGameTests {
             resonator(helper, i).setItem(0, makeWindow(helper, id, i + 1, plain));
         }
         core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()));
-        helper.runAfterDelay(VERDICT_TICKS, () -> {
+        helper.runAfterDelay(CANCEL_TICKS, () -> {
             QuantumNetworks.Network network = networks.network(id);
             if (network == null || network.aliveMembers.size() != 4) {
                 helper.fail("Cap of four members violated: " + (network == null ? "gone" : network.aliveMembers));

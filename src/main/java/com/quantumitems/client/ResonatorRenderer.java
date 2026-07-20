@@ -29,7 +29,6 @@ import java.util.Random;
  * is a full cube, so the base heights compensate to land items ON its top.
  */
 public class ResonatorRenderer implements BlockEntityRenderer<ResonatorBlockEntity> {
-    private final ItemStack innerEye = new ItemStack(com.quantumitems.ModRegistry.EYE_OF_ELSEWHERE.get());
 
     public ResonatorRenderer(BlockEntityRendererProvider.Context context) {
     }
@@ -101,7 +100,6 @@ public class ResonatorRenderer implements BlockEntityRenderer<ResonatorBlockEnti
      */
     private void renderInnerEye(ResonatorBlockEntity resonator, float partialTick, PoseStack poseStack,
                                 MultiBufferSource buffers, int packedOverlay) {
-        ItemRenderer itemRenderer = Minecraft.getInstance().getItemRenderer();
         float time = resonator.getLevel().getGameTime() + partialTick;
         boolean awake = resonator.isLockedByRitual();
         float speed = awake ? 8.0f : 1.0f;
@@ -110,12 +108,10 @@ public class ResonatorRenderer implements BlockEntityRenderer<ResonatorBlockEnti
         poseStack.pushPose();
         poseStack.translate(0.5, 0.5 + Mth.sin(time / 14.0f) * 0.03f, 0.5);
         poseStack.mulPose(Axis.YP.rotationDegrees(time * speed));
-        poseStack.scale(0.4f, 0.4f, 0.4f);
-        itemRenderer.renderStatic(innerEye, ItemDisplayContext.FIXED, light, packedOverlay,
-                poseStack, buffers, resonator.getLevel(), 0);
-        poseStack.mulPose(Axis.YP.rotationDegrees(90));
-        itemRenderer.renderStatic(innerEye, ItemDisplayContext.FIXED, light, packedOverlay,
-                poseStack, buffers, resonator.getLevel(), 0);
+        poseStack.mulPose(Axis.XP.rotationDegrees(35.3f)); // gem tilt
+        poseStack.mulPose(Axis.ZP.rotationDegrees(45.0f));
+        poseStack.scale(0.28f, 0.28f, 0.28f);
+        ObserverEyeRender.renderEyeCube(poseStack, buffers, light);
         poseStack.popPose();
     }
 }

@@ -25,7 +25,6 @@ import net.minecraft.world.item.ItemStack;
  *   phases; it vanishes at the verdict flash.
  */
 public class QuantumCoreRenderer implements BlockEntityRenderer<QuantumCoreBlockEntity> {
-    private final ItemStack observerEye = new ItemStack(ModRegistry.EYE_OF_ELSEWHERE.get());
 
     public QuantumCoreRenderer(BlockEntityRendererProvider.Context context) {
     }
@@ -46,18 +45,20 @@ public class QuantumCoreRenderer implements BlockEntityRenderer<QuantumCoreBlock
         boolean running = core.isRitualRunning();
 
         // --- the observer inside the lower housing ---
-        float observerSpeed = running ? 9.0f : 1.2f;
+        float observerSpeed = switch (core.phase()) {
+            case IDLE -> 1.2f;
+            case CRESCENDO -> 9.0f + 20.0f * core.phaseAge() / QuantumCoreBlockEntity.CRESCENDO_TICKS;
+            default -> 6.0f;
+        };
         int observerLight = running ? 0xF000F0
                 : LevelRenderer.getLightColor(core.getLevel(), core.getBlockPos());
         poseStack.pushPose();
-        poseStack.translate(0.5, 0.5 + Mth.sin(time / 16.0f) * 0.03f, 0.5);
+        poseStack.translate(0.5, 0.55 + Mth.sin(time / 16.0f) * 0.03f, 0.5);
         poseStack.mulPose(Axis.YP.rotationDegrees(time * observerSpeed));
-        poseStack.scale(0.55f, 0.55f, 0.55f);
-        itemRenderer.renderStatic(observerEye, ItemDisplayContext.FIXED, observerLight, packedOverlay,
-                poseStack, buffers, core.getLevel(), 0);
-        poseStack.mulPose(Axis.YP.rotationDegrees(90));
-        itemRenderer.renderStatic(observerEye, ItemDisplayContext.FIXED, observerLight, packedOverlay,
-                poseStack, buffers, core.getLevel(), 0);
+        poseStack.mulPose(Axis.XP.rotationDegrees(35.3f)); // gem tilt
+        poseStack.mulPose(Axis.ZP.rotationDegrees(45.0f));
+        poseStack.scale(0.4f, 0.4f, 0.4f);
+        ObserverEyeRender.renderEyeCube(poseStack, buffers, observerLight);
         poseStack.popPose();
 
         // --- the shard inside the upper frame ---
@@ -66,10 +67,20 @@ public class QuantumCoreRenderer implements BlockEntityRenderer<QuantumCoreBlock
             return;
         }
         float age = core.phaseAge() + partialTick;
-        float chargeEnd = 2.0f * QuantumCoreBlockEntity.CHARGING_TICKS + 8.0f * QuantumCoreBlockEntity.CHARGING_TICKS;
+        // Continuous piecewise-integral angle across the scripted phases:
+        // slow 2°/t through connect/scan/judgement, ramp 4→30°/t in the
+        // crescendo, wind-down in the aftermath, lazy drift when inert.
+        float slowEnd = 2.0f * (QuantumCoreBlockEntity.CONNECTING_TICKS
+                + QuantumCoreBlockEntity.SCANNING_TICKS + QuantumCoreBlockEntity.JUDGEMENT_TICKS);
+        float crescendoEnd = slowEnd + 4.0f * QuantumCoreBlockEntity.CRESCENDO_TICKS
+                + 13.0f * QuantumCoreBlockEntity.CRESCENDO_TICKS;
         float angle = switch (core.phase()) {
-            case CHARGING -> 2.0f * age + 8.0f * age * age / QuantumCoreBlockEntity.CHARGING_TICKS;
-            case JUDGEMENT -> chargeEnd + 18.0f * age;
+            case CONNECTING, SCANNING, JUDGEMENT ->
+                    2.0f * (QuantumCoreBlockEntity.phaseOffset(core.phase()) + age);
+            case CRESCENDO -> slowEnd + 4.0f * age
+                    + 13.0f * age * age / QuantumCoreBlockEntity.CRESCENDO_TICKS;
+            case SUCCESS, FAILURE -> crescendoEnd + 30.0f * age
+                    - 15.0f * age * age / QuantumCoreBlockEntity.SUCCESS_TICKS;
             default -> time * 1.5f; // inert shard on an unfinished machine: lazy drift
         };
         int light = LevelRenderer.getLightColor(core.getLevel(), core.getBlockPos().above());

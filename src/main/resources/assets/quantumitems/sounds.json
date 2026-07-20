@@ -1,0 +1,18 @@
+{
+  "ritual_hum": {
+    "sounds": ["quantumitems:ritual_hum"],
+    "subtitle": "subtitles.quantumitems.ritual_hum"
+  },
+  "ritual_riser": {
+    "sounds": ["quantumitems:ritual_riser"],
+    "subtitle": "subtitles.quantumitems.ritual_riser"
+  },
+  "ritual_burst": {
+    "sounds": ["quantumitems:ritual_burst"],
+    "subtitle": "subtitles.quantumitems.ritual_burst"
+  },
+  "ritual_cancel": {
+    "sounds": ["quantumitems:ritual_cancel"],
+    "subtitle": "subtitles.quantumitems.ritual_cancel"
+  }
+}
