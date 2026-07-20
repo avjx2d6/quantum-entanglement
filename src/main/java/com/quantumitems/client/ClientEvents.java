@@ -22,13 +22,10 @@ public final class ClientEvents {
 
         @SubscribeEvent
         public static void onClientSetup(net.neoforged.fml.event.lifecycle.FMLClientSetupEvent event) {
-            // Ponder is an optional dependency: only wire the guide up if it is
-            // present. Its own plugins register during this same event and
-            // PonderIndex.registerAll() runs later (load-complete), so adding
-            // our plugin here is picked up in time.
-            if (!net.neoforged.fml.ModList.get().isLoaded("ponder")) {
-                return;
-            }
+            // Ponder is embedded (jarJar) and a required client dependency, so
+            // it is always present. Its own plugins register during this same
+            // event and PonderIndex.registerAll() runs later (load-complete),
+            // so adding our plugin here is picked up in time.
             event.enqueueWork(() ->
                     net.createmod.ponder.foundation.PonderIndex.addPlugin(
                             new com.quantumitems.client.ponder.QuantumPonderPlugin()));

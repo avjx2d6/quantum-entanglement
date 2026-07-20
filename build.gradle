@@ -15,10 +15,29 @@ repositories {
 }
 
 dependencies {
-    // Ponder ships Catnip inside the NeoForge jar; Flywheel is a client-only
-    // runtime dependency of the Ponder UI (side=CLIENT, inert on servers).
-    implementation "net.createmod.ponder:Ponder-NeoForge-${minecraft_version}:${ponder_version}"
-    runtimeOnly "dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}"
+    // Ponder + Flywheel are embedded into our jar via jarJar (the same way
+    // Create ships them), so a player only installs quantumitems.jar and the
+    // guide loads automatically. Ponder bundles Catnip inside its own jar;
+    // Flywheel is Ponder's client-only render dependency (inert on servers).
+    // `implementation` puts them on the compile + dev-run classpath; `jarJar`
+    // embeds them (with version ranges) into the packaged artifact.
+    implementation "net.createmod.ponder:ponder-neoforge:${ponder_version}+mc${minecraft_version}"
+    implementation "dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}"
+
+    jarJar("net.createmod.ponder:ponder-neoforge") {
+        version {
+            strictly "[${ponder_version}+mc${minecraft_version},)"
+            prefer "${ponder_version}+mc${minecraft_version}"
+        }
+    }
+    jarJar("dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}") {
+        version {
+            // Loose floor so a co-installed mod shipping a newer Flywheel
+            // (e.g. Create) resolves to a single shared copy.
+            strictly "[1.0.0,2.0)"
+            prefer "${flywheel_version}"
+        }
+    }
 }
 
 base {

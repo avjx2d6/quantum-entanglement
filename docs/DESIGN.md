@@ -328,7 +328,7 @@ Ponder теперь **отдельная standalone-библиотека**: `Cre
 
 ### D.2 Реализовано (0.4.6, черновик до плейтеста)
 
-Зависимость `net.createmod.ponder:Ponder-NeoForge-1.21.1:1.0.69` (+ flywheel runtime) с `https://maven.createmod.net`; Ponder — **опциональная** зависимость в `neoforge.mods.toml` (без неё мод работает как раньше), регистрация плагина под `ModList.isLoaded("ponder")`. Catnip вшит в jar Ponder.
+Standalone-мода «Ponder» в природе почти нет (гуглится только Ponder for KubeJS) — библиотека живёт внутри Create. Поэтому, как и Create, **встраиваем Ponder+Flywheel в наш jar через jarJar** (`net.createmod.ponder:ponder-neoforge:1.0.87+mc1.21.1` + `dev.engine-room.flywheel:flywheel-neoforge-1.21.1:1.0.4`, репо `https://maven.createmod.net`). Игроку хватает одного `quantumitems.jar` — Ponder подхватывается FML из `META-INF/jarjar/` автоматически. Catnip вшит в jar Ponder (отдельно не нужен); forgeconfigapiport на NeoForge не требуется. В `neoforge.mods.toml` Ponder — **required, side=CLIENT** (гайд чисто клиентский, dedicated-сервер не ломается). Координата Create — `ponder-neoforge:<ver>+mc<mc>` (не `Ponder-NeoForge-…`); версии диапазонами (jarJar-требование), flywheel-floor ослаблен до `[1.0.0,2.0)` для совместной установки с Create. Проверено сборкой: jar содержит оба вложенных мода, 103/103 тестов зелены.
 
 Классы: `client/ponder/QuantumPonderPlugin` (тег `quantum_entanglement` + 3 сцены), `client/ponder/QuantumScenes` (сториборды). Схематики генерятся `scratchpad/gen_ponder_schematics.py` → `assets/quantumitems/ponder/{ritual_circle,shared_pool}.nbt`. Визуал ведётся **инструкциями Ponder**, а не реальным тикером ядра (ponder-мир — клиентский фасад; фазы/лучи/искры ставятся вручную для контроля тайминга).
 
