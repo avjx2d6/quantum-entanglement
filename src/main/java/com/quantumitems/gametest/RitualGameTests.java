@@ -307,4 +307,72 @@ public class RitualGameTests {
             helper.succeed();
         });
     }
+
+    /**
+     * Playtest repro: create a network on the circle, TAKE one window by the
+     * hand exchange, throw it on the ground. Rule 1 cashes the pool out into
+     * the dropped stack — and the sibling windows on the resonators must be
+     * wiped SERVER-side immediately (the phantom-pedestal bug).
+     */
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 450)
+    public void droppedWindowWipesSiblingsOnResonators(GameTestHelper helper) {
+        buildCircle(helper);
+        resonator(helper, 0).setItem(0, new ItemStack(Items.BREAD, 20));
+        core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()));
+        helper.runAfterDelay(APPLY_TICKS, () -> {
+            // the exchange take, exactly as ResonatorBlock does it
+            ItemStack taken = resonator(helper, 0).removeItemNoUpdate(0);
+            resonator(helper, 0).setChanged();
+            if (!taken.has(ModRegistry.QUANTUM_LINK.get())) {
+                helper.fail("Expected to take a window, got " + taken);
+            }
+            // thrown on the ground: Rule 1 must cash out and wipe the siblings
+            net.minecraft.core.BlockPos dropAt = helper.absolutePos(new BlockPos(3, 3, 1));
+            helper.getLevel().addFreshEntity(new net.minecraft.world.entity.item.ItemEntity(
+                    helper.getLevel(), dropAt.getX() + 0.5, dropAt.getY(), dropAt.getZ() + 0.5, taken));
+        });
+        helper.runAfterDelay(APPLY_TICKS + 10, () -> {
+            for (int i = 1; i < RESONATORS.length; i++) {
+                ItemStack left = resonator(helper, i).getItem(0);
+                if (!left.isEmpty()) {
+                    helper.fail("Sibling window must be wiped server-side, resonator " + i
+                            + " still holds " + left + " (link="
+                            + left.get(ModRegistry.QUANTUM_LINK.get()) + ")");
+                }
+            }
+            helper.succeed();
+        });
+    }
+
+    /**
+     * The phantom-pedestal regression: canonical refs legitimately drift to
+     * copies (last-touch-wins). If the canonical of a pedestal window points
+     * elsewhere when the network collapses, the wipe used to hit the copy
+     * and leave the REAL stack on the resonator as a live-looking husk. The
+     * holder-scan wipe must clear the pedestal by link, not by identity.
+     */
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 100)
+    public void collapseClearsPedestalEvenWithStolenCanonical(GameTestHelper helper) {
+        buildCircle(helper);
+        QuantumNetworks networks = QuantumNetworks.get(helper.getLevel().getServer());
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        ItemStack plain = new ItemStack(Items.BREAD, 12);
+        int id = networks.createNetwork(plain);
+        ItemStack windowA = makeWindow(helper, id, 1, plain);
+        ItemStack windowB = makeWindow(helper, id, 2, plain);
+        resonator(helper, 1).setItem(0, windowB);
+        // canonical theft: a stray copy of m2 becomes the canonical instance
+        engine.adopt(windowB.copy());
+
+        engine.cashOutToPlain(windowA); // network ends; m2 must die IN the pedestal
+
+        ItemStack left = resonator(helper, 1).getItem(0);
+        if (!left.isEmpty()) {
+            helper.fail("Pedestal must be cleared by the holder-scan wipe, still holds " + left);
+        }
+        if (windowA.has(ModRegistry.QUANTUM_LINK.get()) || windowA.getCount() != 12) {
+            helper.fail("Cash-out target must be plain x12, got " + windowA);
+        }
+        helper.succeed();
+    }
 }

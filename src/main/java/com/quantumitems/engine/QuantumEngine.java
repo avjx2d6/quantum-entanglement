@@ -673,6 +673,7 @@ public final class QuantumEngine {
             if (memberStack != null) {
                 wipe(memberStack);
             }
+            wipeFromHolder(key, networkId, member);
             notifyHolder(key);
             holders.remove(key);
         }
@@ -696,6 +697,7 @@ public final class QuantumEngine {
                 if (memberStack != null) {
                     wipe(memberStack);
                 }
+                wipeFromHolder(key, link.networkId(), member);
             }
             notifyHolder(key);
             holders.remove(key);
@@ -754,6 +756,35 @@ public final class QuantumEngine {
             return;
         }
         holders.put(key(link.networkId(), link.memberId()), new WeakReference<>(holder));
+    }
+
+    /**
+     * Kills a member's window INSIDE its tracked holder by LINK, not by
+     * instance identity. Canonical refs legitimately drift to copies
+     * (last-touch-wins), and a wipe through a stale ref leaves the real
+     * stack sitting in the container as a live-looking husk — the
+     * phantom-pedestal bug: the network is gone but the resonator still
+     * holds a linked stack the player can pick up for a second.
+     */
+    private void wipeFromHolder(long key, int networkId, int memberId) {
+        WeakReference<net.minecraft.world.Container> ref = holders.get(key);
+        net.minecraft.world.Container holder = ref != null ? ref.get() : null;
+        if (holder == null) {
+            return;
+        }
+        boolean changed = false;
+        for (int i = 0; i < holder.getContainerSize(); i++) {
+            ItemStack slotStack = holder.getItem(i);
+            QuantumLinkData link = slotStack.get(ModRegistry.QUANTUM_LINK.get());
+            if (link != null && link.networkId() == networkId && link.memberId() == memberId) {
+                debug("holder-scan wipe net#" + networkId + " m" + memberId + " (stale canonical)");
+                wipe(slotStack);
+                changed = true;
+            }
+        }
+        if (changed) {
+            holder.setChanged();
+        }
     }
 
     /** setChanged() on a member's last known holder (persistence + comparators). */

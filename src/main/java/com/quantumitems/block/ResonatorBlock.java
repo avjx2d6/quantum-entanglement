@@ -90,8 +90,16 @@ public class ResonatorBlock extends Block implements EntityBlock {
         if (!laidOut.isEmpty()) {
             resonator.removeItemNoUpdate(0);
             resonator.setChanged();
-            level.playSound(null, pos, SoundEvents.ITEM_PICKUP, SoundSource.PLAYERS, 0.2f,
-                    1.0f + level.getRandom().nextFloat());
+            // A husk of a dead network dies in the machine's hand, not the
+            // player's: reconcile wipes it here instead of a second later.
+            com.quantumitems.engine.QuantumEngine engine = com.quantumitems.engine.QuantumEngine.onServerThread();
+            if (engine != null) {
+                engine.reconcile(laidOut);
+            }
+            if (!laidOut.isEmpty()) {
+                level.playSound(null, pos, SoundEvents.ITEM_PICKUP, SoundSource.PLAYERS, 0.2f,
+                        1.0f + level.getRandom().nextFloat());
+            }
         }
         if (!emptyHanded) {
             resonator.layDown(heldStack, player.getDirection());
