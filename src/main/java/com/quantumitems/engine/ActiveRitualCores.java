@@ -34,15 +34,25 @@ public final class ActiveRitualCores {
     }
 
     public static boolean nearActiveCore(Level level, Vec3 position) {
+        return nearestActiveCore(level, position) != null;
+    }
+
+    /** The closest running core within pull radius, or null. */
+    @javax.annotation.Nullable
+    public static BlockPos nearestActiveCore(Level level, Vec3 position) {
         Set<BlockPos> set = CORES.get(level.dimension());
         if (set == null || set.isEmpty()) {
-            return false;
+            return null;
         }
+        BlockPos best = null;
+        double bestSq = RADIUS_SQ;
         for (BlockPos pos : set) {
-            if (position.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) < RADIUS_SQ) {
-                return true;
+            double sq = position.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
+            if (sq < bestSq) {
+                bestSq = sq;
+                best = pos;
             }
         }
-        return false;
+        return best;
     }
 }

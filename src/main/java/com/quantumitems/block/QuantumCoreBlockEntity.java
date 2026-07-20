@@ -445,9 +445,7 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
                 orb.discard();
                 continue;
             }
-            orb.addTag(CLAIMED_TAG); // the mixin nulls followingPlayer each orb tick
-            double strength = 0.04 + 0.08 * (1.0 - dist / XP_RADIUS); // a slow, inevitable drift
-            orb.setDeltaMovement(toEye.normalize().scale(strength));
+            orb.addTag(CLAIMED_TAG); // pickup block; the ORB's own tick steers it (both sides)
         }
     }
 

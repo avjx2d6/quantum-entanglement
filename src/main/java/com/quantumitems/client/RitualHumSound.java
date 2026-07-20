@@ -53,7 +53,9 @@ public class RitualHumSound extends AbstractTickableSoundInstance {
         this.core = core;
         this.looping = true;
         this.delay = 0;
-        this.volume = 0.0f;
+        // Non-zero start: the sound engine culls instances that BEGIN at
+        // volume zero and never actually starts them (the silent-hum bug).
+        this.volume = 0.08f;
         this.x = core.getBlockPos().getX() + 0.5;
         this.y = core.getBlockPos().getY() + 0.5;
         this.z = core.getBlockPos().getZ() + 0.5;
