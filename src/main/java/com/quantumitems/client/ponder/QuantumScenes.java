@@ -1,13 +1,21 @@
 package com.quantumitems.client.ponder;
 
 import com.quantumitems.ModRegistry;
+import com.quantumitems.block.QuantumCoreBlock;
+import com.quantumitems.block.QuantumCoreBlockEntity;
+import com.quantumitems.block.ResonatorBlockEntity;
 import net.createmod.catnip.math.Pointing;
+import net.createmod.ponder.api.ParticleEmitter;
 import net.createmod.ponder.api.PonderPalette;
+import net.createmod.ponder.api.element.ElementLink;
+import net.createmod.ponder.api.element.EntityElement;
 import net.createmod.ponder.api.scene.SceneBuilder;
 import net.createmod.ponder.api.scene.SceneBuildingUtil;
 import net.createmod.ponder.api.scene.Selection;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
@@ -17,10 +25,12 @@ import net.minecraft.world.phys.Vec3;
  * Storyboards for the Quantum Entanglement guide. Each static method is one
  * scene played over a schematic in {@code assets/quantumitems/ponder/}.
  *
- * Visuals are staged with Ponder instructions (show sections, outlines, click
- * gestures, lines, particles) rather than the real block-entity logic: the
- * ponder world is a client-side facade, so the theatre is driven by hand for
- * control over timing and framing.
+ * Where possible the scenes drive the mod's own renderers — items laid on a
+ * Resonator ({@link ResonatorBlockEntity#layDown}) and a shard parked in the
+ * Core frame ({@link QuantumCoreBlockEntity#setDisplayShard}) — so the scene
+ * looks exactly like the real block. The ritual itself is staged with Ponder
+ * particles/glow rather than the real (server-only) phase machine, for control
+ * over timing.
  *
  * Text is plain and instructional, matching Create's own scenes.
  *
@@ -47,7 +57,6 @@ public class QuantumScenes {
         scene.configureBasePlate(0, 0, 5);
         scene.scaleSceneView(0.9f);
 
-        // Floor rises into place.
         scene.world().showSection(util.select().layer(0), Direction.UP);
         scene.idle(10);
         scene.overlay().showText(80)
@@ -57,7 +66,6 @@ public class QuantumScenes {
                 .placeNearTarget();
         scene.idle(90);
 
-        // First resonator, with a place-here gesture and an outline on the corner.
         scene.world().showSection(util.select().position(FIRST_CORNER), Direction.DOWN);
         scene.idle(6);
         scene.overlay().showControls(util.vector().centerOf(FIRST_CORNER).add(0, 0.4, 0), Pointing.DOWN, 40)
@@ -70,7 +78,6 @@ public class QuantumScenes {
                 .placeNearTarget();
         scene.idle(90);
 
-        // The other three corners fill in.
         Selection otherCorners = util.select().position(4, 1, 0)
                 .add(util.select().position(0, 1, 4))
                 .add(util.select().position(4, 1, 4));
@@ -82,7 +89,6 @@ public class QuantumScenes {
                 .placeNearTarget();
         scene.idle(80);
 
-        // Core rises in the center.
         Selection core = util.select().fromTo(2, 1, 2, 2, 2, 2);
         scene.world().showSection(core, Direction.DOWN);
         scene.idle(8);
@@ -96,7 +102,6 @@ public class QuantumScenes {
                 .placeNearTarget();
         scene.idle(100);
 
-        // Cleanliness rule, shown: a stray block appears, is flagged, and removed.
         scene.addKeyframe();
         BlockPos intruder = new BlockPos(1, 1, 2);
         scene.world().setBlock(intruder, Blocks.COBBLESTONE.defaultBlockState(), true);
@@ -120,126 +125,223 @@ public class QuantumScenes {
     }
 
     // =====================================================================
-    // Scene 2 — running the ritual.
+    // Scene 2 — creating a network: one stack becomes two.
     // =====================================================================
-    public static void ritual(SceneBuilder scene, SceneBuildingUtil util) {
-        scene.title("ritual", "Entangling Item Stacks");
+    public static void createNetwork(SceneBuilder scene, SceneBuildingUtil util) {
+        scene.title("create", "Creating a Network");
         scene.configureBasePlate(0, 0, 5);
         scene.scaleSceneView(0.9f);
         scene.showBasePlate();
         scene.world().showSection(util.select().layersFrom(1), Direction.DOWN);
         scene.idle(20);
 
-        Vec3 coreTop = util.vector().centerOf(CORE_UPPER).add(0, 0.2, 0);
+        BlockPos inputRes = RESONATORS[0];
+        ItemStack stack = new ItemStack(Items.GOLD_INGOT, 16);
 
-        // Lay a matching stack on each resonator.
-        ItemStack diamond = new ItemStack(Items.DIAMOND);
-        for (BlockPos res : RESONATORS) {
-            scene.world().createItemEntity(util.vector().centerOf(res).add(0, 0.6, 0),
-                    util.vector().of(0, 0, 0), diamond.copy());
-        }
+        scene.world().modifyBlockEntity(inputRes, ResonatorBlockEntity.class,
+                be -> be.layDown(stack.copy(), Direction.SOUTH));
         scene.idle(10);
-        scene.overlay().showText(80)
-                .text("Lay a matching stack of items on all four Resonators")
+        scene.overlay().showOutlineWithText(util.select().position(inputRes), 80)
+                .text("Lay a single stack of items on just one Resonator")
                 .attachKeyFrame()
-                .pointAt(util.vector().topOf(FIRST_CORNER))
+                .pointAt(util.vector().topOf(inputRes))
                 .placeNearTarget();
         scene.idle(90);
 
-        // Drop the shard on the core.
-        scene.world().createItemEntity(coreTop.add(0, 0.5, 0), util.vector().of(0, -0.1, 0),
-                new ItemStack(ModRegistry.QUANTUM_SHARD.get()));
-        scene.idle(15);
+        parkShard(scene);
+        scene.idle(8);
         scene.overlay().showText(80)
                 .text("Then place a Quantum Shard on the Core to start the ritual")
                 .attachKeyFrame()
-                .pointAt(coreTop)
+                .pointAt(util.vector().centerOf(CORE_UPPER).add(0, 0.3, 0))
                 .placeNearTarget();
         scene.idle(90);
 
-        // Connecting lines reach out to each resonator.
-        scene.overlay().showText(70)
-                .text("The Core links to each Resonator, then checks the stacks")
-                .attachKeyFrame()
-                .pointAt(coreTop);
-        for (BlockPos res : RESONATORS) {
-            scene.overlay().showLine(PonderPalette.BLUE, coreTop,
-                    util.vector().centerOf(res).add(0, 0.6, 0), 70);
-            scene.idle(16);
-        }
-        scene.idle(40);
+        ritualFlash(scene, util, inputRes);
+        clearShard(scene);
 
-        // Verdict beam + crescendo.
-        scene.overlay().showBigLine(PonderPalette.OUTPUT,
-                util.vector().centerOf(RESONATORS[0]).add(0, 0.6, 0),
-                coreTop.add(0, 1.2, 0), 90);
-        scene.world().modifyBlock(CORE_LOWER, s -> s.setValue(
-                com.quantumitems.block.QuantumCoreBlock.GLOW, 2), false);
-        scene.world().modifyBlock(CORE_UPPER, s -> s.setValue(
-                com.quantumitems.block.QuantumCoreBlock.GLOW, 2), false);
-        scene.effects().emitParticles(coreTop,
-                scene.effects().simpleParticleEmitter(
-                        net.minecraft.core.particles.ParticleTypes.ELECTRIC_SPARK,
-                        util.vector().of(0, 0.05, 0)),
-                6f, 30);
-        scene.overlay().showText(80)
-                .text("If the stacks all match, they become entangled")
-                .attachKeyFrame()
-                .pointAt(coreTop);
-        scene.idle(90);
-
-        scene.effects().indicateSuccess(CORE_LOWER);
-        scene.overlay().showText(80)
+        BlockPos copyRes = RESONATORS[3];
+        scene.world().modifyBlockEntity(copyRes, ResonatorBlockEntity.class,
+                be -> be.layDown(stack.copy(), Direction.SOUTH));
+        scene.effects().indicateSuccess(copyRes);
+        scene.idle(10);
+        scene.overlay().showText(90)
                 .colored(PonderPalette.GREEN)
-                .text("Entangled stacks share one pool of items across any distance")
-                .pointAt(coreTop);
-        scene.idle(90);
+                .text("One Shard turns that stack into two entangled stacks")
+                .attachKeyFrame()
+                .pointAt(util.vector().topOf(copyRes))
+                .placeNearTarget();
+        scene.idle(100);
 
         scene.overlay().showText(90)
                 .colored(PonderPalette.RED)
                 .text("The Shard is used up whether the ritual succeeds or fails")
-                .pointAt(coreTop);
+                .pointAt(util.vector().centerOf(CORE_UPPER).add(0, 0.3, 0));
         scene.idle(100);
         scene.markAsFinished();
     }
 
     // =====================================================================
-    // Scene 3 — one shared pool.
+    // Scene 3 — growing a network: lay out all its stacks, add one more.
+    // =====================================================================
+    public static void expandNetwork(SceneBuilder scene, SceneBuildingUtil util) {
+        scene.title("expand", "Growing a Network");
+        scene.configureBasePlate(0, 0, 5);
+        scene.scaleSceneView(0.9f);
+        scene.showBasePlate();
+        scene.world().showSection(util.select().layersFrom(1), Direction.DOWN);
+        scene.idle(20);
+
+        ItemStack stack = new ItemStack(Items.GOLD_INGOT, 16);
+        BlockPos a = RESONATORS[0];
+        BlockPos b = RESONATORS[3];
+        scene.world().modifyBlockEntity(a, ResonatorBlockEntity.class,
+                be -> be.layDown(stack.copy(), Direction.SOUTH));
+        scene.world().modifyBlockEntity(b, ResonatorBlockEntity.class,
+                be -> be.layDown(stack.copy(), Direction.SOUTH));
+        scene.idle(10);
+        Selection existing = util.select().position(a).add(util.select().position(b));
+        scene.overlay().showOutlineWithText(existing, 90)
+                .text("To grow a network, first lay out every stack it already has")
+                .attachKeyFrame()
+                .pointAt(util.vector().topOf(a))
+                .placeNearTarget();
+        scene.idle(100);
+
+        parkShard(scene);
+        scene.idle(8);
+        scene.overlay().showText(70)
+                .text("Then run the ritual again with another Shard")
+                .attachKeyFrame()
+                .pointAt(util.vector().centerOf(CORE_UPPER).add(0, 0.3, 0))
+                .placeNearTarget();
+        scene.idle(80);
+
+        ritualFlash(scene, util, a);
+        clearShard(scene);
+
+        BlockPos c = RESONATORS[1];
+        scene.world().modifyBlockEntity(c, ResonatorBlockEntity.class,
+                be -> be.layDown(stack.copy(), Direction.SOUTH));
+        scene.effects().indicateSuccess(c);
+        scene.idle(10);
+        scene.overlay().showText(90)
+                .colored(PonderPalette.GREEN)
+                .text("Each ritual entangles one more stack into the network")
+                .attachKeyFrame()
+                .pointAt(util.vector().topOf(c))
+                .placeNearTarget();
+        scene.idle(100);
+
+        BlockPos d = RESONATORS[2];
+        scene.world().modifyBlockEntity(d, ResonatorBlockEntity.class,
+                be -> be.layDown(stack.copy(), Direction.SOUTH));
+        scene.idle(10);
+        scene.overlay().showText(95)
+                .text("Growing needs an empty Resonator, so four stacks is the limit")
+                .attachKeyFrame()
+                .pointAt(util.vector().topOf(d))
+                .placeNearTarget();
+        scene.idle(105);
+        scene.markAsFinished();
+    }
+
+    // =====================================================================
+    // Scene 4 — one shared pool across distant containers.
     // =====================================================================
     public static void sharedPool(SceneBuilder scene, SceneBuildingUtil util) {
         scene.title("shared_pool", "One Shared Pool");
-        scene.configureBasePlate(0, 0, 1);
-        scene.scaleSceneView(0.9f);
+        scene.configureBasePlate(0, 0, 7);
+        scene.scaleSceneView(0.8f);
         scene.showBasePlate();
         scene.idle(10);
 
-        BlockPos left = new BlockPos(0, 1, 0);
-        BlockPos right = new BlockPos(8, 1, 0);
-        Selection chests = util.select().position(left).add(util.select().position(right));
-        scene.world().showSection(chests, Direction.DOWN);
+        BlockPos left = new BlockPos(0, 1, 1);
+        BlockPos right = new BlockPos(6, 1, 1);
+        scene.world().showSection(util.select().position(left).add(util.select().position(right)),
+                Direction.DOWN);
         scene.idle(15);
-
         scene.overlay().showText(90)
-                .text("Entangled stacks can be stored anywhere, even far apart")
+                .text("Entangled stacks can sit far apart, even in different containers")
                 .attachKeyFrame()
-                .pointAt(util.vector().blockSurface(left, Direction.UP))
+                .pointAt(util.vector().blockSurface(left, Direction.SOUTH))
                 .placeNearTarget();
         scene.idle(100);
 
-        scene.overlay().showBigLine(PonderPalette.INPUT,
-                util.vector().centerOf(left), util.vector().centerOf(right), 120);
+        ItemStack pool = new ItemStack(Items.GOLD_INGOT, 16);
+        Vec3 leftItem = util.vector().centerOf(left).add(0, 0.9, 0);
+        Vec3 rightItem = util.vector().centerOf(right).add(0, 0.9, 0);
+        ElementLink<EntityElement> leftStack =
+                scene.world().createItemEntity(leftItem, util.vector().of(0, 0, 0), pool.copy());
+        ElementLink<EntityElement> rightStack =
+                scene.world().createItemEntity(rightItem, util.vector().of(0, 0, 0), pool.copy());
+        scene.idle(10);
+        scene.overlay().showLine(PonderPalette.INPUT, leftItem, rightItem, 90);
         scene.overlay().showText(90)
-                .text("They do not hold separate items - they share one pool")
+                .text("They are not two piles - they are one shared pool")
                 .attachKeyFrame()
-                .pointAt(util.vector().centerOf(new BlockPos(4, 1, 0)));
+                .pointAt(util.vector().centerOf(new BlockPos(3, 1, 1)).add(0, 0.9, 0));
         scene.idle(100);
 
+        // Take from the left; the right empties by the same amount.
+        scene.overlay().showControls(leftItem, Pointing.DOWN, 40).rightClick();
+        scene.idle(6);
+        scene.world().modifyEntity(leftStack, Entity::discard);
+        scene.world().modifyEntity(rightStack, Entity::discard);
+        scene.world().createItemEntity(leftItem, util.vector().of(-0.15, 0.25, 0.1), pool.copy());
+        scene.world().createItemEntity(rightItem, util.vector().of(0.15, 0.25, 0.1), pool.copy());
+        scene.idle(15);
         scene.overlay().showText(100)
                 .colored(PonderPalette.GREEN)
-                .text("Take items from one and they leave the others too, never copied")
-                .pointAt(util.vector().blockSurface(right, Direction.UP))
+                .text("Take items from one and they leave the other too, never copied")
+                .pointAt(util.vector().blockSurface(right, Direction.SOUTH))
                 .placeNearTarget();
         scene.idle(110);
         scene.markAsFinished();
+    }
+
+    // ---------------------------------------------------------------------
+    // Shared helpers.
+    // ---------------------------------------------------------------------
+
+    /** Park a shard in the Core frame via the real renderer (no ritual). */
+    private static void parkShard(SceneBuilder scene) {
+        scene.world().modifyBlockEntity(CORE_LOWER, QuantumCoreBlockEntity.class,
+                be -> be.setDisplayShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get())));
+    }
+
+    private static void clearShard(SceneBuilder scene) {
+        scene.world().modifyBlockEntity(CORE_LOWER, QuantumCoreBlockEntity.class,
+                be -> be.setDisplayShard(ItemStack.EMPTY));
+    }
+
+    /**
+     * A short ritual beat: streams of energy rise from the input Resonator to
+     * the Core, the Core glows brighter in steps, then a spark burst. Purely
+     * cosmetic — the real entanglement math never runs in a ponder world.
+     */
+    private static void ritualFlash(SceneBuilder scene, SceneBuildingUtil util, BlockPos fromRes) {
+        Vec3 heart = util.vector().centerOf(CORE_UPPER);
+        Vec3 start = util.vector().centerOf(fromRes).add(0, 0.4, 0);
+        Vec3 toHeart = heart.subtract(start);
+        for (int g = 1; g <= 3; g++) {
+            final int glow = g;
+            scene.world().modifyBlock(CORE_LOWER, s -> s.setValue(QuantumCoreBlock.GLOW, glow), false);
+            scene.world().modifyBlock(CORE_UPPER, s -> s.setValue(QuantumCoreBlock.GLOW, glow), false);
+            ParticleEmitter stream = scene.effects().simpleParticleEmitter(
+                    ParticleTypes.ENCHANT, toHeart.scale(0.05));
+            Vec3 step = start;
+            for (int i = 0; i < 4; i++) {
+                scene.effects().emitParticles(step, stream, 3f, 1);
+                step = step.add(toHeart.scale(0.25));
+            }
+            scene.idle(15);
+        }
+        scene.effects().emitParticles(heart,
+                scene.effects().simpleParticleEmitter(ParticleTypes.ELECTRIC_SPARK, util.vector().of(0, 0, 0)),
+                30f, 1);
+        scene.idle(12);
+        scene.world().modifyBlock(CORE_LOWER, s -> s.setValue(QuantumCoreBlock.GLOW, 0), false);
+        scene.world().modifyBlock(CORE_UPPER, s -> s.setValue(QuantumCoreBlock.GLOW, 0), false);
     }
 }

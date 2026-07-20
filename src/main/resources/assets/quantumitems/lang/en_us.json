@@ -24,16 +24,20 @@
   "quantumitems.ponder.circle.text_5": "The space above the floor has to stay clear of other blocks",
   "quantumitems.ponder.circle.text_6": "Once the circle is complete, it is ready to entangle items",
 
-  "quantumitems.ponder.ritual.header": "Entangling Item Stacks",
-  "quantumitems.ponder.ritual.text_1": "Lay a matching stack of items on all four Resonators",
-  "quantumitems.ponder.ritual.text_2": "Then place a Quantum Shard on the Core to start the ritual",
-  "quantumitems.ponder.ritual.text_3": "The Core links to each Resonator, then checks the stacks",
-  "quantumitems.ponder.ritual.text_4": "If the stacks all match, they become entangled",
-  "quantumitems.ponder.ritual.text_5": "Entangled stacks share one pool of items across any distance",
-  "quantumitems.ponder.ritual.text_6": "The Shard is used up whether the ritual succeeds or fails",
+  "quantumitems.ponder.create.header": "Creating a Network",
+  "quantumitems.ponder.create.text_1": "Lay a single stack of items on just one Resonator",
+  "quantumitems.ponder.create.text_2": "Then place a Quantum Shard on the Core to start the ritual",
+  "quantumitems.ponder.create.text_3": "One Shard turns that stack into two entangled stacks",
+  "quantumitems.ponder.create.text_4": "The Shard is used up whether the ritual succeeds or fails",
+
+  "quantumitems.ponder.expand.header": "Growing a Network",
+  "quantumitems.ponder.expand.text_1": "To grow a network, first lay out every stack it already has",
+  "quantumitems.ponder.expand.text_2": "Then run the ritual again with another Shard",
+  "quantumitems.ponder.expand.text_3": "Each ritual entangles one more stack into the network",
+  "quantumitems.ponder.expand.text_4": "Growing needs an empty Resonator, so four stacks is the limit",
 
   "quantumitems.ponder.shared_pool.header": "One Shared Pool",
-  "quantumitems.ponder.shared_pool.text_1": "Entangled stacks can be stored anywhere, even far apart",
-  "quantumitems.ponder.shared_pool.text_2": "They do not hold separate items - they share one pool",
-  "quantumitems.ponder.shared_pool.text_3": "Take items from one and they leave the others too, never copied"
+  "quantumitems.ponder.shared_pool.text_1": "Entangled stacks can sit far apart, even in different containers",
+  "quantumitems.ponder.shared_pool.text_2": "They are not two piles - they are one shared pool",
+  "quantumitems.ponder.shared_pool.text_3": "Take items from one and they leave the other too, never copied"
 }

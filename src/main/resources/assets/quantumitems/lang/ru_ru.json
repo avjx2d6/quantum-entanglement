@@ -24,16 +24,20 @@
   "quantumitems.ponder.circle.text_5": "Пространство над полом должно оставаться свободным от других блоков",
   "quantumitems.ponder.circle.text_6": "Когда круг собран, он готов запутывать предметы",
 
-  "quantumitems.ponder.ritual.header": "Запутывание стаков предметов",
-  "quantumitems.ponder.ritual.text_1": "Положите по одинаковому стаку предметов на все четыре резонатора",
-  "quantumitems.ponder.ritual.text_2": "Затем положите на ядро квантовый осколок, чтобы запустить ритуал",
-  "quantumitems.ponder.ritual.text_3": "Ядро соединяется с каждым резонатором и проверяет стаки",
-  "quantumitems.ponder.ritual.text_4": "Если все стаки совпадают, они становятся запутанными",
-  "quantumitems.ponder.ritual.text_5": "Запутанные стаки делят один запас предметов на любом расстоянии",
-  "quantumitems.ponder.ritual.text_6": "Осколок тратится вне зависимости от того, удался ритуал или нет",
+  "quantumitems.ponder.create.header": "Создание сети",
+  "quantumitems.ponder.create.text_1": "Положите один стак предметов только на один резонатор",
+  "quantumitems.ponder.create.text_2": "Затем положите на ядро квантовый осколок, чтобы запустить ритуал",
+  "quantumitems.ponder.create.text_3": "Один осколок превращает этот стак в два запутанных стака",
+  "quantumitems.ponder.create.text_4": "Осколок тратится вне зависимости от того, удался ритуал или нет",
+
+  "quantumitems.ponder.expand.header": "Расширение сети",
+  "quantumitems.ponder.expand.text_1": "Чтобы расширить сеть, сначала выложите все её стаки",
+  "quantumitems.ponder.expand.text_2": "Затем снова проведите ритуал с ещё одним осколком",
+  "quantumitems.ponder.expand.text_3": "Каждый ритуал добавляет в сеть ещё один запутанный стак",
+  "quantumitems.ponder.expand.text_4": "Для расширения нужен пустой резонатор, поэтому предел - четыре стака",
 
   "quantumitems.ponder.shared_pool.header": "Один общий запас",
-  "quantumitems.ponder.shared_pool.text_1": "Запутанные стаки можно хранить где угодно, даже далеко друг от друга",
-  "quantumitems.ponder.shared_pool.text_2": "Они не хранят отдельные предметы - они делят один запас",
-  "quantumitems.ponder.shared_pool.text_3": "Возьмите предметы из одного - они пропадут и у остальных, без копий"
+  "quantumitems.ponder.shared_pool.text_1": "Запутанные стаки могут лежать далеко друг от друга, даже в разных контейнерах",
+  "quantumitems.ponder.shared_pool.text_2": "Это не две кучки - это один общий запас",
+  "quantumitems.ponder.shared_pool.text_3": "Возьмите предметы из одного - они пропадут и у другого, без копий"
 }
