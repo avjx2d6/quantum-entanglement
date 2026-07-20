@@ -34,10 +34,5 @@
   "quantumitems.ponder.expand.text_1": "Чтобы расширить сеть, сначала выложите все её стаки",
   "quantumitems.ponder.expand.text_2": "Затем снова проведите ритуал с ещё одним осколком",
   "quantumitems.ponder.expand.text_3": "Каждый ритуал добавляет в сеть ещё один запутанный стак",
-  "quantumitems.ponder.expand.text_4": "Для расширения нужен пустой резонатор, поэтому предел - четыре стака",
-
-  "quantumitems.ponder.shared_pool.header": "Один общий запас",
-  "quantumitems.ponder.shared_pool.text_1": "Запутанные стаки могут лежать далеко друг от друга, в разных контейнерах",
-  "quantumitems.ponder.shared_pool.text_2": "Это не две кучки - это один общий запас",
-  "quantumitems.ponder.shared_pool.text_3": "Возьмите предметы из одного - они пропадут и у другого, без копий"
+  "quantumitems.ponder.expand.text_4": "Для расширения нужен пустой резонатор, поэтому предел - четыре стака"
 }

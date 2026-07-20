@@ -4,18 +4,13 @@ import com.quantumitems.ModRegistry;
 import com.quantumitems.block.QuantumCoreBlock;
 import com.quantumitems.block.QuantumCoreBlockEntity;
 import com.quantumitems.block.ResonatorBlockEntity;
-import net.createmod.catnip.math.Pointing;
-import net.createmod.ponder.api.ParticleEmitter;
 import net.createmod.ponder.api.PonderPalette;
-import net.createmod.ponder.api.element.ElementLink;
-import net.createmod.ponder.api.element.EntityElement;
 import net.createmod.ponder.api.scene.SceneBuilder;
 import net.createmod.ponder.api.scene.SceneBuildingUtil;
 import net.createmod.ponder.api.scene.Selection;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
@@ -25,12 +20,11 @@ import net.minecraft.world.phys.Vec3;
  * Storyboards for the Quantum Entanglement guide. Each static method is one
  * scene played over a schematic in {@code assets/quantumitems/ponder/}.
  *
- * Where possible the scenes drive the mod's own renderers — items laid on a
- * Resonator ({@link ResonatorBlockEntity#layDown}) and a shard parked in the
- * Core frame ({@link QuantumCoreBlockEntity#setDisplayShard}) — so the scene
- * looks exactly like the real block. The ritual itself is staged with Ponder
- * particles/glow rather than the real (server-only) phase machine, for control
- * over timing.
+ * Items are shown with the mod's own renderers: laid on a Resonator via
+ * {@link ResonatorBlockEntity#layDown}, and a shard parked in the Core frame
+ * by writing its "shard" NBT (the Core BER draws {@code displayedShard()}).
+ * The ritual itself is staged with Ponder glow + particles rather than the
+ * real (server-only) phase machine, for control over timing.
  *
  * Text is plain and instructional, matching Create's own scenes.
  *
@@ -96,22 +90,20 @@ public class QuantumScenes {
                 .placeNearTarget();
         scene.idle(100);
 
-        // Cleanliness rule, shown: a stray block drops in, is flagged red, and
-        // is cleared away. setBlock + showSection so it actually renders (a bare
-        // setBlock on an unshown position leaves it invisible).
-        scene.addKeyframe();
+        // Cleanliness rule — one segment: the stray block drops in and its
+        // warning show together (a bare setBlock on an unshown position never
+        // renders, so setBlock + showSection make it actually appear).
         BlockPos intruder = new BlockPos(1, 1, 2);
         scene.world().setBlock(intruder, Blocks.COBBLESTONE.defaultBlockState(), false);
         scene.world().showSection(util.select().position(intruder), Direction.DOWN);
-        scene.idle(15);
-        scene.overlay().showOutline(PonderPalette.RED, intruder, util.select().position(intruder), 70);
-        scene.overlay().showText(80)
+        scene.overlay().showOutline(PonderPalette.RED, intruder, util.select().position(intruder), 80);
+        scene.overlay().showText(85)
                 .colored(PonderPalette.RED)
                 .text("The space above the floor has to stay clear of other blocks")
                 .attachKeyFrame()
                 .pointAt(util.vector().topOf(intruder))
                 .placeNearTarget();
-        scene.idle(85);
+        scene.idle(95);
         scene.world().destroyBlock(intruder);
         scene.idle(20);
 
@@ -146,8 +138,8 @@ public class QuantumScenes {
                 .placeNearTarget();
         scene.idle(90);
 
-        parkShard(scene);
-        scene.idle(8);
+        parkShard(scene, util);
+        scene.idle(10);
         scene.overlay().showText(80)
                 .text("Then place a Quantum Shard on the Core to start the ritual")
                 .attachKeyFrame()
@@ -155,8 +147,8 @@ public class QuantumScenes {
                 .placeNearTarget();
         scene.idle(90);
 
-        ritualFlash(scene, util, inputRes);
-        clearShard(scene);
+        ritualFlash(scene, util);
+        clearShard(scene, util);
 
         BlockPos copyRes = RESONATORS[3];
         scene.world().modifyBlockEntity(copyRes, ResonatorBlockEntity.class,
@@ -206,8 +198,8 @@ public class QuantumScenes {
                 .placeNearTarget();
         scene.idle(100);
 
-        parkShard(scene);
-        scene.idle(8);
+        parkShard(scene, util);
+        scene.idle(10);
         scene.overlay().showText(70)
                 .text("Then run the ritual again with another Shard")
                 .attachKeyFrame()
@@ -215,8 +207,8 @@ public class QuantumScenes {
                 .placeNearTarget();
         scene.idle(80);
 
-        ritualFlash(scene, util, a);
-        clearShard(scene);
+        ritualFlash(scene, util);
+        clearShard(scene, util);
 
         BlockPos c = RESONATORS[1];
         scene.world().modifyBlockEntity(c, ResonatorBlockEntity.class,
@@ -244,103 +236,42 @@ public class QuantumScenes {
         scene.markAsFinished();
     }
 
-    // =====================================================================
-    // Scene 4 — one shared pool across distant containers.
-    // =====================================================================
-    public static void sharedPool(SceneBuilder scene, SceneBuildingUtil util) {
-        scene.title("shared_pool", "One Shared Pool");
-        scene.configureBasePlate(0, 0, 5);
-        scene.showBasePlate();
-        scene.idle(10);
-
-        BlockPos left = new BlockPos(0, 1, 2);
-        BlockPos right = new BlockPos(4, 1, 2);
-        scene.world().showSection(util.select().position(left), Direction.DOWN);
-        scene.world().showSection(util.select().position(right), Direction.DOWN);
-        scene.idle(15);
-        scene.overlay().showText(90)
-                .text("Entangled stacks can sit far apart, in separate containers")
-                .attachKeyFrame()
-                .pointAt(util.vector().topOf(left))
-                .placeNearTarget();
-        scene.idle(100);
-
-        // A stack rests in each barrel; a link shows they are one pool.
-        ItemStack pool = new ItemStack(Items.GOLD_INGOT, 16);
-        Vec3 leftItem = util.vector().centerOf(left).add(0, 0.55, 0);
-        Vec3 rightItem = util.vector().centerOf(right).add(0, 0.55, 0);
-        ElementLink<EntityElement> leftStack =
-                scene.world().createItemEntity(leftItem, util.vector().of(0, 0, 0), pool.copy());
-        ElementLink<EntityElement> rightStack =
-                scene.world().createItemEntity(rightItem, util.vector().of(0, 0, 0), pool.copy());
-        scene.idle(10);
-        scene.overlay().showLine(PonderPalette.INPUT, leftItem, rightItem, 90);
-        scene.overlay().showText(90)
-                .text("They are not two piles - they are one shared pool")
-                .attachKeyFrame()
-                .pointAt(util.vector().centerOf(new BlockPos(2, 1, 2)).add(0, 0.6, 0));
-        scene.idle(100);
-
-        // Take from the left barrel; the right empties at the same instant.
-        scene.overlay().showControls(leftItem, Pointing.DOWN, 40).rightClick();
-        scene.idle(8);
-        scene.world().modifyEntity(leftStack, Entity::discard);
-        scene.world().modifyEntity(rightStack, Entity::discard);
-        scene.effects().indicateSuccess(right);
-        scene.world().createItemEntity(leftItem.add(0, 0.2, 0), util.vector().of(0, 0.25, 0.15), pool.copy());
-        scene.idle(15);
-        scene.overlay().showText(100)
-                .colored(PonderPalette.GREEN)
-                .text("Take items from one and they leave the other too, never copied")
-                .attachKeyFrame()
-                .pointAt(util.vector().topOf(right))
-                .placeNearTarget();
-        scene.idle(110);
-        scene.markAsFinished();
-    }
-
     // ---------------------------------------------------------------------
     // Shared helpers.
     // ---------------------------------------------------------------------
 
-    /** Park a shard in the Core frame via the real renderer (no ritual). */
-    private static void parkShard(SceneBuilder scene) {
-        scene.world().modifyBlockEntity(CORE_LOWER, QuantumCoreBlockEntity.class,
-                be -> be.setDisplayShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get())));
+    /** Park a shard in the Core frame by writing its NBT (real BER draws it). */
+    private static void parkShard(SceneBuilder scene, SceneBuildingUtil util) {
+        scene.world().modifyBlockEntityNBT(util.select().position(CORE_LOWER),
+                QuantumCoreBlockEntity.class,
+                nbt -> nbt.put("shard", new ItemStack(ModRegistry.QUANTUM_SHARD.get())
+                        .save(scene.world().getHolderLookupProvider())),
+                true);
     }
 
-    private static void clearShard(SceneBuilder scene) {
-        scene.world().modifyBlockEntity(CORE_LOWER, QuantumCoreBlockEntity.class,
-                be -> be.setDisplayShard(ItemStack.EMPTY));
+    private static void clearShard(SceneBuilder scene, SceneBuildingUtil util) {
+        scene.world().modifyBlockEntityNBT(util.select().position(CORE_LOWER),
+                QuantumCoreBlockEntity.class, nbt -> nbt.remove("shard"), true);
     }
 
     /**
-     * A short ritual beat: streams of energy rise from the input Resonator to
-     * the Core, the Core glows brighter in steps, then a spark burst. Purely
-     * cosmetic — the real entanglement math never runs in a ponder world.
+     * A short ritual beat: the Core brightens in steps, then a spark burst.
+     * Only the upper block's glow is changed so the lower block-entity (which
+     * holds the parked shard) is never rebuilt. Cosmetic only — the real
+     * entanglement math never runs in a ponder world.
      */
-    private static void ritualFlash(SceneBuilder scene, SceneBuildingUtil util, BlockPos fromRes) {
+    private static void ritualFlash(SceneBuilder scene, SceneBuildingUtil util) {
         Vec3 heart = util.vector().centerOf(CORE_UPPER);
-        Vec3 start = util.vector().centerOf(fromRes).add(0, 0.4, 0);
-        Vec3 toHeart = heart.subtract(start);
         for (int g = 1; g <= 3; g++) {
             final int glow = g;
-            scene.world().modifyBlock(CORE_LOWER, s -> s.setValue(QuantumCoreBlock.GLOW, glow), false);
             scene.world().modifyBlock(CORE_UPPER, s -> s.setValue(QuantumCoreBlock.GLOW, glow), false);
-            ParticleEmitter stream = scene.effects().simpleParticleEmitter(
-                    ParticleTypes.ENCHANT, toHeart.scale(0.05));
-            Vec3 step = start;
-            for (int i = 0; i < 4; i++) {
-                scene.effects().emitParticles(step, stream, 3f, 1);
-                step = step.add(toHeart.scale(0.25));
-            }
             scene.idle(15);
         }
-        scene.effects().emitParticles(heart,
-                scene.effects().simpleParticleEmitter(ParticleTypes.ELECTRIC_SPARK, util.vector().of(0, 0, 0)),
-                30f, 1);
+        scene.effects().emitParticles(heart, scene.effects().simpleParticleEmitter(
+                ParticleTypes.END_ROD, util.vector().of(0, 0.12, 0)), 10f, 1);
+        scene.effects().emitParticles(heart, scene.effects().simpleParticleEmitter(
+                ParticleTypes.ELECTRIC_SPARK, util.vector().of(0, 0, 0)), 24f, 1);
         scene.idle(12);
-        scene.world().modifyBlock(CORE_LOWER, s -> s.setValue(QuantumCoreBlock.GLOW, 0), false);
         scene.world().modifyBlock(CORE_UPPER, s -> s.setValue(QuantumCoreBlock.GLOW, 0), false);
     }
 }

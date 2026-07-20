@@ -113,16 +113,6 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         return shard;
     }
 
-    /**
-     * Display only: park a shard in the frame so a Ponder scene can show it
-     * levitating without running a ritual. Not for gameplay — the real path is
-     * {@link #placeShard}, which is server-authoritative and would launch the
-     * rite on a complete circle.
-     */
-    public void setDisplayShard(ItemStack stack) {
-        this.shard = stack;
-    }
-
     public boolean isRitualRunning() {
         return phase != Phase.IDLE;
     }

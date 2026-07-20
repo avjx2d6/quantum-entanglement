@@ -47,8 +47,7 @@ public class QuantumPonderPlugin implements PonderPlugin {
                         ModRegistry.EYE_OF_ELSEWHERE.getId())
                 .addStoryBoard("ritual_circle", QuantumScenes::circleAssembly, TAG_QUANTUM)
                 .addStoryBoard("ritual_circle", QuantumScenes::createNetwork, TAG_QUANTUM)
-                .addStoryBoard("ritual_circle", QuantumScenes::expandNetwork, TAG_QUANTUM)
-                .addStoryBoard("shared_pool", QuantumScenes::sharedPool, TAG_QUANTUM);
+                .addStoryBoard("ritual_circle", QuantumScenes::expandNetwork, TAG_QUANTUM);
     }
 
     @Override

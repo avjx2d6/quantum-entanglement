@@ -34,10 +34,5 @@
   "quantumitems.ponder.expand.text_1": "To grow a network, first lay out every stack it already has",
   "quantumitems.ponder.expand.text_2": "Then run the ritual again with another Shard",
   "quantumitems.ponder.expand.text_3": "Each ritual entangles one more stack into the network",
-  "quantumitems.ponder.expand.text_4": "Growing needs an empty Resonator, so four stacks is the limit",
-
-  "quantumitems.ponder.shared_pool.header": "One Shared Pool",
-  "quantumitems.ponder.shared_pool.text_1": "Entangled stacks can sit far apart, in separate containers",
-  "quantumitems.ponder.shared_pool.text_2": "They are not two piles - they are one shared pool",
-  "quantumitems.ponder.shared_pool.text_3": "Take items from one and they leave the other too, never copied"
+  "quantumitems.ponder.expand.text_4": "Growing needs an empty Resonator, so four stacks is the limit"
 }
