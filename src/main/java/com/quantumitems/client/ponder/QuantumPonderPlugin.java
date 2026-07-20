@@ -36,20 +36,18 @@ public class QuantumPonderPlugin implements PonderPlugin {
 
     @Override
     public void registerScenes(PonderSceneRegistrationHelper<ResourceLocation> helper) {
-        ResourceLocation shard = ModRegistry.QUANTUM_SHARD.getId();
-        ResourceLocation eye = ModRegistry.EYE_OF_ELSEWHERE.getId();
-        ResourceLocation core = ModRegistry.QUANTUM_CORE_ITEM.getId();
-
-        // Scene 1 — building the ritual circle. Anchored to the core item,
-        // since the core is what the player places to start a structure.
-        helper.addStoryBoard(core, "ritual_circle", QuantumScenes::circleAssembly, TAG_QUANTUM);
-
-        // Scene 2 — running the ritual (also surfaced on the shard, the fuel).
-        helper.addStoryBoard(shard, "ritual_circle", QuantumScenes::ritual, TAG_QUANTUM);
-
-        // Scene 3 — one pool seen through windows far apart. The payoff of the
-        // eye, so it lives there.
-        helper.addStoryBoard(eye, "shared_pool", QuantumScenes::sharedPool, TAG_QUANTUM);
+        // All four components share ONE ordered set of scenes, so hovering any
+        // of them opens the same chapter list, pageable with the Next Scene
+        // arrows. (Attaching a scene to several components via forComponents is
+        // exactly how Create does it — the scene's text keys are shared.)
+        helper.forComponents(
+                        ModRegistry.QUANTUM_CORE_ITEM.getId(),
+                        ModRegistry.RESONATOR_ITEM.getId(),
+                        ModRegistry.QUANTUM_SHARD.getId(),
+                        ModRegistry.EYE_OF_ELSEWHERE.getId())
+                .addStoryBoard("ritual_circle", QuantumScenes::circleAssembly, TAG_QUANTUM)
+                .addStoryBoard("ritual_circle", QuantumScenes::ritual, TAG_QUANTUM)
+                .addStoryBoard("shared_pool", QuantumScenes::sharedPool, TAG_QUANTUM);
     }
 
     @Override
