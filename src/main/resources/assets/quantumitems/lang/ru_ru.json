@@ -20,7 +20,7 @@
   "quantumitems.ponder.circle.text_1": "Ритуальный круг строится на полу 5x5 из аметистовых блоков",
   "quantumitems.ponder.circle.text_2": "Поставьте по резонатору на каждый из четырёх углов",
   "quantumitems.ponder.circle.text_3": "Каждый резонатор держит один стак предметов",
-  "quantumitems.ponder.circle.text_4": "Квантовое ядро стоит в центре и занимает два блока в высоту",
+  "quantumitems.ponder.circle.text_4": "Квантовое ядро стоит в центре круга",
   "quantumitems.ponder.circle.text_5": "Пространство над полом должно оставаться свободным от других блоков",
   "quantumitems.ponder.circle.text_6": "Когда круг собран, он готов запутывать предметы",
 
@@ -37,7 +37,7 @@
   "quantumitems.ponder.expand.text_4": "Для расширения нужен пустой резонатор, поэтому предел - четыре стака",
 
   "quantumitems.ponder.shared_pool.header": "Один общий запас",
-  "quantumitems.ponder.shared_pool.text_1": "Запутанные стаки могут лежать далеко друг от друга, даже в разных контейнерах",
+  "quantumitems.ponder.shared_pool.text_1": "Запутанные стаки могут лежать далеко друг от друга, в разных контейнерах",
   "quantumitems.ponder.shared_pool.text_2": "Это не две кучки - это один общий запас",
   "quantumitems.ponder.shared_pool.text_3": "Возьмите предметы из одного - они пропадут и у другого, без копий"
 }

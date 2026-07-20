@@ -68,13 +68,10 @@ public class QuantumScenes {
 
         scene.world().showSection(util.select().position(FIRST_CORNER), Direction.DOWN);
         scene.idle(6);
-        scene.overlay().showControls(util.vector().centerOf(FIRST_CORNER).add(0, 0.4, 0), Pointing.DOWN, 40)
-                .rightClick()
-                .withItem(new ItemStack(ModRegistry.RESONATOR_ITEM.get()));
         scene.overlay().showOutlineWithText(util.select().position(FIRST_CORNER), 80)
                 .text("Place a Resonator on each of the four corners")
                 .attachKeyFrame()
-                .pointAt(util.vector().blockSurface(FIRST_CORNER, Direction.WEST))
+                .pointAt(util.vector().topOf(FIRST_CORNER))
                 .placeNearTarget();
         scene.idle(90);
 
@@ -85,33 +82,34 @@ public class QuantumScenes {
         scene.idle(20);
         scene.overlay().showText(70)
                 .text("Each Resonator holds a single stack of items")
-                .pointAt(util.vector().blockSurface(new BlockPos(4, 1, 4), Direction.EAST))
+                .pointAt(util.vector().topOf(new BlockPos(4, 1, 0)))
                 .placeNearTarget();
         scene.idle(80);
 
         Selection core = util.select().fromTo(2, 1, 2, 2, 2, 2);
         scene.world().showSection(core, Direction.DOWN);
         scene.idle(8);
-        scene.overlay().showControls(util.vector().centerOf(CORE_LOWER).add(0, 0.4, 0), Pointing.DOWN, 40)
-                .rightClick()
-                .withItem(new ItemStack(ModRegistry.QUANTUM_CORE_ITEM.get()));
         scene.overlay().showOutlineWithText(core, 90)
-                .text("The Quantum Core stands two blocks tall in the center")
+                .text("The Quantum Core stands at the center of the circle")
                 .attachKeyFrame()
-                .pointAt(util.vector().blockSurface(CORE_UPPER, Direction.WEST))
+                .pointAt(util.vector().topOf(CORE_UPPER))
                 .placeNearTarget();
         scene.idle(100);
 
+        // Cleanliness rule, shown: a stray block drops in, is flagged red, and
+        // is cleared away. setBlock + showSection so it actually renders (a bare
+        // setBlock on an unshown position leaves it invisible).
         scene.addKeyframe();
         BlockPos intruder = new BlockPos(1, 1, 2);
-        scene.world().setBlock(intruder, Blocks.COBBLESTONE.defaultBlockState(), true);
-        scene.idle(10);
+        scene.world().setBlock(intruder, Blocks.COBBLESTONE.defaultBlockState(), false);
+        scene.world().showSection(util.select().position(intruder), Direction.DOWN);
+        scene.idle(15);
         scene.overlay().showOutline(PonderPalette.RED, intruder, util.select().position(intruder), 70);
         scene.overlay().showText(80)
                 .colored(PonderPalette.RED)
                 .text("The space above the floor has to stay clear of other blocks")
                 .attachKeyFrame()
-                .pointAt(util.vector().blockSurface(intruder, Direction.WEST))
+                .pointAt(util.vector().topOf(intruder))
                 .placeNearTarget();
         scene.idle(85);
         scene.world().destroyBlock(intruder);
@@ -251,26 +249,26 @@ public class QuantumScenes {
     // =====================================================================
     public static void sharedPool(SceneBuilder scene, SceneBuildingUtil util) {
         scene.title("shared_pool", "One Shared Pool");
-        scene.configureBasePlate(0, 0, 7);
-        scene.scaleSceneView(0.8f);
+        scene.configureBasePlate(0, 0, 5);
         scene.showBasePlate();
         scene.idle(10);
 
-        BlockPos left = new BlockPos(0, 1, 1);
-        BlockPos right = new BlockPos(6, 1, 1);
-        scene.world().showSection(util.select().position(left).add(util.select().position(right)),
-                Direction.DOWN);
+        BlockPos left = new BlockPos(0, 1, 2);
+        BlockPos right = new BlockPos(4, 1, 2);
+        scene.world().showSection(util.select().position(left), Direction.DOWN);
+        scene.world().showSection(util.select().position(right), Direction.DOWN);
         scene.idle(15);
         scene.overlay().showText(90)
-                .text("Entangled stacks can sit far apart, even in different containers")
+                .text("Entangled stacks can sit far apart, in separate containers")
                 .attachKeyFrame()
-                .pointAt(util.vector().blockSurface(left, Direction.SOUTH))
+                .pointAt(util.vector().topOf(left))
                 .placeNearTarget();
         scene.idle(100);
 
+        // A stack rests in each barrel; a link shows they are one pool.
         ItemStack pool = new ItemStack(Items.GOLD_INGOT, 16);
-        Vec3 leftItem = util.vector().centerOf(left).add(0, 0.9, 0);
-        Vec3 rightItem = util.vector().centerOf(right).add(0, 0.9, 0);
+        Vec3 leftItem = util.vector().centerOf(left).add(0, 0.55, 0);
+        Vec3 rightItem = util.vector().centerOf(right).add(0, 0.55, 0);
         ElementLink<EntityElement> leftStack =
                 scene.world().createItemEntity(leftItem, util.vector().of(0, 0, 0), pool.copy());
         ElementLink<EntityElement> rightStack =
@@ -280,21 +278,22 @@ public class QuantumScenes {
         scene.overlay().showText(90)
                 .text("They are not two piles - they are one shared pool")
                 .attachKeyFrame()
-                .pointAt(util.vector().centerOf(new BlockPos(3, 1, 1)).add(0, 0.9, 0));
+                .pointAt(util.vector().centerOf(new BlockPos(2, 1, 2)).add(0, 0.6, 0));
         scene.idle(100);
 
-        // Take from the left; the right empties by the same amount.
+        // Take from the left barrel; the right empties at the same instant.
         scene.overlay().showControls(leftItem, Pointing.DOWN, 40).rightClick();
-        scene.idle(6);
+        scene.idle(8);
         scene.world().modifyEntity(leftStack, Entity::discard);
         scene.world().modifyEntity(rightStack, Entity::discard);
-        scene.world().createItemEntity(leftItem, util.vector().of(-0.15, 0.25, 0.1), pool.copy());
-        scene.world().createItemEntity(rightItem, util.vector().of(0.15, 0.25, 0.1), pool.copy());
+        scene.effects().indicateSuccess(right);
+        scene.world().createItemEntity(leftItem.add(0, 0.2, 0), util.vector().of(0, 0.25, 0.15), pool.copy());
         scene.idle(15);
         scene.overlay().showText(100)
                 .colored(PonderPalette.GREEN)
                 .text("Take items from one and they leave the other too, never copied")
-                .pointAt(util.vector().blockSurface(right, Direction.SOUTH))
+                .attachKeyFrame()
+                .pointAt(util.vector().topOf(right))
                 .placeNearTarget();
         scene.idle(110);
         scene.markAsFinished();

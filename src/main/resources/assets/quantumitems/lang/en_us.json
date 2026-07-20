@@ -20,7 +20,7 @@
   "quantumitems.ponder.circle.text_1": "The ritual circle is built on a 5x5 floor of Amethyst Blocks",
   "quantumitems.ponder.circle.text_2": "Place a Resonator on each of the four corners",
   "quantumitems.ponder.circle.text_3": "Each Resonator holds a single stack of items",
-  "quantumitems.ponder.circle.text_4": "The Quantum Core stands two blocks tall in the center",
+  "quantumitems.ponder.circle.text_4": "The Quantum Core stands at the center of the circle",
   "quantumitems.ponder.circle.text_5": "The space above the floor has to stay clear of other blocks",
   "quantumitems.ponder.circle.text_6": "Once the circle is complete, it is ready to entangle items",
 
@@ -37,7 +37,7 @@
   "quantumitems.ponder.expand.text_4": "Growing needs an empty Resonator, so four stacks is the limit",
 
   "quantumitems.ponder.shared_pool.header": "One Shared Pool",
-  "quantumitems.ponder.shared_pool.text_1": "Entangled stacks can sit far apart, even in different containers",
+  "quantumitems.ponder.shared_pool.text_1": "Entangled stacks can sit far apart, in separate containers",
   "quantumitems.ponder.shared_pool.text_2": "They are not two piles - they are one shared pool",
   "quantumitems.ponder.shared_pool.text_3": "Take items from one and they leave the other too, never copied"
 }
