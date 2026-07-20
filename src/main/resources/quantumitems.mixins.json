@@ -7,7 +7,6 @@
     "AbstractContainerMenuMixin",
     "BundleContentsMutableMixin",
     "ExperienceOrbMixin",
-    "ExperienceOrbMixin$FollowingAccessor",
     "HopperBlockEntityMixin",
     "InvWrapperMixin",
     "InventoryMixin",

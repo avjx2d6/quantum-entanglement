@@ -61,7 +61,7 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
     public static final int CONNECTING_TICKS = 60;   // one beam every 15 ticks
     public static final int SCANNING_TICKS = 60;     // inputs recolor every 15 ticks
     public static final int JUDGEMENT_TICKS = 25;    // gold output beam shows
-    public static final int CRESCENDO_TICKS = 60;    // riser, glow, spin-up
+    public static final int CRESCENDO_TICKS = 180;   // engine spool-up, glow, spin (author: x3)
     public static final int SUCCESS_TICKS = 25;
     public static final int FAILURE_TICKS = 30;
     private static final int BEAM_STEP_TICKS = 15;
@@ -262,7 +262,7 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
                         core.enterPhase(Phase.SUCCESS);
                     } else {
                         // the locked circle should make this impossible; fail honestly if it happens
-                        serverLevel.playSound(null, pos, ModRegistry.RITUAL_CANCEL.get(), SoundSource.BLOCKS, 1.4f, 1.0f);
+                        serverLevel.playSound(null, pos, ModRegistry.RITUAL_CANCEL.get(), SoundSource.BLOCKS, 2.5f, 0.95f);
                         core.enterPhase(Phase.FAILURE);
                     }
                 }
@@ -287,7 +287,7 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         shard = ItemStack.EMPTY;
         setGlow(level, 0);
         releaseClaimedOrbs(level);
-        level.playSound(null, worldPosition, ModRegistry.RITUAL_CANCEL.get(), SoundSource.BLOCKS, 1.4f, 1.0f);
+        level.playSound(null, worldPosition, ModRegistry.RITUAL_CANCEL.get(), SoundSource.BLOCKS, 2.5f, 0.95f);
         enterPhase(Phase.FAILURE);
     }
 
@@ -303,7 +303,7 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
             }
         }
         level.sendParticles(ParticleTypes.FLASH, focus.x, focus.y, focus.z, 1, 0, 0, 0, 0);
-        level.playSound(null, worldPosition, ModRegistry.RITUAL_BURST.get(), SoundSource.BLOCKS, 1.6f, 1.0f);
+        level.playSound(null, worldPosition, ModRegistry.RITUAL_BURST.get(), SoundSource.BLOCKS, 2.5f, 1.0f);
     }
 
     private void enterPhase(Phase next) {
@@ -422,8 +422,10 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
             }
             player.giveExperiencePoints(-1);
             Vec3 toward = eye.subtract(player.position()).normalize().scale(0.8);
-            level.addFreshEntity(new net.minecraft.world.entity.ExperienceOrb(level,
-                    player.getX() + toward.x, player.getY() + 0.9, player.getZ() + toward.z, 1));
+            var orb = new net.minecraft.world.entity.ExperienceOrb(level,
+                    player.getX() + toward.x, player.getY() + 0.9, player.getZ() + toward.z, 1);
+            orb.addTag(CLAIMED_TAG); // claimed BEFORE entering the world: never insta-picked
+            level.addFreshEntity(orb);
         }
     }
 
@@ -449,9 +451,7 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
                 orb.discard();
                 continue;
             }
-            orb.addTag(CLAIMED_TAG);
-            ((com.quantumitems.mixin.ExperienceOrbMixin.FollowingAccessor) orb)
-                    .quantumitems$setFollowingPlayer(null);
+            orb.addTag(CLAIMED_TAG); // the mixin nulls followingPlayer each orb tick
             double strength = 0.04 + 0.08 * (1.0 - dist / XP_RADIUS); // a slow, inevitable drift
             orb.setDeltaMovement(toEye.normalize().scale(strength));
         }

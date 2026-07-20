@@ -78,7 +78,7 @@ public class RitualGameTests {
         return window;
     }
 
-    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 320)
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 450)
     public void ritualCreatesNetworkFromPlainStack(GameTestHelper helper) {
         buildCircle(helper);
         resonator(helper, 0).setItem(0, new ItemStack(Items.BREAD, 20));
@@ -115,7 +115,7 @@ public class RitualGameTests {
         return ItemStack.EMPTY;
     }
 
-    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 320)
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 450)
     public void ritualBurnsShardOnEmptyCircle(GameTestHelper helper) {
         buildCircle(helper);
         if (!core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()))) {
@@ -164,7 +164,7 @@ public class RitualGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 320)
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 450)
     public void ritualExpandsNetworkWhenAllWindowsPresent(GameTestHelper helper) {
         buildCircle(helper);
         QuantumNetworks networks = QuantumNetworks.get(helper.getLevel().getServer());
@@ -201,7 +201,7 @@ public class RitualGameTests {
         });
     }
 
-    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 320)
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 450)
     public void ritualFailsWhenAWindowIsMissing(GameTestHelper helper) {
         buildCircle(helper);
         QuantumNetworks networks = QuantumNetworks.get(helper.getLevel().getServer());
@@ -229,7 +229,7 @@ public class RitualGameTests {
         });
     }
 
-    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 320)
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 450)
     public void ritualFailsOnTwoPlainStacks(GameTestHelper helper) {
         buildCircle(helper);
         resonator(helper, 0).setItem(0, new ItemStack(Items.BREAD, 5));
@@ -248,7 +248,7 @@ public class RitualGameTests {
         });
     }
 
-    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 320)
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 450)
     public void ritualRefusesDamageableItems(GameTestHelper helper) {
         buildCircle(helper);
         resonator(helper, 0).setItem(0, new ItemStack(Items.IRON_PICKAXE));
@@ -265,7 +265,7 @@ public class RitualGameTests {
         });
     }
 
-    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 320)
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 450)
     public void circleIsLockedDuringRitual(GameTestHelper helper) {
         buildCircle(helper);
         resonator(helper, 0).setItem(0, new ItemStack(Items.BREAD, 20));
@@ -284,7 +284,7 @@ public class RitualGameTests {
     }
 
     /** A full network occupies all four resonators — no vacancy, the cap is visible. */
-    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 320)
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 450)
     public void fullNetworkCannotExpand(GameTestHelper helper) {
         buildCircle(helper);
         QuantumNetworks networks = QuantumNetworks.get(helper.getLevel().getServer());
