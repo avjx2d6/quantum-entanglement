@@ -57,9 +57,15 @@ public final class ClientEvents {
             if (stack.is(ModRegistry.QUANTUM_SHARD.get())) {
                 tooltip.add(doctrine("tooltip.quantumitems.shard.lore"));
                 tooltip.add(doctrine("tooltip.quantumitems.shard.source"));
+            } else if (stack.is(ModRegistry.EYE_OF_ELSEWHERE.get())) {
+                tooltip.add(doctrine("tooltip.quantumitems.eye.lore"));
+            } else if (stack.is(ModRegistry.QUANTUM_CORE_ITEM.get())) {
+                tooltip.add(doctrine("tooltip.quantumitems.core.lore"));
+            } else if (stack.is(ModRegistry.RESONATOR_ITEM.get())) {
+                tooltip.add(doctrine("tooltip.quantumitems.resonator.lore"));
             }
-            // Core/resonator/eye tooltips deliberately absent for now: the
-            // author wants mechanics corrected first, labels designed later.
+            // Mechanics are taught by the embedded Ponder guide (hold the Ponder
+            // key on any of these items); tooltips stay to one line of flavour.
         }
 
         private static net.minecraft.network.chat.Component doctrine(String key) {

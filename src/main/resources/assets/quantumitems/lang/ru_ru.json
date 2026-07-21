@@ -11,7 +11,15 @@
   "tooltip.quantumitems.window.shulker": "Спокойно спит в шалкеровом ящике. Что найдёшь при пробуждении — зависит от запаса.",
   "tooltip.quantumitems.shard.lore": "Осколок чего-то нездешнего. Он помнит, каково быть в двух местах сразу.",
   "tooltip.quantumitems.shard.source": "Находится там, где древний город спит во тьме.",
+  "tooltip.quantumitems.eye.lore": "Око, открытое куда-то не сюда.",
+  "tooltip.quantumitems.core.lore": "Сердце ритуального круга.",
+  "tooltip.quantumitems.resonator.lore": "Пьедестал, что держит один стак для обряда.",
   "item.quantumitems.eye_of_elsewhere": "Сквозное око",
+
+  "subtitles.quantumitems.ritual_hum": "Ритуал гудит",
+  "subtitles.quantumitems.ritual_riser": "Ритуал нарастает",
+  "subtitles.quantumitems.ritual_burst": "Запутанность защёлкивается",
+  "subtitles.quantumitems.ritual_cancel": "Ритуал рушится",
 
   "quantumitems.ponder.tag.quantum_entanglement": "Квантовая запутанность",
   "quantumitems.ponder.tag.quantum_entanglement.description": "Запутайте стаки предметов, чтобы далёкие стаки делили один общий запас.",

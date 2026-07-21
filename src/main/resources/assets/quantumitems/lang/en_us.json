@@ -11,7 +11,15 @@
   "tooltip.quantumitems.window.shulker": "Sleeps safely inside a shulker box. What you find on waking depends on the pool.",
   "tooltip.quantumitems.shard.lore": "A splinter of somewhere else. It remembers being two places at once.",
   "tooltip.quantumitems.shard.source": "Found where the old city sleeps in the dark.",
+  "tooltip.quantumitems.eye.lore": "An eye that opens onto somewhere else.",
+  "tooltip.quantumitems.core.lore": "The heart of the ritual circle.",
+  "tooltip.quantumitems.resonator.lore": "A pedestal that steadies one stack for the rite.",
   "item.quantumitems.eye_of_elsewhere": "Eye of Elsewhere",
+
+  "subtitles.quantumitems.ritual_hum": "Ritual hums",
+  "subtitles.quantumitems.ritual_riser": "Ritual builds",
+  "subtitles.quantumitems.ritual_burst": "Entanglement snaps into place",
+  "subtitles.quantumitems.ritual_cancel": "Ritual collapses",
 
   "quantumitems.ponder.tag.quantum_entanglement": "Quantum Entanglement",
   "quantumitems.ponder.tag.quantum_entanglement.description": "Entangle item stacks so distant stacks share a single pool of items.",
