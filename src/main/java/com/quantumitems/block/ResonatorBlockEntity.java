@@ -67,6 +67,26 @@ public class ResonatorBlockEntity extends SyncedBlockEntity implements WorldlyCo
             beltPosition += diff / 4f;
         }
         selfHeal();
+        syncOccupiedFlag();
+    }
+
+    /**
+     * Mirrors "a stack lies here" into the OCCUPIED blockstate every server
+     * tick. Engine wipes mutate the held stack in place (no setItem call), so
+     * this is the one spot that reliably notices emptiness however it happened;
+     * the state flip rides the never-lost blockstate sync AND re-broadcasts the
+     * BE data, while the renderer gates on the flag — both together close the
+     * client-phantom desync for good.
+     */
+    private void syncOccupiedFlag() {
+        if (level == null || level.isClientSide) {
+            return;
+        }
+        BlockState state = getBlockState();
+        boolean occupied = !item.isEmpty();
+        if (state.hasProperty(ResonatorBlock.OCCUPIED) && state.getValue(ResonatorBlock.OCCUPIED) != occupied) {
+            level.setBlock(worldPosition, state.setValue(ResonatorBlock.OCCUPIED, occupied), 3);
+        }
     }
 
     /**

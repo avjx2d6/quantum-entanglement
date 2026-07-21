@@ -435,9 +435,11 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
                 continue; // nothing left to drink
             }
             player.giveExperiencePoints(-1);
-            Vec3 toward = eye.subtract(player.position()).normalize().scale(0.8);
+            // The orb leaves FROM the player (mid-body), not from a point
+            // toward the core — spawning it offset put it inside the absorb
+            // zone when the player stood close, so it blinked out unseen.
             var orb = new net.minecraft.world.entity.ExperienceOrb(level,
-                    player.getX() + toward.x, player.getY() + 0.9, player.getZ() + toward.z, 1);
+                    player.getX(), player.getY() + player.getBbHeight() * 0.6, player.getZ(), 1);
             orb.addTag(CLAIMED_TAG); // claimed BEFORE entering the world: never insta-picked
             level.addFreshEntity(orb);
         }
@@ -451,14 +453,20 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
      */
     private void pullExperienceOrbs(ServerLevel level) {
         Vec3 eye = observerEyePos();
+        // Absorb on TOUCHING the two-block core column (slightly inflated),
+        // not at a point-distance from the eye: an orb resting on TOP of the
+        // core — a player standing on it feeds from up there — touches the
+        // column and is eaten, instead of hovering forever out of point range.
+        var column = new net.minecraft.world.phys.AABB(
+                worldPosition.getX(), worldPosition.getY(), worldPosition.getZ(),
+                worldPosition.getX() + 1, worldPosition.getY() + 2, worldPosition.getZ() + 1)
+                .inflate(0.3);
         var box = new net.minecraft.world.phys.AABB(worldPosition).inflate(XP_RADIUS);
         for (net.minecraft.world.entity.ExperienceOrb orb
                 : level.getEntitiesOfClass(net.minecraft.world.entity.ExperienceOrb.class, box)) {
-            Vec3 toEye = eye.subtract(orb.position());
-            double dist = toEye.length();
-            // Absorb at the housing wall: the orb collides with the core's
-            // posts and can never physically reach the inner eye.
-            if (dist < 1.15) {
+            // A freshly drained orb gets a moment of visible flight before it
+            // can be eaten — spawn-and-vanish reads as a glitch.
+            if (orb.tickCount > 8 && column.contains(orb.position())) {
                 level.sendParticles(ParticleTypes.PORTAL, eye.x, eye.y, eye.z, 6, 0.1, 0.1, 0.1, 0.05);
                 level.playSound(null, worldPosition, SoundEvents.AMETHYST_BLOCK_CHIME,
                         SoundSource.BLOCKS, 0.4f, 1.8f);

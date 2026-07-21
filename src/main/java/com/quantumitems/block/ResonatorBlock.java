@@ -32,6 +32,17 @@ import javax.annotation.Nullable;
  * annoying in the depot itself, so our pedestal answers on any face.
  */
 public class ResonatorBlock extends Block implements EntityBlock {
+    /**
+     * Server-authoritative "a stack lies here" flag, mirrored into the
+     * blockstate every tick by the block entity. Blockstate sync is the one
+     * channel that never misses (section packets, and a state change also
+     * re-broadcasts the BE data) — the item renderer gates on it, so a client
+     * that somehow kept a stale item copy stops drawing it the moment the
+     * server says the pedestal is empty (the client-phantom bug).
+     */
+    public static final net.minecraft.world.level.block.state.properties.BooleanProperty OCCUPIED =
+            net.minecraft.world.level.block.state.properties.BooleanProperty.create("occupied");
+
     private static final net.minecraft.world.phys.shapes.VoxelShape SHAPE =
             net.minecraft.world.phys.shapes.Shapes.or(
                     Block.box(1, 0, 1, 15, 3, 15),
@@ -41,6 +52,13 @@ public class ResonatorBlock extends Block implements EntityBlock {
 
     public ResonatorBlock(Properties properties) {
         super(properties);
+        registerDefaultState(stateDefinition.any().setValue(OCCUPIED, false));
+    }
+
+    @Override
+    protected void createBlockStateDefinition(
+            net.minecraft.world.level.block.state.StateDefinition.Builder<Block, BlockState> builder) {
+        builder.add(OCCUPIED);
     }
 
     @Override

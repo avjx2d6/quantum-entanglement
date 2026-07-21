@@ -44,6 +44,17 @@ public class ResonatorRenderer implements BlockEntityRenderer<ResonatorBlockEnti
         if (stack.isEmpty()) {
             return;
         }
+        // Blockstate gate: the server mirrors occupancy into OCCUPIED every
+        // tick over the never-lost blockstate channel. A stale client-side
+        // item copy (missed BE packet) must not be drawn. Only in a real
+        // client level — fake worlds (Ponder) have no server tick to raise
+        // the flag, their laid items must still render.
+        net.minecraft.world.level.block.state.BlockState state = resonator.getBlockState();
+        if (resonator.getLevel() instanceof net.minecraft.client.multiplayer.ClientLevel
+                && state.hasProperty(com.quantumitems.block.ResonatorBlock.OCCUPIED)
+                && !state.getValue(com.quantumitems.block.ResonatorBlock.OCCUPIED)) {
+            return;
+        }
         ItemRenderer itemRenderer = Minecraft.getInstance().getItemRenderer();
         BakedModel model = itemRenderer.getModel(stack, resonator.getLevel(), null, 0);
         boolean blockItem = model.isGui3d();
