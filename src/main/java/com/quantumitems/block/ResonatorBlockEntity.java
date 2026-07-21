@@ -66,6 +66,38 @@ public class ResonatorBlockEntity extends SyncedBlockEntity implements WorldlyCo
             }
             beltPosition += diff / 4f;
         }
+        selfHeal();
+    }
+
+    /**
+     * Server-side backstop against phantom windows. When a network dies, the
+     * collapse sweep clears its sibling windows through the engine's in-memory
+     * holder map — but that map is empty right after a world load (before the
+     * deferred chunk-load reconcile runs) and can drift stale, so a sibling can
+     * be left sitting on its pedestal as a dead husk that only heals when a
+     * player finally touches it. Reconciling our own window on a slow, staggered
+     * cadence closes that gap: a husk empties within a tick or two on its own,
+     * with no dependence on holder tracking, events, or load timing. A live
+     * window reconciles to a no-op.
+     */
+    private void selfHeal() {
+        if (level == null || level.isClientSide || !item.has(ModRegistry.QUANTUM_LINK.get())) {
+            return;
+        }
+        long stagger = Math.floorMod(worldPosition.getX() * 7L + worldPosition.getZ() * 13L, 16L);
+        if ((level.getGameTime() & 15L) != stagger) {
+            return;
+        }
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        if (engine == null) {
+            return;
+        }
+        engine.reconcile(item);
+        if (item.isEmpty()) {
+            item = ItemStack.EMPTY;
+            insertedFrom = null;
+            setChanged();
+        }
     }
 
     /** Player-facing insertion: the stack arrives from the player's side and slides in. */

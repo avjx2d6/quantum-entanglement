@@ -345,6 +345,46 @@ public class RitualGameTests {
     }
 
     /**
+     * Playtest repro of the recurring phantom-pedestal bug. A network is filled,
+     * the world reloaded, then one window taken and dropped: the collapse ends
+     * the network but its sibling-wipe walks the engine's holder map — empty
+     * right after a load — and misses the other pedestals, leaving dead husks
+     * that only cleared on a manual click and survived relogs.
+     *
+     * Modelled here without touching global engine state (game tests share one
+     * server): a window of a since-removed network is planted on a pedestal —
+     * exactly the husk a missed sweep leaves behind — and the pedestal's
+     * server-side self-heal must clear it on its own, no player touch.
+     */
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 100)
+    public void phantomWindowSelfHealsOnPedestal(GameTestHelper helper) {
+        buildCircle(helper);
+        QuantumNetworks networks = QuantumNetworks.get(helper.getLevel().getServer());
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        ItemStack plain = new ItemStack(Items.BREAD, 20);
+        int id = networks.createNetwork(plain); // members {1,2}, unique id
+        ItemStack windowB = plain.copy();
+        windowB.set(ModRegistry.QUANTUM_LINK.get(), new QuantumLinkData(id, 2));
+        resonator(helper, 1).setItem(0, windowB);
+        // the network dies elsewhere; the collapse sweep missed this pedestal
+        // (its holder ref was stale/forgotten, as after a reload)
+        networks.removeNetwork(id);
+        engine.deregister(id, 1);
+        engine.deregister(id, 2);
+        if (resonator(helper, 1).getItem(0).isEmpty()) {
+            helper.fail("Setup: the husk should be present before the self-heal");
+        }
+        helper.runAfterDelay(40, () -> {
+            ItemStack left = resonator(helper, 1).getItem(0);
+            if (!left.isEmpty()) {
+                helper.fail("Phantom window must self-heal on the pedestal, still holds " + left
+                        + " (link=" + left.get(ModRegistry.QUANTUM_LINK.get()) + ")");
+            }
+            helper.succeed();
+        });
+    }
+
+    /**
      * The phantom-pedestal regression: canonical refs legitimately drift to
      * copies (last-touch-wins). If the canonical of a pedestal window points
      * elsewhere when the network collapses, the wipe used to hit the copy

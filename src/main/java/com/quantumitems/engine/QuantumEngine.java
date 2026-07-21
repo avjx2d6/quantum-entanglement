@@ -154,7 +154,11 @@ public final class QuantumEngine {
             // Lone-member anomaly surfacing (save predating the cleanup): the
             // network is deleted and this last clone wipes with it — the
             // vanished sibling either died with the items or left with them.
+            // dissolve() clears members through canonical/holder refs, which are
+            // empty right after a reload; wipe THIS physical instance too so the
+            // pedestal it sits in never keeps a husk.
             dissolve(link.networkId(), network, networks);
+            wipe(stack);
             return Status.DEAD;
         }
         if (stack.getCount() != network.pool) {
