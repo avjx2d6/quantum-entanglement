@@ -3,7 +3,7 @@
   "block.quantumitems.quantum_core": "Квантовое ядро",
   "block.quantumitems.resonator": "Резонатор",
   "item.quantumitems.quantum_shard": "Квантовый осколок",
-  "tooltip.quantumitems.link_id": "ID связи: %s#%s",
+  "tooltip.quantumitems.link_id": "ID окна: %s#%s",
   "tooltip.quantumitems.window.hint": "Зажмите Shift для подробностей",
   "tooltip.quantumitems.window.shared": "Общий запас с близнецами: бери из любого — убудет у всех.",
   "tooltip.quantumitems.window.ground": "Упадёт на землю — связь разорвётся.",

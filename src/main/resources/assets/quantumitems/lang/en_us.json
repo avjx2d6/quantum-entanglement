@@ -3,7 +3,7 @@
   "block.quantumitems.quantum_core": "Quantum Core",
   "block.quantumitems.resonator": "Resonator",
   "item.quantumitems.quantum_shard": "Quantum Shard",
-  "tooltip.quantumitems.link_id": "Link ID: %s#%s",
+  "tooltip.quantumitems.link_id": "Window ID: %s#%s",
   "tooltip.quantumitems.window.hint": "Hold Shift for details",
   "tooltip.quantumitems.window.shared": "Shares one pool with its twins — draw from any, drain them all.",
   "tooltip.quantumitems.window.ground": "Touching the ground breaks the link.",
