@@ -27,12 +27,19 @@
   "quantumitems.ponder.create.header": "Создание сети",
   "quantumitems.ponder.create.text_1": "Положите один стак предметов только на один резонатор",
   "quantumitems.ponder.create.text_2": "Затем положите на ядро квантовый осколок, чтобы запустить ритуал",
-  "quantumitems.ponder.create.text_3": "Один осколок превращает этот стак в два запутанных стака",
-  "quantumitems.ponder.create.text_4": "Осколок тратится вне зависимости от того, удался ритуал или нет",
+  "quantumitems.ponder.create.text_3": "Пока ритуал идёт, он вытягивает опыт из игроков поблизости",
+  "quantumitems.ponder.create.text_4": "Один осколок превращает этот стак в два запутанных стака",
+  "quantumitems.ponder.create.text_5": "Осколок тратится вне зависимости от того, удался ритуал или нет",
 
   "quantumitems.ponder.expand.header": "Расширение сети",
   "quantumitems.ponder.expand.text_1": "Чтобы расширить сеть, сначала выложите все её стаки",
   "quantumitems.ponder.expand.text_2": "Затем снова проведите ритуал с ещё одним осколком",
   "quantumitems.ponder.expand.text_3": "Каждый ритуал добавляет в сеть ещё один запутанный стак",
-  "quantumitems.ponder.expand.text_4": "Для расширения нужен пустой резонатор, поэтому предел - четыре стака"
+  "quantumitems.ponder.expand.text_4": "Для расширения нужен пустой резонатор, поэтому предел - четыре стака",
+
+  "quantumitems.ponder.failure.header": "Когда ритуал проваливается",
+  "quantumitems.ponder.failure.text_1": "Ритуал придирчив - смешанные или несовпадающие стаки это ошибка",
+  "quantumitems.ponder.failure.text_2": "Запустите всё равно - и круг отвергнет узор",
+  "quantumitems.ponder.failure.text_3": "Всё кончается громким крахом - осколок потрачен, предметы нетронуты",
+  "quantumitems.ponder.failure.text_4": "Пустые резонаторы, лишние стаки или не все окна сети проваливают так же"
 }

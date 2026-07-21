@@ -147,6 +147,13 @@ public class QuantumScenes {
                 .placeNearTarget();
         scene.idle(90);
 
+        scene.overlay().showText(70)
+                .colored(PonderPalette.GREEN)
+                .text("While it runs, the ritual pulls experience from nearby players")
+                .attachKeyFrame()
+                .pointAt(util.vector().centerOf(CORE_UPPER).add(0, 0.3, 0));
+        scene.idle(80);
+
         ritualFlash(scene, util);
         clearShard(scene, util);
 
@@ -236,6 +243,59 @@ public class QuantumScenes {
         scene.markAsFinished();
     }
 
+    // =====================================================================
+    // Scene 4 — when the ritual fails.
+    // =====================================================================
+    public static void failedRitual(SceneBuilder scene, SceneBuildingUtil util) {
+        scene.title("failure", "When the Ritual Fails");
+        scene.configureBasePlate(0, 0, 5);
+        scene.scaleSceneView(0.9f);
+        scene.showBasePlate();
+        scene.world().showSection(util.select().layersFrom(1), Direction.DOWN);
+        scene.idle(20);
+
+        // A bad setup: two different stacks (creation needs exactly one input).
+        BlockPos a = RESONATORS[0];
+        BlockPos b = RESONATORS[1];
+        scene.world().modifyBlockEntity(a, ResonatorBlockEntity.class,
+                be -> be.layDown(new ItemStack(Items.GOLD_INGOT, 16), Direction.SOUTH));
+        scene.world().modifyBlockEntity(b, ResonatorBlockEntity.class,
+                be -> be.layDown(new ItemStack(Items.IRON_INGOT, 16), Direction.SOUTH));
+        scene.idle(10);
+        scene.overlay().showOutlineWithText(util.select().position(a).add(util.select().position(b)), 95)
+                .text("The ritual is strict - mixed or mismatched stacks are a mistake")
+                .attachKeyFrame()
+                .pointAt(util.vector().topOf(a))
+                .placeNearTarget();
+        scene.idle(105);
+
+        parkShard(scene, util);
+        scene.idle(10);
+        scene.overlay().showText(70)
+                .text("Start it anyway, and the circle rejects the pattern")
+                .attachKeyFrame()
+                .pointAt(util.vector().centerOf(CORE_UPPER).add(0, 0.3, 0))
+                .placeNearTarget();
+        scene.idle(80);
+
+        failFlash(scene, util);
+        clearShard(scene, util);
+        scene.idle(10);
+        scene.overlay().showText(95)
+                .colored(PonderPalette.RED)
+                .text("It ends in a loud collapse - the Shard is spent, the items untouched")
+                .attachKeyFrame()
+                .pointAt(util.vector().centerOf(CORE_UPPER).add(0, 0.3, 0));
+        scene.idle(105);
+
+        scene.overlay().showText(100)
+                .text("Empty pedestals, stray stacks, or a network not fully laid out fail the same way")
+                .pointAt(util.vector().topOf(b))
+                .placeNearTarget();
+        scene.idle(110);
+        scene.markAsFinished();
+    }
+
     // ---------------------------------------------------------------------
     // Shared helpers.
     // ---------------------------------------------------------------------
@@ -263,7 +323,7 @@ public class QuantumScenes {
     private static void ritualFlash(SceneBuilder scene, SceneBuildingUtil util) {
         Vec3 heart = util.vector().centerOf(CORE_UPPER);
         for (int g = 1; g <= 3; g++) {
-            final int glow = g;
+            final int glow = g * 5; // 5 → 10 → 15 on the 0..15 light scale
             scene.world().modifyBlock(CORE_UPPER, s -> s.setValue(QuantumCoreBlock.GLOW, glow), false);
             scene.idle(15);
         }
@@ -273,5 +333,20 @@ public class QuantumScenes {
                 ParticleTypes.ELECTRIC_SPARK, util.vector().of(0, 0, 0)), 24f, 1);
         scene.idle(12);
         scene.world().modifyBlock(CORE_UPPER, s -> s.setValue(QuantumCoreBlock.GLOW, 0), false);
+    }
+
+    /**
+     * A failed ritual: a brief red flicker, then a puff of smoke as it dies.
+     * No build-up, no success glow — the circle rejects the pattern.
+     */
+    private static void failFlash(SceneBuilder scene, SceneBuildingUtil util) {
+        Vec3 heart = util.vector().centerOf(CORE_UPPER);
+        scene.world().modifyBlock(CORE_UPPER, s -> s.setValue(QuantumCoreBlock.GLOW, 6), false);
+        scene.idle(10);
+        scene.effects().createRedstoneParticles(CORE_UPPER, 0xE23A3A, 20);
+        scene.effects().emitParticles(heart, scene.effects().simpleParticleEmitter(
+                ParticleTypes.SMOKE, util.vector().of(0, 0.08, 0)), 16f, 1);
+        scene.world().modifyBlock(CORE_UPPER, s -> s.setValue(QuantumCoreBlock.GLOW, 0), false);
+        scene.idle(12);
     }
 }

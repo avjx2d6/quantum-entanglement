@@ -261,13 +261,11 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
                 }
             }
             case CRESCENDO -> {
-                if (core.phaseAge == 1) {
-                    core.setGlow(serverLevel, 1);
-                } else if (core.phaseAge == CRESCENDO_TICKS / 3) {
-                    core.setGlow(serverLevel, 2);
-                } else if (core.phaseAge == 2 * CRESCENDO_TICKS / 3) {
-                    core.setGlow(serverLevel, 3);
-                }
+                // Smooth light ramp: 0 → 15 across the crescendo, one level at a
+                // time (setGlow no-ops when the level is unchanged, so this is at
+                // most 15 block updates over the whole phase).
+                int targetGlow = Math.min(15, (int) ((long) core.phaseAge * 15 / CRESCENDO_TICKS));
+                core.setGlow(serverLevel, targetGlow);
                 if (core.phaseAge >= CRESCENDO_TICKS) {
                     int result = core.performRitual(serverLevel, true);
                     core.shard = ItemStack.EMPTY; // burned: the rules are taught, not refunded
@@ -328,7 +326,7 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         setChanged();
     }
 
-    /** Light emission steps up with the crescendo (GLOW blockstate on both halves). */
+    /** Light emission for the crescendo ramp (GLOW blockstate 0..15 on both halves). */
     private void setGlow(ServerLevel level, int glow) {
         for (BlockPos pos : new BlockPos[]{worldPosition, worldPosition.above()}) {
             BlockState state = level.getBlockState(pos);

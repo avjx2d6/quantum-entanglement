@@ -27,12 +27,19 @@
   "quantumitems.ponder.create.header": "Creating a Network",
   "quantumitems.ponder.create.text_1": "Lay a single stack of items on just one Resonator",
   "quantumitems.ponder.create.text_2": "Then place a Quantum Shard on the Core to start the ritual",
-  "quantumitems.ponder.create.text_3": "One Shard turns that stack into two entangled stacks",
-  "quantumitems.ponder.create.text_4": "The Shard is used up whether the ritual succeeds or fails",
+  "quantumitems.ponder.create.text_3": "While it runs, the ritual pulls experience from nearby players",
+  "quantumitems.ponder.create.text_4": "One Shard turns that stack into two entangled stacks",
+  "quantumitems.ponder.create.text_5": "The Shard is used up whether the ritual succeeds or fails",
 
   "quantumitems.ponder.expand.header": "Growing a Network",
   "quantumitems.ponder.expand.text_1": "To grow a network, first lay out every stack it already has",
   "quantumitems.ponder.expand.text_2": "Then run the ritual again with another Shard",
   "quantumitems.ponder.expand.text_3": "Each ritual entangles one more stack into the network",
-  "quantumitems.ponder.expand.text_4": "Growing needs an empty Resonator, so four stacks is the limit"
+  "quantumitems.ponder.expand.text_4": "Growing needs an empty Resonator, so four stacks is the limit",
+
+  "quantumitems.ponder.failure.header": "When the Ritual Fails",
+  "quantumitems.ponder.failure.text_1": "The ritual is strict - mixed or mismatched stacks are a mistake",
+  "quantumitems.ponder.failure.text_2": "Start it anyway, and the circle rejects the pattern",
+  "quantumitems.ponder.failure.text_3": "It ends in a loud collapse - the Shard is spent, the items untouched",
+  "quantumitems.ponder.failure.text_4": "Empty pedestals, stray stacks, or a network not fully laid out fail the same way"
 }

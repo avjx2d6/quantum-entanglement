@@ -40,9 +40,9 @@ import javax.annotation.Nullable;
  */
 public class QuantumCoreBlock extends Block implements EntityBlock {
     public static final EnumProperty<DoubleBlockHalf> HALF = BlockStateProperties.DOUBLE_BLOCK_HALF;
-    /** Emitted light steps up with the ritual crescendo (0..3 → light 0/5/10/15). */
+    /** Emitted light rises with the ritual crescendo (0..15 = light level, ramped smoothly). */
     public static final net.minecraft.world.level.block.state.properties.IntegerProperty GLOW =
-            net.minecraft.world.level.block.state.properties.IntegerProperty.create("glow", 0, 3);
+            net.minecraft.world.level.block.state.properties.IntegerProperty.create("glow", 0, 15);
 
     private static final VoxelShape SHAPE_LOWER = Shapes.or(
             Block.box(0, 0, 0, 16, 3, 16),

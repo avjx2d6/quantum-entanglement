@@ -66,7 +66,7 @@ public final class ModRegistry {
                             .strength(4.0f, 1200.0f)
                             .requiresCorrectToolForDrops()
                             .noOcclusion()
-                            .lightLevel(state -> state.getValue(com.quantumitems.block.QuantumCoreBlock.GLOW) * 5)
+                            .lightLevel(state -> state.getValue(com.quantumitems.block.QuantumCoreBlock.GLOW))
                             .sound(SoundType.METAL));
 
     public static final DeferredBlock<ResonatorBlock> RESONATOR =
