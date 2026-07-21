@@ -1,0 +1,18 @@
+{
+  "parent": "quantumitems:entanglement/shard",
+  "display": {
+    "icon": { "id": "quantumitems:quantum_core" },
+    "title": { "translate": "advancement.quantumitems.entangled.title" },
+    "description": { "translate": "advancement.quantumitems.entangled.description" },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "trigger": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "requirements": [ [ "trigger" ] ]
+}

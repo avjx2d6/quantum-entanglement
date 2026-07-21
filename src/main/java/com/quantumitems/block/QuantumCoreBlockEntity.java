@@ -96,6 +96,11 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
     private ItemStack shard = ItemStack.EMPTY;
     /** Corner index (0..3) the dry-run picked for the new window; -1 = none. */
     private int plannedOutputCorner = -1;
+    /** Who lit this ritual (for advancements); resolved at the outcome. */
+    @Nullable
+    private java.util.UUID launcherId;
+    /** Members in the network after the last successful apply (for the quartet advancement). */
+    private int lastRitualMemberCount;
 
     public QuantumCoreBlockEntity(BlockPos pos, BlockState state) {
         super(ModRegistry.QUANTUM_CORE_BE.get(), pos, state);
@@ -180,6 +185,10 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
      * retrievable with an empty hand.
      */
     public boolean placeShard(ItemStack shardStack) {
+        return placeShard(shardStack, null);
+    }
+
+    public boolean placeShard(ItemStack shardStack, @Nullable net.minecraft.world.entity.player.Player igniter) {
         if (level == null || level.isClientSide || phase != Phase.IDLE || !shard.isEmpty()
                 || !shardStack.is(ModRegistry.QUANTUM_SHARD.get())) {
             return false;
@@ -189,6 +198,7 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
             phase = Phase.CONNECTING;
             phaseAge = 0;
             plannedOutputCorner = -1;
+            launcherId = igniter != null ? igniter.getUUID() : null;
             level.playSound(null, worldPosition, SoundEvents.AMETHYST_BLOCK_RESONATE, SoundSource.BLOCKS, 1.0f, 0.8f);
         } else {
             level.playSound(null, worldPosition, SoundEvents.AMETHYST_BLOCK_PLACE, SoundSource.BLOCKS, 0.7f, 1.2f);
@@ -274,10 +284,12 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
                     if (result >= 0) {
                         core.burst(serverLevel);
                         core.enterPhase(Phase.SUCCESS);
+                        core.awardSuccess(serverLevel);
                     } else {
                         // the locked circle should make this impossible; fail honestly if it happens
                         serverLevel.playSound(null, pos, ModRegistry.RITUAL_CANCEL.get(), SoundSource.BLOCKS, 2.5f, 0.95f);
                         core.enterPhase(Phase.FAILURE);
+                        core.awardFailure(serverLevel);
                     }
                 }
             }
@@ -303,6 +315,31 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         releaseClaimedOrbs(level);
         level.playSound(null, worldPosition, ModRegistry.RITUAL_CANCEL.get(), SoundSource.BLOCKS, 2.5f, 0.95f);
         enterPhase(Phase.FAILURE);
+        awardFailure(level);
+    }
+
+    @Nullable
+    private net.minecraft.server.level.ServerPlayer launcher(ServerLevel level) {
+        return launcherId != null ? level.getServer().getPlayerList().getPlayer(launcherId) : null;
+    }
+
+    private void awardSuccess(ServerLevel level) {
+        net.minecraft.server.level.ServerPlayer player = launcher(level);
+        if (player != null) {
+            com.quantumitems.QuantumAdvancements.award(player, com.quantumitems.QuantumAdvancements.ENTANGLED);
+            if (lastRitualMemberCount >= QuantumNetworks.MAX_MEMBERS) {
+                com.quantumitems.QuantumAdvancements.award(player, com.quantumitems.QuantumAdvancements.QUARTET);
+            }
+        }
+        launcherId = null;
+    }
+
+    private void awardFailure(ServerLevel level) {
+        net.minecraft.server.level.ServerPlayer player = launcher(level);
+        if (player != null) {
+            com.quantumitems.QuantumAdvancements.award(player, com.quantumitems.QuantumAdvancements.YOUR_OWN_FAULT);
+        }
+        launcherId = null;
     }
 
     /** Beam lines explode outward, one sharp crack, then darkness. */
@@ -563,6 +600,7 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
             }
             QuantumDebug.log(level.getServer(), "ritual created net#" + networkId + " "
                     + input.getItem() + " x" + input.getCount() + " members[1, 2]");
+            lastRitualMemberCount = 2;
             return outputCorner;
         }
 
@@ -608,6 +646,7 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         engine.adopt(newWindow);
         engine.trackHolder(newWindow, target);
         QuantumDebug.log(level.getServer(), "ritual expanded net#" + first.networkId() + " +member " + member);
+        lastRitualMemberCount = network.aliveMembers.size();
         return outputCorner;
     }
 
@@ -622,6 +661,10 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         if (!shard.isEmpty()) {
             tag.put("shard", shard.save(registries));
         }
+        tag.putInt("lastMembers", lastRitualMemberCount);
+        if (launcherId != null) {
+            tag.putUUID("launcher", launcherId);
+        }
     }
 
     @Override
@@ -631,6 +674,8 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         phaseAge = tag.getInt("phaseAge");
         plannedOutputCorner = tag.contains("plannedOutput") ? tag.getInt("plannedOutput") : -1;
         shard = tag.contains("shard") ? ItemStack.parseOptional(registries, tag.getCompound("shard")) : ItemStack.EMPTY;
+        lastRitualMemberCount = tag.getInt("lastMembers");
+        launcherId = tag.hasUUID("launcher") ? tag.getUUID("launcher") : null;
     }
 
     @Override

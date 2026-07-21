@@ -1,0 +1,19 @@
+{
+  "display": {
+    "icon": { "id": "quantumitems:quantum_shard" },
+    "title": { "translate": "advancement.quantumitems.shard.title" },
+    "description": { "translate": "advancement.quantumitems.shard.description" },
+    "frame": "task",
+    "background": "minecraft:textures/block/deepslate.png",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "obtained": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": { "items": [ { "items": "quantumitems:quantum_shard" } ] }
+    }
+  },
+  "requirements": [ [ "obtained" ] ]
+}

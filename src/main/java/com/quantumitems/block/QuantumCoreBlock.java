@@ -170,7 +170,7 @@ public class QuantumCoreBlock extends Block implements EntityBlock {
                     net.minecraft.sounds.SoundSource.PLAYERS, 0.2f, 1.0f + level.getRandom().nextFloat());
             return ItemInteractionResult.SUCCESS;
         }
-        return core.placeShard(heldStack) ? ItemInteractionResult.SUCCESS : ItemInteractionResult.FAIL;
+        return core.placeShard(heldStack, player) ? ItemInteractionResult.SUCCESS : ItemInteractionResult.FAIL;
     }
 
     @Override

@@ -41,5 +41,16 @@
   "quantumitems.ponder.failure.text_1": "Ритуал придирчив - смешанные или несовпадающие стаки это ошибка",
   "quantumitems.ponder.failure.text_2": "Запустите всё равно - и круг отвергнет узор",
   "quantumitems.ponder.failure.text_3": "Всё кончается громким крахом - осколок потрачен, предметы нетронуты",
-  "quantumitems.ponder.failure.text_4": "Пустые резонаторы, лишние стаки или не все окна сети проваливают так же"
+  "quantumitems.ponder.failure.text_4": "Пустые резонаторы, лишние стаки или не все окна сети проваливают так же",
+
+  "advancement.quantumitems.shard.title": "Осколок оттуда",
+  "advancement.quantumitems.shard.description": "Найдите квантовый осколок там, где древний город спит во тьме",
+  "advancement.quantumitems.eye.title": "Сквозное око",
+  "advancement.quantumitems.eye.description": "Скрафтите Сквозное око",
+  "advancement.quantumitems.entangled.title": "Запутанность",
+  "advancement.quantumitems.entangled.description": "Проведите ритуал и создайте свою первую сеть",
+  "advancement.quantumitems.quartet.title": "Квартет",
+  "advancement.quantumitems.quartet.description": "Разрастите сеть до полных четырёх окон",
+  "advancement.quantumitems.your_own_fault.title": "Сам виноват",
+  "advancement.quantumitems.your_own_fault.description": "Провалите ритуал и сожгите осколок впустую"
 }

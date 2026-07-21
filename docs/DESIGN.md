@@ -456,3 +456,14 @@ R . . . R
 ### G.8 Ponder — уточнение подачи (автор)
 
 Одна **объёмная сцена-storyboard для всех предметов мода**, разбитая на несколько под-сцен/глав (Ponder это позволяет), и все предметы мода вызывают один и тот же storyboard. В сцену включить правила ритуала (в т.ч. «шард сгорает и при провале»), т.к. игрок обязан их знать до использования.
+
+### H. Достижения (0.4.14)
+
+Ветка `entanglement` (таб-фон дипслейт), 5 продвижений:
+1. **«Осколок оттуда»** / Shard of Elsewhere — root, `inventory_changed` на квантовый осколок.
+2. **«Сквозное око»** / Eye of Elsewhere — `inventory_changed` на око.
+3. **«Запутанность»** / Entangled — goal, выдаётся кодом на УСПЕХЕ ритуала.
+4. **«Квартет»** / Quartet — challenge, кодом на успехе, если сеть достигла 4 членов.
+5. **«Сам виноват»** / Your Own Fault — скрытое, кодом на ПРОВАЛЕ ритуала.
+
+Три код-достижения: JSON с `minecraft:impossible`-критерием (имя «trigger»), выдача `PlayerAdvancements.award(holder, "trigger")` из фазовой машины ядра. Игрок-инициатор запоминается по UUID в `placeShard(stack, player)` при запуске (persist в NBT), резолвится в `getPlayerList().getPlayer(uuid)` на исходе; `lastRitualMemberCount` пишется в apply-ветках performRitual для квартета. #3 «первый запуск» отброшен (дублировал бы успех/провал за один запуск). Хелпер `QuantumAdvancements`. Data-папка singular: `data/quantumitems/advancement/entanglement/`.

@@ -41,5 +41,16 @@
   "quantumitems.ponder.failure.text_1": "The ritual is strict - mixed or mismatched stacks are a mistake",
   "quantumitems.ponder.failure.text_2": "Start it anyway, and the circle rejects the pattern",
   "quantumitems.ponder.failure.text_3": "It ends in a loud collapse - the Shard is spent, the items untouched",
-  "quantumitems.ponder.failure.text_4": "Empty pedestals, stray stacks, or a network not fully laid out fail the same way"
+  "quantumitems.ponder.failure.text_4": "Empty pedestals, stray stacks, or a network not fully laid out fail the same way",
+
+  "advancement.quantumitems.shard.title": "Shard of Elsewhere",
+  "advancement.quantumitems.shard.description": "Find a Quantum Shard where the old city sleeps in the dark",
+  "advancement.quantumitems.eye.title": "Eye of Elsewhere",
+  "advancement.quantumitems.eye.description": "Craft an Eye of Elsewhere",
+  "advancement.quantumitems.entangled.title": "Entangled",
+  "advancement.quantumitems.entangled.description": "Complete a ritual and entangle your first network",
+  "advancement.quantumitems.quartet.title": "Quartet",
+  "advancement.quantumitems.quartet.description": "Grow a network to its full four windows",
+  "advancement.quantumitems.your_own_fault.title": "Your Own Fault",
+  "advancement.quantumitems.your_own_fault.description": "Botch a ritual and burn a Shard for nothing"
 }
