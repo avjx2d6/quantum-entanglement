@@ -435,4 +435,49 @@ public class RitualGameTests {
         }
         helper.succeed();
     }
+
+    /** A successful ritual awards the igniter the "entangled" advancement. */
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 450)
+    public void ritualSuccessAwardsEntangled(GameTestHelper helper) {
+        buildCircle(helper);
+        net.minecraft.server.level.ServerPlayer player = helper.makeMockServerPlayerInLevel();
+        resonator(helper, 0).setItem(0, new ItemStack(Items.BREAD, 20));
+        core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()), player);
+        helper.runAfterDelay(APPLY_TICKS + 10, () -> {
+            if (!hasAdvancement(helper, player, "entanglement/entangled")) {
+                helper.fail("Ritual success must award the entangled advancement to the igniter");
+            }
+            if (hasAdvancement(helper, player, "entanglement/your_own_fault")) {
+                helper.fail("A success must not award the failure advancement");
+            }
+            helper.succeed();
+        });
+    }
+
+    /** A failed ritual (two mismatched inputs) awards the hidden failure advancement. */
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 300)
+    public void ritualFailureAwardsYourOwnFault(GameTestHelper helper) {
+        buildCircle(helper);
+        net.minecraft.server.level.ServerPlayer player = helper.makeMockServerPlayerInLevel();
+        resonator(helper, 0).setItem(0, new ItemStack(Items.GOLD_INGOT, 16));
+        resonator(helper, 1).setItem(0, new ItemStack(Items.IRON_INGOT, 16)); // mismatch → fail
+        core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()), player);
+        // failure lands at the scan verdict (~CONNECTING+SCANNING); give it room
+        helper.runAfterDelay(QuantumCoreBlockEntity.ticksUntilCancel() + 20, () -> {
+            if (!hasAdvancement(helper, player, "entanglement/your_own_fault")) {
+                helper.fail("Ritual failure must award the your_own_fault advancement");
+            }
+            if (hasAdvancement(helper, player, "entanglement/entangled")) {
+                helper.fail("A failure must not award the entangled advancement");
+            }
+            helper.succeed();
+        });
+    }
+
+    private static boolean hasAdvancement(GameTestHelper helper,
+                                          net.minecraft.server.level.ServerPlayer player, String path) {
+        net.minecraft.advancements.AdvancementHolder holder = helper.getLevel().getServer().getAdvancements()
+                .get(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(QuantumItemsMod.MOD_ID, path));
+        return holder != null && player.getAdvancements().getOrStartProgress(holder).isDone();
+    }
 }
