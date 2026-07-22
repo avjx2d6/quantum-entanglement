@@ -1,7 +1,7 @@
 modLoader = "javafml"
 loaderVersion = "[4,)"
 license = "MIT"
-issueTrackerURL = "https://github.com/avjx2d6/quantumitems/issues"
+issueTrackerURL = "https://github.com/avjx2d6/quantum-entanglement/issues"
 
 [[mixins]]
 config = "quantumitems.mixins.json"
@@ -10,7 +10,7 @@ config = "quantumitems.mixins.json"
 modId = "quantumitems"
 version = "${mod_version}"
 displayName = "Quantum Entanglement"
-displayURL = "https://github.com/avjx2d6/quantumitems"
+displayURL = "https://github.com/avjx2d6/quantum-entanglement"
 logoFile = "logo.png"
 description = '''Entangle item stacks into quantum networks that share a single pool of items across any distance.'''
 authors = "avjx2d6"
