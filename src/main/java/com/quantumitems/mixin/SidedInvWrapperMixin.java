@@ -1,7 +1,6 @@
 package com.quantumitems.mixin;
 
-import com.quantumitems.ModRegistry;
-import com.quantumitems.engine.QuantumEngine;
+import com.quantumitems.engine.WindowSlotOps;
 import net.minecraft.core.Direction;
 import net.minecraft.world.WorldlyContainer;
 import net.minecraft.world.item.ItemStack;
@@ -15,12 +14,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * The sided-container counterpart of {@link InvWrapperMixin}. Furnaces, brewing
- * stands and any {@link WorldlyContainer} machine expose their slots through
- * {@code SidedInvWrapper}, whose {@code insertItem} has the same overwrite bug:
- * a merge replaces the slot with a copy of the incoming stack, erasing a window
- * that lives there. So feeding plain into a window in, say, a furnace input
- * slot would destroy the link. Absorb the plain into the pool instead, honouring
- * the same face/placement checks vanilla would.
+ * stands, composters and any {@link WorldlyContainer} machine expose their slots
+ * through {@code SidedInvWrapper}. Same window rules ({@link WindowSlotOps}),
+ * plus the two things that are genuinely sided: the slot has to be resolved for
+ * the face, and the face itself may refuse the item.
  */
 @Mixin(value = SidedInvWrapper.class, remap = false)
 public abstract class SidedInvWrapperMixin {
@@ -33,79 +30,38 @@ public abstract class SidedInvWrapperMixin {
     @Final
     protected Direction side;
 
-    /** Rule 2 for sided extraction: plain probes, plain partials, cash-out on whole takes. */
+    @Shadow
+    public abstract int getSlotLimit(int slot);
+
     @Inject(method = "extractItem", at = @At("HEAD"), cancellable = true)
     private void quantumitems$extractFromWindow(int slot, int amount, boolean simulate,
                                                 CallbackInfoReturnable<ItemStack> cir) {
-        if (amount <= 0) {
-            return;
-        }
-        QuantumEngine engine = QuantumEngine.onServerThread();
-        if (engine == null) {
-            return;
-        }
         int slot1 = SidedInvWrapper.getSlot(inv, slot, side);
         if (slot1 == -1) {
             return;
         }
-        ItemStack inSlot = inv.getItem(slot1);
-        if (!inSlot.has(ModRegistry.QUANTUM_LINK.get())) {
-            return;
-        }
-        if (side != null && !inv.canTakeItemThroughFace(slot1, inSlot, side)) {
+        if (side != null && !inv.canTakeItemThroughFace(slot1, inv.getItem(slot1), side)) {
             return; // the face refuses — vanilla returns EMPTY anyway
         }
-        if (engine.reconcile(inSlot) != QuantumEngine.Status.CANONICAL) {
-            return;
-        }
-        engine.trackHolder(inSlot, inv);
-        int taking = Math.min(inSlot.getCount(), amount);
-        if (simulate) {
-            ItemStack probe = inSlot.copyWithCount(taking);
-            probe.remove(ModRegistry.QUANTUM_LINK.get());
-            cir.setReturnValue(probe);
-            return;
-        }
-        if (taking >= inSlot.getCount()) {
-            engine.cashOutToPlain(inSlot); // full extraction: plain out, network ends
+        ItemStack result = WindowSlotOps.extract(inv, slot1, amount, simulate);
+        if (result != null) {
+            cir.setReturnValue(result);
         }
     }
 
     @Inject(method = "insertItem", at = @At("HEAD"), cancellable = true)
     private void quantumitems$insertIntoWindow(int slot, ItemStack stack, boolean simulate,
                                                CallbackInfoReturnable<ItemStack> cir) {
-        QuantumEngine engine = QuantumEngine.onServerThread();
-        if (engine == null || stack.isEmpty() || stack.has(ModRegistry.QUANTUM_LINK.get())) {
-            return; // only plain items flowing into a window slot are special
-        }
         int slot1 = SidedInvWrapper.getSlot(inv, slot, side);
         if (slot1 == -1) {
             return;
         }
-        ItemStack inSlot = inv.getItem(slot1);
-        if (!inSlot.has(ModRegistry.QUANTUM_LINK.get())) {
-            return; // ordinary slot: let vanilla insertion run
-        }
-        if (!inv.canPlaceItemThroughFace(slot1, stack, side) || !inv.canPlaceItem(slot1, stack)) {
+        if (!stack.isEmpty() && !inv.canPlaceItemThroughFace(slot1, stack, side)) {
             return; // the face rejects it — vanilla would refuse too
         }
-        if (engine.reconcile(inSlot) != QuantumEngine.Status.CANONICAL) {
-            return; // wiped/collapsed in place — it is plain now, vanilla handles it
+        ItemStack result = WindowSlotOps.insert(inv, slot1, stack, simulate, getSlotLimit(slot));
+        if (result != null) {
+            cir.setReturnValue(result);
         }
-        int room = Math.min(stack.getCount(), inSlot.getMaxStackSize() - inSlot.getCount());
-        if (room <= 0) {
-            cir.setReturnValue(stack); // pool is full: nothing inserted
-            return;
-        }
-        if (simulate) {
-            cir.setReturnValue(stack.getCount() > room ? stack.copyWithCount(stack.getCount() - room) : ItemStack.EMPTY);
-            return;
-        }
-        engine.trackHolder(inSlot, inv); // before absorb: the push must notify this holder too
-        ItemStack remainder = stack.copy();
-        if (engine.absorb(inSlot, remainder, room) > 0) {
-            inv.setChanged(); // vanilla insertion would have marked the target changed
-        }
-        cir.setReturnValue(remainder.isEmpty() ? ItemStack.EMPTY : remainder);
     }
 }

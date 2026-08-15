@@ -193,7 +193,31 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
                 || !shardStack.is(ModRegistry.QUANTUM_SHARD.get())) {
             return false;
         }
-        shard = shardStack.split(1);
+        // Shards stack, so they can be entangled — and the field below is a
+        // plain field, not a Container: a window parked there is invisible to
+        // every sweep and holder scan, and burning the shard just clears the
+        // field, so the pool (and its siblings) would survive a shard the
+        // ritual already consumed. The core takes shards the way automation
+        // does: always plain. A whole take ends the network honestly first,
+        // otherwise split() would relocate the window into the field.
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        if (engine != null && shardStack.has(ModRegistry.QUANTUM_LINK.get())) {
+            // reconcile first: it heals the count to the pool, so the whole-take
+            // test below is made against the real pool and never against a
+            // transient copy's stale count
+            if (engine.reconcile(shardStack) == QuantumEngine.Status.CANONICAL
+                    && shardStack.getCount() <= 1) {
+                engine.cashOutToPlain(shardStack);
+            }
+            if (!shardStack.is(ModRegistry.QUANTUM_SHARD.get())) {
+                return false; // husk of a dead network: reconcile wiped it, nothing to place
+            }
+        }
+        ItemStack taken = shardStack.split(1);
+        if (taken.isEmpty()) {
+            return false;
+        }
+        shard = taken;
         if (isStructureValid()) {
             phase = Phase.CONNECTING;
             phaseAge = 0;

@@ -32,6 +32,10 @@ public abstract class BundleContentsMutableMixin {
         if (stack.isEmpty() || !stack.has(ModRegistry.QUANTUM_LINK.get())) {
             return;
         }
+        if (!stack.getItem().canFitInsideContainerItems()) {
+            return; // vanilla refuses this item outright and moves nothing;
+                    // dissolving the network for a no-op gesture would be theft
+        }
         if (quantumitems$maxAmountToAdd(stack) < stack.getCount()) {
             return; // partial insert: split -> plain, already honest
         }

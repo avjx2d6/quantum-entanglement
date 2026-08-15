@@ -2,7 +2,6 @@ package com.quantumitems.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
-import com.quantumitems.ModRegistry;
 import com.quantumitems.block.QuantumCoreBlockEntity;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LevelRenderer;
@@ -73,15 +72,14 @@ public class QuantumCoreRenderer implements BlockEntityRenderer<QuantumCoreBlock
         // crescendo, wind-down in the aftermath, lazy drift when inert.
         float slowEnd = 2.0f * (QuantumCoreBlockEntity.CONNECTING_TICKS
                 + QuantumCoreBlockEntity.SCANNING_TICKS + QuantumCoreBlockEntity.JUDGEMENT_TICKS);
-        float crescendoEnd = slowEnd + 4.0f * QuantumCoreBlockEntity.CRESCENDO_TICKS
-                + 13.0f * QuantumCoreBlockEntity.CRESCENDO_TICKS;
+        // No SUCCESS/FAILURE arm: both are entered only after the shard has
+        // already been burned (tick() and cancelRitual() clear it first), so
+        // the early return above fires and there is nothing left to spin.
         float angle = switch (core.phase()) {
             case CONNECTING, SCANNING, JUDGEMENT ->
                     2.0f * (QuantumCoreBlockEntity.phaseOffset(core.phase()) + age);
             case CRESCENDO -> slowEnd + 4.0f * age
                     + 13.0f * age * age / QuantumCoreBlockEntity.CRESCENDO_TICKS;
-            case SUCCESS, FAILURE -> crescendoEnd + 30.0f * age
-                    - 15.0f * age * age / QuantumCoreBlockEntity.SUCCESS_TICKS;
             default -> time * 1.5f; // inert shard on an unfinished machine: lazy drift
         };
         int light = LevelRenderer.getLightColor(core.getLevel(), core.getBlockPos().above());

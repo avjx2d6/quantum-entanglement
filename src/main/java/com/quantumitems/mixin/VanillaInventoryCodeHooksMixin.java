@@ -2,6 +2,7 @@ package com.quantumitems.mixin;
 
 import com.quantumitems.ModRegistry;
 import com.quantumitems.engine.QuantumEngine;
+import com.quantumitems.engine.WindowSlotOps;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.ItemStack;
@@ -93,8 +94,7 @@ public abstract class VanillaInventoryCodeHooksMixin {
 
     /** Would the hopper accept one plain copy of this window's item right now? */
     private static boolean quantumitems$destHasRoom(Hopper dest, ItemStack window) {
-        ItemStack plain = window.copyWithCount(1);
-        plain.remove(ModRegistry.QUANTUM_LINK.get());
+        ItemStack plain = WindowSlotOps.plainProbe(window, 1);
         for (int j = 0; j < dest.getContainerSize(); j++) {
             ItemStack destStack = dest.getItem(j);
             if (!dest.canPlaceItem(j, plain)) {
@@ -192,9 +192,7 @@ public abstract class VanillaInventoryCodeHooksMixin {
 
     /** One plain item of a window's kind — automation only ever moves plain. */
     private static ItemStack quantumitems$plainProbe(ItemStack window) {
-        ItemStack probe = window.copyWithCount(1);
-        probe.remove(ModRegistry.QUANTUM_LINK.get());
-        return probe;
+        return WindowSlotOps.plainProbe(window, 1);
     }
 
     private static boolean quantumitems$push(QuantumEngine engine, HopperBlockEntity hopper, IItemHandler handler) {

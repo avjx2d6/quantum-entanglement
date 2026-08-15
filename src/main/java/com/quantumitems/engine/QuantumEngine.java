@@ -521,6 +521,12 @@ public final class QuantumEngine {
      * A window's item entity was destroyed (despawn, lava, cactus, void).
      * The member retires; the pool is untouched — a window burned, not the
      * items. If it was the last window, the pool dies with it.
+     *
+     * <p>No production path reaches this today: Rule 1 ({@code onEntityJoin})
+     * cashes a window out to plain the instant it would become a free item, so
+     * no window can die as an ItemEntity. It is kept as the engine's model of
+     * member retirement — the gametests drive it directly — but do not read
+     * green tests here as coverage of a live path.
      */
     public void windowDestroyed(ItemStack stack) {
         QuantumLinkData link = stack.get(ModRegistry.QUANTUM_LINK.get());

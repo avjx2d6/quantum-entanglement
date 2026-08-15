@@ -34,6 +34,14 @@ public final class ClientEvents {
 
     @EventBusSubscriber(modid = QuantumItemsMod.MOD_ID, value = Dist.CLIENT)
     public static final class GameBus {
+        /** Leaving a world: drop the client-side hum instances (see {@link RitualHumSound#forgetAll()}). */
+        @SubscribeEvent
+        public static void onLevelUnload(net.neoforged.neoforge.event.level.LevelEvent.Unload event) {
+            if (event.getLevel().isClientSide()) {
+                RitualHumSound.forgetAll();
+            }
+        }
+
         @SubscribeEvent
         public static void onItemTooltip(ItemTooltipEvent event) {
             var stack = event.getItemStack();

@@ -1,5 +1,6 @@
 package com.quantumitems;
 
+import com.quantumitems.engine.ActiveRitualCores;
 import com.quantumitems.engine.QuantumEngine;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -42,6 +43,19 @@ public final class ServerEvents {
     @SubscribeEvent
     public static void onServerStopped(ServerStoppedEvent event) {
         QuantumEngine.stop();
+        ActiveRitualCores.clear();
+    }
+
+    /**
+     * The active-core registry is static and reported by BOTH sides, so it
+     * outlives the level that filled it — including a ClientLevel dropped at
+     * the title screen, which never unloads its chunks. Clear it per level.
+     */
+    @SubscribeEvent
+    public static void onLevelUnload(net.neoforged.neoforge.event.level.LevelEvent.Unload event) {
+        if (event.getLevel() instanceof net.minecraft.world.level.Level level) {
+            ActiveRitualCores.clear(level.dimension());
+        }
     }
 
     /** Reconcile the whole inventory (plus ender chest) when a player logs in. */

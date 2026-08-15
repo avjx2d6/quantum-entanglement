@@ -33,8 +33,21 @@ public final class ActiveRitualCores {
         }
     }
 
-    public static boolean nearActiveCore(Level level, Vec3 position) {
-        return nearestActiveCore(level, position) != null;
+    /**
+     * Forgets a dimension's cores because its level is going away. Nothing in
+     * the level's own lifecycle does this: a client quitting to the title
+     * drops its ClientLevel without unloading chunks, so the block entities
+     * never report themselves inactive and the positions would haunt the next
+     * world opened under the same dimension key — steering its orbs at empty
+     * air forever.
+     */
+    public static void clear(ResourceKey<Level> dimension) {
+        CORES.remove(dimension);
+    }
+
+    /** Forgets everything; the server (and with it every dimension) is gone. */
+    public static void clear() {
+        CORES.clear();
     }
 
     /** The closest running core within pull radius, or null. */

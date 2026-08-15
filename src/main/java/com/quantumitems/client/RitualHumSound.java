@@ -34,12 +34,25 @@ public class RitualHumSound extends AbstractTickableSoundInstance {
         }
         BlockPos pos = core.getBlockPos();
         RitualHumSound existing = ACTIVE.get(pos);
-        if (existing != null && !existing.isStopped()) {
+        // Compare the block entity, not just the position: the same x/y/z in
+        // another dimension is a different core, and a stale entry there would
+        // suppress its hum forever.
+        if (existing != null && existing.core == core && !existing.isStopped()) {
             return;
         }
         RitualHumSound sound = new RitualHumSound(core);
         ACTIVE.put(pos, sound);
         Minecraft.getInstance().getSoundManager().play(sound);
+    }
+
+    /**
+     * Leaving a world. Entries are otherwise only dropped by {@link #tick()},
+     * which the sound manager stops calling the moment it discards the
+     * instance — so a hum playing at disconnect would strand its entry, and
+     * with it a strong reference to the block entity and its whole Level.
+     */
+    public static void forgetAll() {
+        ACTIVE.clear();
     }
 
     private static boolean humPhase(QuantumCoreBlockEntity.Phase phase) {

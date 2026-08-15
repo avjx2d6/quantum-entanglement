@@ -2,6 +2,7 @@ package com.quantumitems.mixin;
 
 import com.quantumitems.ModRegistry;
 import com.quantumitems.engine.QuantumEngine;
+import com.quantumitems.engine.WindowSlotOps;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.ItemStackHandler;
 import org.spongepowered.asm.mixin.Mixin;
@@ -51,9 +52,7 @@ public abstract class ItemStackHandlerMixin {
         }
         int taking = Math.min(existing.getCount(), Math.min(amount, existing.getMaxStackSize()));
         if (simulate) {
-            ItemStack probe = existing.copyWithCount(taking);
-            probe.remove(ModRegistry.QUANTUM_LINK.get());
-            cir.setReturnValue(probe);
+            cir.setReturnValue(WindowSlotOps.plainProbe(existing, taking));
             return;
         }
         if (taking >= existing.getCount()) {

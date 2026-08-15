@@ -474,6 +474,82 @@ public class RitualGameTests {
         });
     }
 
+    /**
+     * Shards stack, so a player can entangle them and then commit a ritual
+     * with a shard WINDOW. The core's shard is a plain field, not a Container:
+     * a window parked there is invisible to every sweep, and burning it just
+     * clears the field — so the sibling window would keep handing out a shard
+     * the ritual already consumed. Taking the pool's LAST shard must end the
+     * network and leave a plain shard on the core.
+     */
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 100)
+    public void coreNeverHoldsAShardWindow(GameTestHelper helper) {
+        placeCore(helper, CORE); // no circle: the shard lies inert, no ritual to race
+        QuantumNetworks networks = QuantumNetworks.get(helper.getLevel().getServer());
+        ItemStack plain = new ItemStack(ModRegistry.QUANTUM_SHARD.get(), 1);
+        int id = networks.createNetwork(plain);
+        ItemStack held = makeWindow(helper, id, 1, plain);
+        ItemStack sibling = makeWindow(helper, id, 2, plain);
+
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        engine.beginPlayerGesture(); // right-clicking the core is a player gesture
+        try {
+            if (!core(helper).placeShard(held)) {
+                helper.fail("The core must accept a shard window");
+            }
+        } finally {
+            engine.endPlayerGesture();
+        }
+
+        ItemStack onCore = core(helper).displayedShard();
+        if (onCore.has(ModRegistry.QUANTUM_LINK.get())) {
+            helper.fail("The core must never hold a live window, got " + onCore);
+        }
+        if (!onCore.is(ModRegistry.QUANTUM_SHARD.get()) || onCore.getCount() != 1) {
+            helper.fail("The core must hold exactly one plain shard, got " + onCore);
+        }
+        if (networks.network(id) != null) {
+            helper.fail("Handing over the pool's last shard must end the network");
+        }
+        if (!sibling.isEmpty()) {
+            helper.fail("The sibling window must not outlive the pool it shared, got " + sibling);
+        }
+        helper.succeed();
+    }
+
+    /** A partial take off a shard pool stays a partial take: the window survives, minus one. */
+    @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 100)
+    public void coreTakesOnePlainShardFromAPool(GameTestHelper helper) {
+        placeCore(helper, CORE);
+        QuantumNetworks networks = QuantumNetworks.get(helper.getLevel().getServer());
+        ItemStack plain = new ItemStack(ModRegistry.QUANTUM_SHARD.get(), 4);
+        int id = networks.createNetwork(plain);
+        ItemStack held = makeWindow(helper, id, 1, plain);
+        ItemStack sibling = makeWindow(helper, id, 2, plain);
+
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        engine.beginPlayerGesture();
+        try {
+            core(helper).placeShard(held);
+        } finally {
+            engine.endPlayerGesture();
+        }
+
+        if (core(helper).displayedShard().has(ModRegistry.QUANTUM_LINK.get())) {
+            helper.fail("The core must hold a plain shard, not a window");
+        }
+        if (networks.network(id) == null || networks.network(id).pool != 3) {
+            helper.fail("Exactly one shard leaves the pool of 4");
+        }
+        if (!held.has(ModRegistry.QUANTUM_LINK.get()) || held.getCount() != 3) {
+            helper.fail("The hand keeps its window, now showing 3, got " + held);
+        }
+        if (sibling.getCount() != 3) {
+            helper.fail("The sibling window tracks the pool, got " + sibling);
+        }
+        helper.succeed();
+    }
+
     private static boolean hasAdvancement(GameTestHelper helper,
                                           net.minecraft.server.level.ServerPlayer player, String path) {
         net.minecraft.advancements.AdvancementHolder holder = helper.getLevel().getServer().getAdvancements()
