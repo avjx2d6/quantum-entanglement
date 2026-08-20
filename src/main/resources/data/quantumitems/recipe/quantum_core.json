@@ -2,11 +2,12 @@
   "type": "minecraft:crafting_shaped",
   "category": "misc",
   "pattern": [
-    "PPP",
-    "PBP",
+    "APA",
+    "ABA",
     "DDD"
   ],
   "key": {
+    "A": { "item": "minecraft:amethyst_shard" },
     "P": { "item": "minecraft:ender_pearl" },
     "B": { "item": "quantumitems:eye_of_elsewhere" },
     "D": { "item": "minecraft:polished_deepslate" }
