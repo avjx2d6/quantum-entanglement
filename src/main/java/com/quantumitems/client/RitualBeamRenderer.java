@@ -52,9 +52,12 @@ public final class RitualBeamRenderer {
             new BlockPos(-2, 0, -2), new BlockPos(2, 0, -2),
             new BlockPos(-2, 0, 2), new BlockPos(2, 0, 2)};
 
-    private static final int COLOR_CHARGE = 0xBF8CFF;
-    private static final int COLOR_INPUT = 0x59E6FF;
-    private static final int COLOR_OUTPUT = 0xFFD64D;
+    // Deeper than the pastels the dust used: additive blending already lifts a
+    // colour toward white, so the hue has to start saturated and low-value or
+    // the beam ends up as glare with no colour left in it.
+    private static final int COLOR_CHARGE = 0x8243E0;   // deep violet
+    private static final int COLOR_INPUT = 0x21BED9;    // deep cyan
+    private static final int COLOR_OUTPUT = 0xE0B01B;   // deep amber
 
     /** Deflection of one walk step, in blocks, before amplitude is applied. */
     private static final float WALK_UNIT = 0.085f;

@@ -31,11 +31,12 @@ public final class BeamTuning {
     /** Random walk kick per tick. */
     public static float spread = 0.7f;
     /**
-     * Overall brightness multiplier on top of the per-node shimmer. Additive
-     * blending makes an untouched colour read almost white against a dark
-     * circle; pulling this down gives the beam a body colour again.
+     * How hard the beam emits — intensity, not the lightness of the hue. With
+     * additive blending a full-strength beam washes out to white whatever its
+     * colour is; the colour's own darkness lives in the constants in
+     * {@link RitualBeamRenderer}.
      */
-    public static float brightness = 0.7f;
+    public static float brightness = 0.5f;
     /**
      * Line width in blocks. Segments are separate cuboids, so their end faces
      * meet at an angle at every node — the reference hides that by staying
