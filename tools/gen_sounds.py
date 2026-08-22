@@ -92,20 +92,27 @@ T = 2.6
 t = np.arange(int(SR * T)) / SR
 fsub = 95 * (24 / 95) ** np.clip(t / 1.1, 0, 1)
 sub = np.sin(2 * np.pi * np.cumsum(fsub) / SR) * np.exp(-t * 1.5) * 2.0
-# muffled impact: averaging 40 samples rolls off above roughly 1 kHz, and the
-# gain compensates for what that averaging takes out
-slam = np.convolve(rng.standard_normal(len(t)), np.ones(40) / 40, mode="same")
-slam *= np.exp(-t * 6) * np.clip(t / 0.02, 0, 1) * 5.0
+# Two layers off ONE noise draw. The body is heavily low-passed (40-sample
+# average, roughly a 1 kHz corner) and rings on for a while; the crack is only
+# gently rolled off (8 samples, ~5 kHz) and is gone in about 45 ms. A crack
+# that brief answers the riser without the ear having time to mind it — what
+# hurt before was broadband noise SUSTAINED, not the fact of a transient.
+slam_raw = rng.standard_normal(len(t))
+slam_body = np.convolve(slam_raw, np.ones(40) / 40, mode="same") \
+    * np.exp(-t * 6) * np.clip(t / 0.02, 0, 1) * 5.0
+slam_crack = np.convolve(slam_raw, np.ones(8) / 8, mode="same") \
+    * np.exp(-t * 22) * np.clip(t / 0.006, 0, 1) * 1.1
+slam = slam_body + slam_crack
 echo = np.zeros_like(t)
 shift = int(0.33 * SR)
 echo[shift:] = np.convolve(rng.standard_normal(len(t) - shift), np.ones(60) / 60, mode="same") \
     * np.exp(-t[:-shift] * 5) * 5.0
 # ring: a low partial added for body, the shrill top ones nearly gone
 ring = sum(a * np.sin(2 * np.pi * f * t) for f, a in
-           ((560, 0.45), (820, 0.38), (1370, 0.20), (2210, 0.07))) * np.exp(-t * 2.0)
+           ((560, 0.45), (820, 0.38), (1370, 0.22), (2210, 0.16), (3080, 0.06))) * np.exp(-t * 2.2)
 crackle = (rng.random(len(t)) < 0.002).astype(float) * rng.standard_normal(len(t)) * np.exp(-t * 1.5) * 0.35
 sig = sub + slam + echo + ring + crackle
-sig = np.tanh(sig * 1.15)  # gentler drive: less of the mix folded up into highs
+sig = np.tanh(sig * 1.3)  # gentler than the original 1.6, still with some bite
 sf.write(OUT + "ritual_burst.ogg", norm(sig, 0.62), SR, format="OGG", subtype="VORBIS")
 
 # --- cancel: an enormous machine slammed to a halt, 2.8s, deafening ---
