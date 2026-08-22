@@ -4,7 +4,6 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.quantumitems.QuantumItemsMod;
 import com.quantumitems.block.QuantumCoreBlockEntity;
 import com.quantumitems.engine.ActiveRitualCores;
-import net.createmod.catnip.outliner.LineOutline;
 import net.createmod.catnip.render.DefaultSuperRenderTypeBuffer;
 import net.createmod.catnip.render.SuperRenderTypeBuffer;
 import net.minecraft.client.Minecraft;
@@ -37,10 +36,10 @@ import java.util.Map;
  * renderer. A BER only runs while its own block is on screen, which made every
  * beam in the circle vanish the moment the core left the edge of view.
  *
- * <p>The line itself is Catnip's {@link LineOutline}: a real cuboid segment,
- * not a camera-facing strip. Billboards are what made the first attempt read as
- * panes of glass — each segment is a flat quad, and neighbouring segments that
- * move independently visibly overlap.
+ * <p>The line is a tube of shared rings, built here. Camera-facing strips read
+ * as panes of glass, and a cuboid per segment leaves a visible corner at every
+ * node where the two end faces meet at an angle — fine on a fast thin beam seen
+ * in first person, obvious on a slow one you can stand beside.
  *
  * <p>Both endpoints are fixed for the life of a circle, so every beam is
  * exactly the same length. That removes the adaptive node-count maths a
@@ -64,7 +63,8 @@ public final class RitualBeamRenderer {
     /** The shard inside the upper frame. */
     private static final double FOCUS_HEIGHT = 1.45;
 
-    private static final LineOutline LINE = new LineOutline();
+    /** Faces around the tube. Four reads chunky, eight is round; six sits between. */
+    private static final int SIDES = 6;
 
     private RitualBeamRenderer() {
     }
@@ -80,8 +80,8 @@ public final class RitualBeamRenderer {
 
         void resize(int n) {
             nodes = n;
-            cur = new float[4][n + 1][2];
-            prev = new float[4][n + 1][2];
+            cur = new float[4][n + 1][3];   // x, y across the beam; z = brightness
+            prev = new float[4][n + 1][3];
         }
 
         void step(RandomSource random, float decay, float spread) {
@@ -89,6 +89,11 @@ public final class RitualBeamRenderer {
                 for (int i = 0; i <= nodes; i++) {
                     prev[b][i][0] = cur[b][i][0];
                     prev[b][i][1] = cur[b][i][1];
+                    prev[b][i][2] = cur[b][i][2];
+                    // brightness wanders on its own everywhere, including the
+                    // pinned ends — vanilla dust varies every mote, and a beam
+                    // of one flat colour is what reads as painted plastic
+                    cur[b][i][2] = (cur[b][i][2] + (random.nextFloat() - 0.5f)) * 0.75f;
                     if (i == 0 || i == nodes) {
                         cur[b][i][0] = 0;
                         cur[b][i][1] = 0;
@@ -181,23 +186,22 @@ public final class RitualBeamRenderer {
         WalkState walk = advanceWalk(core, n);
         Vec3 focus = Vec3.atCenterOf(core.getBlockPos()).add(0, FOCUS_HEIGHT - 0.5, 0);
 
-        LINE.getParams()
-                .disableLineNormals()
-                .disableCull()
-                // full-bright: the beam emits, it is not a surface being lit.
-                // Without this it takes the world's light and reads as flat
-                // paint after dark instead of something glowing.
-                .lightmap(0xF000F0)
-                .lineWidth(Math.max(0.005f, BeamTuning.width) * (1.0f + ramp * 0.6f));
+        float radius = Math.max(0.005f, BeamTuning.width) * (1.0f + ramp * 0.6f) * 0.5f;
+        var consumer = buffer.getBuffer(QuantumRenderTypes.RITUAL_BEAM);
 
+        poseStack.pushPose();
+        poseStack.translate(-camera.x, -camera.y, -camera.z);
         for (int b = 0; b < lit; b++) {
             Vec3 from = Vec3.atBottomCenterOf(core.getBlockPos().offset(CORNERS[b])).add(0, RESONATOR_TOP, 0);
-            LINE.getParams().colored(colorFor(b, phase, recoloredCount));
             Vec3[] pts = buildBeam(walk, b, n, from, focus, partialTick, ampScale);
-            for (int i = 0; i < pts.length - 1; i++) {
-                LINE.set(pts[i], pts[i + 1]).render(poseStack, buffer, camera, partialTick);
+            float[] bright = new float[n + 1];
+            for (int i = 0; i <= n; i++) {
+                float w = Mth.lerp(partialTick, walk.prev[b][i][2], walk.cur[b][i][2]);
+                bright[i] = Mth.clamp(0.8f + w * 0.45f, 0.55f, 1.0f); // vanilla dust varies 0.6..1.0
             }
+            tube(poseStack, consumer, pts, bright, colorFor(b, phase, recoloredCount), radius);
         }
+        poseStack.popPose();
         return true;
     }
 
@@ -239,6 +243,68 @@ public final class RitualBeamRenderer {
             out[i] = from.add(to.subtract(from).scale(t)).add(u.scale(ox)).add(v.scale(oy));
         }
         return out;
+    }
+
+    /**
+     * A closed tube through the node path, built from rings that are SHARED
+     * between neighbouring segments.
+     *
+     * <p>Drawing one cuboid per segment — what the reference does, and what the
+     * previous attempt copied — leaves each segment's end faces meeting the
+     * next at an angle, so the corners stick out at every node. It is invisible
+     * on a fast, thin, first-person beam and very visible on a slow fat one you
+     * can stand beside. Here every ring is emitted once and both adjacent
+     * segments use it, so the surface is continuous by construction.
+     *
+     * <p>The ring frame is carried along the path instead of being rebuilt from
+     * world up at each node: rebuilding makes the tube spin around its own axis
+     * wherever the direction changes.
+     */
+    private static void tube(PoseStack poseStack, com.mojang.blaze3d.vertex.VertexConsumer consumer,
+                             Vec3[] pts, float[] bright, int rgb, float radius) {
+        int n = pts.length - 1;
+        int baseR = (rgb >> 16) & 0xFF, baseG = (rgb >> 8) & 0xFF, baseB = rgb & 0xFF;
+        var pose = poseStack.last().pose();
+
+        Vec3[] tangent = new Vec3[n + 1];
+        tangent[0] = pts[1].subtract(pts[0]).normalize();
+        tangent[n] = pts[n].subtract(pts[n - 1]).normalize();
+        for (int i = 1; i < n; i++) {
+            tangent[i] = pts[i + 1].subtract(pts[i - 1]).normalize();
+        }
+
+        Vec3 up = Math.abs(tangent[0].y) > 0.9 ? new Vec3(1, 0, 0) : new Vec3(0, 1, 0);
+        Vec3 u = tangent[0].cross(up).normalize();
+        Vec3[][] ring = new Vec3[n + 1][SIDES];
+        for (int i = 0; i <= n; i++) {
+            // parallel transport: drop the component along the new tangent
+            u = u.subtract(tangent[i].scale(u.dot(tangent[i])));
+            if (u.lengthSqr() < 1.0e-8) {
+                u = tangent[i].cross(new Vec3(0, 1, 0));
+            }
+            u = u.normalize();
+            Vec3 v = tangent[i].cross(u).normalize();
+            for (int k = 0; k < SIDES; k++) {
+                double a = 2 * Math.PI * k / SIDES;
+                ring[i][k] = pts[i].add(u.scale(Math.cos(a) * radius)).add(v.scale(Math.sin(a) * radius));
+            }
+        }
+
+        for (int i = 0; i < n; i++) {
+            for (int k = 0; k < SIDES; k++) {
+                int k2 = (k + 1) % SIDES;
+                emit(consumer, pose, ring[i][k], baseR, baseG, baseB, bright[i]);
+                emit(consumer, pose, ring[i][k2], baseR, baseG, baseB, bright[i]);
+                emit(consumer, pose, ring[i + 1][k2], baseR, baseG, baseB, bright[i + 1]);
+                emit(consumer, pose, ring[i + 1][k], baseR, baseG, baseB, bright[i + 1]);
+            }
+        }
+    }
+
+    private static void emit(com.mojang.blaze3d.vertex.VertexConsumer consumer, org.joml.Matrix4f pose,
+                             Vec3 p, int r, int g, int b, float bright) {
+        consumer.addVertex(pose, (float) p.x, (float) p.y, (float) p.z)
+                .setColor((int) (r * bright), (int) (g * bright), (int) (b * bright), 255);
     }
 
     // ---- the old look, kept so it can be compared against in the same world ----
