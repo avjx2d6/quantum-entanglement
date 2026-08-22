@@ -48,15 +48,24 @@ public final class QuantumCommand {
                         .then(Commands.literal("release").executes(ctx -> release(ctx.getSource())))));
     }
 
-    /** The nearest core within 24 blocks of the caller — the one being looked at while tuning. */
+    /**
+     * The nearest core to the caller. Deliberately a small box and loaded
+     * chunks only: {@code getBlockEntity} on an unloaded position drags the
+     * chunk in — generating it if it does not exist yet — so a generous search
+     * radius here would stall the server thread doing worldgen on a whim.
+     */
     private static QuantumCoreBlockEntity nearestCore(CommandSourceStack src) {
         net.minecraft.world.phys.Vec3 at = src.getPosition();
         net.minecraft.core.BlockPos origin = net.minecraft.core.BlockPos.containing(at);
+        net.minecraft.server.level.ServerLevel level = src.getLevel();
         QuantumCoreBlockEntity best = null;
-        double bestSq = 24 * 24;
+        double bestSq = 12 * 12;
         for (net.minecraft.core.BlockPos pos : net.minecraft.core.BlockPos.betweenClosed(
-                origin.offset(-24, -12, -24), origin.offset(24, 12, 24))) {
-            if (src.getLevel().getBlockEntity(pos) instanceof QuantumCoreBlockEntity core) {
+                origin.offset(-12, -6, -12), origin.offset(12, 6, 12))) {
+            if (!level.isLoaded(pos)) {
+                continue;
+            }
+            if (level.getBlockEntity(pos) instanceof QuantumCoreBlockEntity core) {
                 double sq = pos.distToCenterSqr(at);
                 if (sq < bestSq) {
                     bestSq = sq;
