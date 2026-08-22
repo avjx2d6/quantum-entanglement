@@ -31,6 +31,12 @@ public final class BeamTuning {
     /** Random walk kick per tick. */
     public static float spread = 0.7f;
     /**
+     * Overall brightness multiplier on top of the per-node shimmer. Additive
+     * blending makes an untouched colour read almost white against a dark
+     * circle; pulling this down gives the beam a body colour again.
+     */
+    public static float brightness = 0.7f;
+    /**
      * Line width in blocks. Segments are separate cuboids, so their end faces
      * meet at an angle at every node — the reference hides that by staying
      * thin (0.6/16), and so do we. Widen it and the joints start showing.
@@ -56,6 +62,7 @@ public final class BeamTuning {
                 + " nodes=" + nodes
                 + " decay=" + String.format("%.2f", decay)
                 + " spread=" + String.format("%.2f", spread)
+                + " bright=" + String.format("%.2f", brightness)
                 + " width=" + String.format("%.3f", width);
     }
 }

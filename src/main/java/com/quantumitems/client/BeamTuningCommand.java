@@ -43,6 +43,7 @@ public final class BeamTuningCommand {
         root.then(floatArg("amp", 0f, 4f, v -> BeamTuning.amplitude = v));
         root.then(floatArg("decay", 0.1f, 0.97f, v -> BeamTuning.decay = v));
         root.then(floatArg("spread", 0.02f, 6f, v -> BeamTuning.spread = v));
+        root.then(floatArg("bright", 0.1f, 1.5f, v -> BeamTuning.brightness = v));
         root.then(floatArg("width", 0.005f, 0.4f, v -> BeamTuning.width = v));
         root.then(Commands.literal("nodes")
                 .then(Commands.argument("v", IntegerArgumentType.integer(3, 64))

@@ -197,7 +197,7 @@ public final class RitualBeamRenderer {
             float[] bright = new float[n + 1];
             for (int i = 0; i <= n; i++) {
                 float w = Mth.lerp(partialTick, walk.prev[b][i][2], walk.cur[b][i][2]);
-                bright[i] = Mth.clamp(0.8f + w * 0.45f, 0.55f, 1.0f); // vanilla dust varies 0.6..1.0
+                bright[i] = Mth.clamp(0.8f + w * 0.45f, 0.55f, 1.0f) * BeamTuning.brightness;
             }
             tube(poseStack, consumer, pts, bright, colorFor(b, phase, recoloredCount), radius);
         }
