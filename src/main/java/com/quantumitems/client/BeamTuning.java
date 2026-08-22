@@ -30,8 +30,12 @@ public final class BeamTuning {
     public static float decay = 0.8f;
     /** Random walk kick per tick. */
     public static float spread = 0.7f;
-    /** Width of the bright core filament, in blocks. */
-    public static float width = 0.045f;
+    /**
+     * Line width in blocks. Segments are separate cuboids, so their end faces
+     * meet at an angle at every node — the reference hides that by staying
+     * thin (0.6/16), and so do we. Widen it and the joints start showing.
+     */
+    public static float width = 0.6f / 16f;
 
     private BeamTuning() {
     }

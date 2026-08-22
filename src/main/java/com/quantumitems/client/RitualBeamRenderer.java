@@ -184,6 +184,10 @@ public final class RitualBeamRenderer {
         LINE.getParams()
                 .disableLineNormals()
                 .disableCull()
+                // full-bright: the beam emits, it is not a surface being lit.
+                // Without this it takes the world's light and reads as flat
+                // paint after dark instead of something glowing.
+                .lightmap(0xF000F0)
                 .lineWidth(Math.max(0.005f, BeamTuning.width) * (1.0f + ramp * 0.6f));
 
         for (int b = 0; b < lit; b++) {
