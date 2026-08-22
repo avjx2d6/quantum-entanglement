@@ -91,7 +91,9 @@ sf.write(OUT + "ritual_riser.ogg", norm(sig, 0.9), SR, format="OGG", subtype="VO
 T = 2.6
 t = np.arange(int(SR * T)) / SR
 fsub = 95 * (24 / 95) ** np.clip(t / 1.1, 0, 1)
-sub = np.sin(2 * np.pi * np.cumsum(fsub) / SR) * np.exp(-t * 1.5) * 2.0
+# 1.2, not higher: through the tanh a louder sub saturates the whole clip and
+# the burst turns into a flat two-second wash with no impact shape left
+sub = np.sin(2 * np.pi * np.cumsum(fsub) / SR) * np.exp(-t * 1.5) * 1.2
 # Two layers off ONE noise draw. The body is heavily low-passed (40-sample
 # average, roughly a 1 kHz corner) and rings on for a while; the crack is only
 # gently rolled off (8 samples, ~5 kHz) and is gone in about 45 ms. A crack
@@ -101,19 +103,29 @@ slam_raw = rng.standard_normal(len(t))
 slam_body = np.convolve(slam_raw, np.ones(40) / 40, mode="same") \
     * np.exp(-t * 6) * np.clip(t / 0.02, 0, 1) * 5.0
 slam_crack = np.convolve(slam_raw, np.ones(8) / 8, mode="same") \
-    * np.exp(-t * 22) * np.clip(t / 0.006, 0, 1) * 1.1
+    * np.exp(-t * 13) * np.clip(t / 0.006, 0, 1) * 1.7
 slam = slam_body + slam_crack
-echo = np.zeros_like(t)
+# The reflection used to land a third of a second after the impact, which is
+# long enough for the ear to hear a SECOND, separate hit rather than the room
+# answering the first — the "double hit". It starts at 100 ms now and swells
+# instead of striking, so it fuses into the tail. The draw keeps its original
+# size because cancel is generated from the rest of this stream.
 shift = int(0.33 * SR)
-echo[shift:] = np.convolve(rng.standard_normal(len(t) - shift), np.ones(60) / 60, mode="same") \
-    * np.exp(-t[:-shift] * 5) * 5.0
+echo_raw = rng.standard_normal(len(t) - shift)
+echo_t = np.arange(len(echo_raw)) / SR
+echo = np.zeros_like(t)
+place = int(0.10 * SR)
+echo[place:place + len(echo_raw)] = np.convolve(echo_raw, np.ones(120) / 120, mode="same") \
+    * np.clip(echo_t / 0.12, 0, 1) * np.exp(-echo_t * 3.2) * 4.0
 # ring: a low partial added for body, the shrill top ones nearly gone
 ring = sum(a * np.sin(2 * np.pi * f * t) for f, a in
            ((560, 0.45), (820, 0.38), (1370, 0.22), (2210, 0.16), (3080, 0.06))) * np.exp(-t * 2.2)
 crackle = (rng.random(len(t)) < 0.002).astype(float) * rng.standard_normal(len(t)) * np.exp(-t * 1.5) * 0.35
 sig = sub + slam + echo + ring + crackle
 sig = np.tanh(sig * 1.3)  # gentler than the original 1.6, still with some bite
-sf.write(OUT + "ritual_burst.ogg", norm(sig, 0.62), SR, format="OGG", subtype="VORBIS")
+# 0.75 keeps the decoded peak at 0.96 — Vorbis overshoots on the transient, and
+# the original 0.98 decoded to 1.71, i.e. it clipped on playback
+sf.write(OUT + "ritual_burst.ogg", norm(sig, 0.75), SR, format="OGG", subtype="VORBIS")
 
 # --- cancel: an enormous machine slammed to a halt, 2.8s, deafening ---
 T = 2.8
