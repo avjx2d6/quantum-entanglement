@@ -80,29 +80,32 @@ sig = (body + whine + noise) * (0.3 + 0.7 * (t / T) ** 1.4)
 sig[-1500:] *= np.linspace(1, 0, 1500)
 sf.write(OUT + "ritual_riser.ogg", norm(sig, 0.9), SR, format="OGG", subtype="VORBIS")
 
-# --- burst: sub-drop + slam + long metallic ring, 2.6s, heavy ---
+# --- burst: sub-drop + muffled slam + low metallic ring, 2.6s ---
+# Softness here is structural, not a level. A full-band noise crack puts most
+# of its energy in 2-8 kHz, which is exactly where the ear hurts, and tanh at
+# high drive pushes even more up there. So the slam is low-passed into a thump,
+# the ring loses its shrillest partials, and the drive comes down — the weight
+# is carried by the sub-drop, which you feel rather than hear.
+# The RNG is drawn in the same order and the same sizes as before: cancel is
+# generated from what is left of this stream and must not shift.
 T = 2.6
 t = np.arange(int(SR * T)) / SR
 fsub = 95 * (24 / 95) ** np.clip(t / 1.1, 0, 1)
-sub = np.sin(2 * np.pi * np.cumsum(fsub) / SR) * np.exp(-t * 1.6) * 1.6
-# The slam used to start at full amplitude on its very first sample, which is
-# a click, not an impact — that edge is what made the burst hurt. A short
-# attack ramp and a slower decay turn the crack into a thump; the sub-drop
-# below still carries the weight.
-slam_attack = np.clip(t / 0.012, 0, 1)          # ~12 ms instead of an instant edge
-slam = rng.standard_normal(len(t)) * np.exp(-t * 7) * slam_attack * 0.65
+sub = np.sin(2 * np.pi * np.cumsum(fsub) / SR) * np.exp(-t * 1.5) * 2.0
+# muffled impact: averaging 40 samples rolls off above roughly 1 kHz, and the
+# gain compensates for what that averaging takes out
+slam = np.convolve(rng.standard_normal(len(t)), np.ones(40) / 40, mode="same")
+slam *= np.exp(-t * 6) * np.clip(t / 0.02, 0, 1) * 5.0
 echo = np.zeros_like(t)
 shift = int(0.33 * SR)
-echo[shift:] = (rng.standard_normal(len(t) - shift)) * np.exp(-t[:-shift] * 7) * 0.5
+echo[shift:] = np.convolve(rng.standard_normal(len(t) - shift), np.ones(60) / 60, mode="same") \
+    * np.exp(-t[:-shift] * 5) * 5.0
+# ring: a low partial added for body, the shrill top ones nearly gone
 ring = sum(a * np.sin(2 * np.pi * f * t) for f, a in
-           ((820, 0.5), (1370, 0.35), (2210, 0.25), (3080, 0.15))) * np.exp(-t * 2.4)
-crackle = (rng.random(len(t)) < 0.002).astype(float) * rng.standard_normal(len(t)) * np.exp(-t * 1.5) * 1.1
+           ((560, 0.45), (820, 0.38), (1370, 0.20), (2210, 0.07))) * np.exp(-t * 2.0)
+crackle = (rng.random(len(t)) < 0.002).astype(float) * rng.standard_normal(len(t)) * np.exp(-t * 1.5) * 0.35
 sig = sub + slam + echo + ring + crackle
-sig = np.tanh(sig * 1.6)  # soft clip = perceived loudness
-# 0.62, not the 0.98 the other clips use: Vorbis overshoots on a transient this
-# steep, and at 0.98 the burst decoded to a peak of 1.71 — it was clipping on
-# playback, which is most of why it hurt rather than landed. This keeps the
-# decoded peak under 1.0 so what reaches the ear is the sound, not distortion.
+sig = np.tanh(sig * 1.15)  # gentler drive: less of the mix folded up into highs
 sf.write(OUT + "ritual_burst.ogg", norm(sig, 0.62), SR, format="OGG", subtype="VORBIS")
 
 # --- cancel: an enormous machine slammed to a halt, 2.8s, deafening ---
