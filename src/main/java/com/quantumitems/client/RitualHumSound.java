@@ -21,9 +21,7 @@ import java.util.Map;
  */
 public class RitualHumSound extends AbstractTickableSoundInstance {
     private static final Map<BlockPos, RitualHumSound> ACTIVE = new HashMap<>();
-    // A bed, not an event: it runs unbroken from the first beam to the burst,
-    // so it sits under the riser rather than competing with it.
-    private static final float TARGET_VOLUME = 0.6f;
+    private static final float TARGET_VOLUME = 0.9f;
     private static final float FADE_IN = 0.045f;   // ~1s to full
     private static final float FADE_OUT = 0.06f;   // ~0.75s to silence
 
