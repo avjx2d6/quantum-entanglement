@@ -24,6 +24,17 @@ import soundfile as sf
 SR = 44100
 OUT = "src/main/resources/assets/quantumitems/sounds/"
 
+# Peak each clip is normalised to. These are the mix, and they matter more than
+# playSound's volume does: in Minecraft a volume above 1.0 does not play louder
+# up close — OpenAL clamps the gain — it only widens the audible radius. So a
+# clip normalised near 1.0 is as loud as the game can make it and the only way
+# to stop it hitting the ear is to leave headroom here. Burst and cancel used
+# to sit at 0.98, brick-walled.
+PEAK_HUM = 0.55
+PEAK_RISER = 0.55
+PEAK_BURST = 0.50
+PEAK_CANCEL = 0.50
+
 
 def norm(x, peak=0.95):
     return (x / max(1e-9, np.max(np.abs(x)))) * peak
@@ -50,7 +61,7 @@ hum = (0.5 * np.sin(2 * np.pi * loop_freq(82) * t)
        + 0.15 * np.sin(2 * np.pi * loop_freq(246.5) * t)
        + 0.08 * np.sin(2 * np.pi * loop_freq(329) * t))
 lfo = 1.0 + 0.12 * np.sin(2 * np.pi * loop_freq(0.66) * t)
-sf.write(OUT + "ritual_hum.ogg", norm(hum * lfo, 0.55), SR, format="OGG", subtype="VORBIS")
+sf.write(OUT + "ritual_hum.ogg", norm(hum * lfo, PEAK_HUM), SR, format="OGG", subtype="VORBIS")
 
 # Shared seeded RNG. The three effects below draw from it in order; keep that
 # order (riser, then burst, then cancel) or the noise in burst/cancel shifts.
@@ -78,7 +89,7 @@ noise = np.convolve(noise, np.ones(24) / 24, mode="same")   # crude lowpass
 noise *= 0.25 * (t / T) ** 2
 sig = (body + whine + noise) * (0.3 + 0.7 * (t / T) ** 1.4)
 sig[-1500:] *= np.linspace(1, 0, 1500)
-sf.write(OUT + "ritual_riser.ogg", norm(sig, 0.9), SR, format="OGG", subtype="VORBIS")
+sf.write(OUT + "ritual_riser.ogg", norm(sig, PEAK_RISER), SR, format="OGG", subtype="VORBIS")
 
 # --- burst: sub-drop + slam + long metallic ring, 2.6s, heavy ---
 T = 2.6
@@ -94,7 +105,7 @@ ring = sum(a * np.sin(2 * np.pi * f * t) for f, a in
 crackle = (rng.random(len(t)) < 0.002).astype(float) * rng.standard_normal(len(t)) * np.exp(-t * 1.5) * 2.0
 sig = sub + slam + echo + ring + crackle
 sig = np.tanh(sig * 1.6)  # soft clip = perceived loudness
-sf.write(OUT + "ritual_burst.ogg", norm(sig, 0.98), SR, format="OGG", subtype="VORBIS")
+sf.write(OUT + "ritual_burst.ogg", norm(sig, PEAK_BURST), SR, format="OGG", subtype="VORBIS")
 
 # --- cancel: an enormous machine slammed to a halt, 2.8s, deafening ---
 T = 2.8
@@ -118,6 +129,6 @@ judder = (0.5 + 0.5 * np.sign(np.sin(jph))) * np.sin(2 * np.pi * 48 * t) * np.ex
 groan_f = 58 * (34 / 58) ** np.clip(t / T, 0, 1)
 groan = saw_harmonics(2 * np.pi * np.cumsum(groan_f) / SR, 5) * np.exp(-t * 1.4) * 0.5
 sig = np.tanh((clang + thump + screech + judder + groan) * 1.5)
-sf.write(OUT + "ritual_cancel.ogg", norm(sig, 0.98), SR, format="OGG", subtype="VORBIS")
+sf.write(OUT + "ritual_cancel.ogg", norm(sig, PEAK_CANCEL), SR, format="OGG", subtype="VORBIS")
 
 print("4 sounds written to", OUT)
