@@ -40,6 +40,7 @@ public class QuantumCoreRenderer implements BlockEntityRenderer<QuantumCoreBlock
             return;
         }
         RitualHumSound.ensurePlaying(core); // client-owned hum with smooth fades
+        RitualBeamRenderer.render(core, partialTick, poseStack, buffers);
         ItemRenderer itemRenderer = Minecraft.getInstance().getItemRenderer();
         float time = core.getLevel().getGameTime() + partialTick;
         boolean running = core.isRitualRunning();

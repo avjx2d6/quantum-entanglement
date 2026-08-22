@@ -1,6 +1,7 @@
 package com.quantumitems;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.quantumitems.block.QuantumCoreBlockEntity;
 import com.quantumitems.engine.QuantumEngine;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
@@ -33,7 +34,62 @@ public final class QuantumCommand {
                 .then(Commands.literal("remove")
                         .then(Commands.argument("id", com.mojang.brigadier.arguments.IntegerArgumentType.integer(1))
                                 .executes(ctx -> removeNetwork(ctx.getSource(),
-                                        com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "id"))))));
+                                        com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "id")))))
+                .then(Commands.literal("ritual")
+                        .then(Commands.literal("hold")
+                                .then(Commands.literal("connecting").executes(ctx -> hold(ctx.getSource(),
+                                        QuantumCoreBlockEntity.Phase.CONNECTING)))
+                                .then(Commands.literal("scanning").executes(ctx -> hold(ctx.getSource(),
+                                        QuantumCoreBlockEntity.Phase.SCANNING)))
+                                .then(Commands.literal("judgement").executes(ctx -> hold(ctx.getSource(),
+                                        QuantumCoreBlockEntity.Phase.JUDGEMENT)))
+                                .then(Commands.literal("crescendo").executes(ctx -> hold(ctx.getSource(),
+                                        QuantumCoreBlockEntity.Phase.CRESCENDO))))
+                        .then(Commands.literal("release").executes(ctx -> release(ctx.getSource())))));
+    }
+
+    /** The nearest core within 24 blocks of the caller — the one being looked at while tuning. */
+    private static QuantumCoreBlockEntity nearestCore(CommandSourceStack src) {
+        net.minecraft.world.phys.Vec3 at = src.getPosition();
+        net.minecraft.core.BlockPos origin = net.minecraft.core.BlockPos.containing(at);
+        QuantumCoreBlockEntity best = null;
+        double bestSq = 24 * 24;
+        for (net.minecraft.core.BlockPos pos : net.minecraft.core.BlockPos.betweenClosed(
+                origin.offset(-24, -12, -24), origin.offset(24, 12, 24))) {
+            if (src.getLevel().getBlockEntity(pos) instanceof QuantumCoreBlockEntity core) {
+                double sq = pos.distToCenterSqr(at);
+                if (sq < bestSq) {
+                    bestSq = sq;
+                    best = core;
+                }
+            }
+        }
+        return best;
+    }
+
+    private static int hold(CommandSourceStack src, QuantumCoreBlockEntity.Phase phase) {
+        QuantumCoreBlockEntity core = nearestCore(src);
+        if (core == null) {
+            src.sendFailure(Component.literal("No quantum core within 24 blocks."));
+            return 0;
+        }
+        core.holdForTuning(phase);
+        src.sendSuccess(() -> Component.literal("Core at " + core.getBlockPos().toShortString()
+                + " held in " + phase + " — /quantum ritual release to let it go")
+                .withStyle(ChatFormatting.AQUA), false);
+        return 1;
+    }
+
+    private static int release(CommandSourceStack src) {
+        QuantumCoreBlockEntity core = nearestCore(src);
+        if (core == null) {
+            src.sendFailure(Component.literal("No quantum core within 24 blocks."));
+            return 0;
+        }
+        core.releaseFromTuning();
+        src.sendSuccess(() -> Component.literal("Core released; the ritual clock runs again.")
+                .withStyle(ChatFormatting.AQUA), false);
+        return 1;
     }
 
     private static int setDebug(CommandSourceStack src, boolean on) {

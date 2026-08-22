@@ -64,7 +64,7 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
     public static final int CRESCENDO_TICKS = 180;   // engine spool-up, glow, spin (author: x3)
     public static final int SUCCESS_TICKS = 25;
     public static final int FAILURE_TICKS = 30;
-    private static final int BEAM_STEP_TICKS = 15;
+    public static final int BEAM_STEP_TICKS = 15;
 
     /** Tick (from launch) at which a doomed ritual cancels. */
     public static int ticksUntilCancel() {
@@ -116,6 +116,33 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
 
     public ItemStack displayedShard() {
         return shard;
+    }
+
+    /**
+     * Development aid (<code>/quantum ritual hold</code>): freezes the phase
+     * clock so a running ritual can be looked at for as long as it takes to
+     * tune it. Never saved, cleared by a restart, and a held core never
+     * completes — the ritual maths is downstream of the clock.
+     */
+    private transient boolean heldForTuning;
+
+    public void holdForTuning(Phase target) {
+        if (level == null || level.isClientSide) {
+            return;
+        }
+        phase = target;
+        phaseAge = 0;
+        heldForTuning = true;
+        setChanged();
+    }
+
+    public void releaseFromTuning() {
+        heldForTuning = false;
+        setChanged();
+    }
+
+    public boolean isHeldForTuning() {
+        return heldForTuning;
     }
 
     public boolean isRitualRunning() {
@@ -256,6 +283,13 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
             return;
         }
         ServerLevel serverLevel = (ServerLevel) level;
+        if (core.heldForTuning) {
+            // /quantum ritual hold: the clock stops so the beams keep running
+            // while their look is being tuned. Nothing else about the ritual
+            // advances, so no entanglement can happen from a held core.
+            core.emitTheater(serverLevel);
+            return;
+        }
         core.phaseAge++;
         core.emitTheater(serverLevel);
         if (activePhases) {
@@ -407,55 +441,26 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
      * doubles the density, failure bleeds red.
      */
     private void emitTheater(ServerLevel level) {
+        // The lit beams are drawn client-side by RitualBeamRenderer, off the
+        // phase and phaseAge the block entity already syncs — no packets, and
+        // the crescendo can ramp on a curve instead of spraying denser dust.
+        // What stays here is the aftermath: one-shot bursts that have to agree
+        // for everyone watching.
+        if (phase != Phase.SUCCESS && phase != Phase.FAILURE) {
+            return;
+        }
         Vec3 focus = beamFocus();
-        int connectedBeams = switch (phase) {
-            case CONNECTING -> Math.min(4, 1 + phaseAge / BEAM_STEP_TICKS);
-            case SCANNING, JUDGEMENT, CRESCENDO -> 4;
-            default -> 0;
-        };
-        int recoloredInputs = switch (phase) {
-            case SCANNING -> 1 + phaseAge / BEAM_STEP_TICKS;
-            case JUDGEMENT, CRESCENDO -> 4;
-            default -> 0;
-        };
-        int density = phase == Phase.CRESCENDO ? 4 : 2;
-        int inputSeen = 0;
-        for (int i = 0; i < CORNERS.length; i++) {
-            BlockPos resonatorPos = worldPosition.offset(CORNERS[i]);
-            boolean occupied = level.getBlockEntity(resonatorPos) instanceof ResonatorBlockEntity resonator
-                    && !resonator.isEmpty();
-            Vec3 from = Vec3.atCenterOf(resonatorPos).add(0, 0.8, 0);
-
+        for (BlockPos corner : CORNERS) {
+            Vec3 from = Vec3.atCenterOf(worldPosition.offset(corner)).add(0, 0.8, 0);
             if (phase == Phase.SUCCESS) {
                 level.sendParticles(ParticleTypes.END_ROD,
                         from.x, from.y + 0.3, from.z, 1, 0.15, 0.2, 0.15, 0.01);
-                continue;
-            }
-            if (phase == Phase.FAILURE) {
+            } else {
                 Vec3 point = from.lerp(focus, level.random.nextDouble());
                 level.sendParticles(new DustParticleOptions(COLOR_FAIL, 1.2f),
                         point.x, point.y, point.z, 2, 0.08, 0.08, 0.08, 0);
                 level.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE,
                         focus.x, focus.y, focus.z, 1, 0.1, 0.1, 0.1, 0.01);
-                continue;
-            }
-            if (i >= connectedBeams) {
-                continue;
-            }
-            Vector3f color = COLOR_CHARGE;
-            if (occupied) {
-                inputSeen++;
-                if (inputSeen <= recoloredInputs) {
-                    color = COLOR_INPUT;
-                }
-            }
-            if ((phase == Phase.JUDGEMENT || phase == Phase.CRESCENDO) && i == plannedOutputCorner) {
-                color = COLOR_OUTPUT;
-            }
-            for (int sample = 0; sample < density; sample++) {
-                Vec3 point = from.lerp(focus, level.random.nextDouble());
-                level.sendParticles(new DustParticleOptions(color, 1.0f),
-                        point.x, point.y, point.z, 1, 0.05, 0.05, 0.05, 0);
             }
         }
     }
