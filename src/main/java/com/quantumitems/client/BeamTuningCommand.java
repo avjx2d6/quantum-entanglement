@@ -42,7 +42,6 @@ public final class BeamTuningCommand {
         }
 
         root.then(floatArg("amp", 0f, 4f, v -> BeamTuning.amplitude = v));
-        root.then(floatArg("speed", 0.05f, 6f, v -> BeamTuning.waveSpeed = v));
         root.then(floatArg("decay", 0.1f, 0.97f, v -> BeamTuning.decay = v));
         root.then(floatArg("spread", 0.02f, 6f, v -> BeamTuning.spread = v));
         root.then(floatArg("width", 0.005f, 0.4f, v -> BeamTuning.width = v));

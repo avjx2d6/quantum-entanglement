@@ -17,19 +17,13 @@ public final class BeamTuning {
         /** Exponential random walk, the reference values: twitchy electric arc. */
         TWITCHY,
         /** Same walk, slower and narrower — it flows instead of snapping. */
-        CALM,
-        /** Standing wave pinned at both ends. No per-node state at all. */
-        WAVE,
-        /** Wave leads, a quarter-strength walk adds texture. */
-        BOTH
+        CALM
     }
 
     public static Style style = Style.CALM;
 
     /** Overall deflection from the straight line. */
     public static float amplitude = 0.9f;
-    /** Wave frequency multiplier (WAVE / BOTH). */
-    public static float waveSpeed = 1.0f;
     /** Segments per beam; our beams are always 2.83 blocks, so this is just fixed. */
     public static int nodes = 12;
     /** Random walk pull-back per tick. Higher drifts slower AND wider. */
@@ -49,8 +43,6 @@ public final class BeamTuning {
         switch (preset) {
             case TWITCHY -> { decay = 0.5f; spread = 3.0f; nodes = 8; amplitude = 0.5f; }
             case CALM -> { decay = 0.8f; spread = 0.7f; nodes = 12; amplitude = 0.9f; }
-            case WAVE -> { nodes = 14; amplitude = 0.55f; waveSpeed = 1.0f; }
-            case BOTH -> { decay = 0.82f; spread = 0.5f; nodes = 14; amplitude = 0.5f; waveSpeed = 1.0f; }
             default -> { }
         }
     }
@@ -59,7 +51,6 @@ public final class BeamTuning {
     public static String describe() {
         return "style=" + style
                 + " amp=" + String.format("%.2f", amplitude)
-                + " speed=" + String.format("%.2f", waveSpeed)
                 + " nodes=" + nodes
                 + " decay=" + String.format("%.2f", decay)
                 + " spread=" + String.format("%.2f", spread)

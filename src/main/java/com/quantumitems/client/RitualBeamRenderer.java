@@ -5,7 +5,6 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.quantumitems.block.QuantumCoreBlockEntity;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.util.Mth;
@@ -43,8 +42,6 @@ public final class RitualBeamRenderer {
 
     /** Deflection of one walk step, in blocks, before amplitude is applied. */
     private static final float WALK_UNIT = 0.085f;
-    /** Deflection of the wave at its belly, in blocks, before amplitude. */
-    private static final float WAVE_UNIT = 0.29f;
 
     private RitualBeamRenderer() {
     }
@@ -132,18 +129,17 @@ public final class RitualBeamRenderer {
         int n = Mth.clamp(BeamTuning.nodes, 3, 64);
         WalkState walk = advanceWalk(core, n);
         float time = (core.getLevel().getGameTime() % 100000L) + partialTick;
-        float waveTime = time * 0.35f * BeamTuning.waveSpeed * (1.0f + ramp * 1.6f);
         float walkBlend = partialTick;
 
         Vec3 cam = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
         Vec3 camLocal = cam.subtract(Vec3.atLowerCornerOf(core.getBlockPos()));
-        VertexConsumer buffer = buffers.getBuffer(RenderType.lightning());
+        VertexConsumer buffer = buffers.getBuffer(QuantumRenderTypes.RITUAL_BEAM);
 
         Vec3 focus = new Vec3(0.5, 1.45, 0.5); // the shard, in block-local space
         for (int b = 0; b < lit; b++) {
             Vec3 from = new Vec3(CORNERS[b].getX() + 0.5, 1.3, CORNERS[b].getZ() + 0.5);
             Vector3f color = colorFor(b, phase, recolored(phase, age));
-            Vec3[] pts = buildBeam(walk, b, n, from, focus, waveTime, walkBlend, ampScale, b * 1.9f);
+            Vec3[] pts = buildBeam(walk, b, n, from, focus, walkBlend, ampScale);
             draw(poseStack, buffer, pts, camLocal, color, intensity);
         }
     }
@@ -177,7 +173,7 @@ public final class RitualBeamRenderer {
 
     /** Node positions in block-local space, offset in the plane across the beam. */
     private static Vec3[] buildBeam(WalkState walk, int beam, int n, Vec3 from, Vec3 to,
-                                    float waveTime, float blend, float ampScale, float phi) {
+                                    float blend, float ampScale) {
         Vec3 dir = to.subtract(from).normalize();
         Vec3 u = dir.cross(new Vec3(0, 1, 0));
         if (u.lengthSqr() < 1.0e-6) {
@@ -186,29 +182,14 @@ public final class RitualBeamRenderer {
         u = u.normalize();
         Vec3 v = dir.cross(u).normalize();
 
-        BeamTuning.Style style = BeamTuning.style;
-        boolean useWalk = style == BeamTuning.Style.TWITCHY || style == BeamTuning.Style.CALM
-                || style == BeamTuning.Style.BOTH;
-        boolean useWave = style == BeamTuning.Style.WAVE || style == BeamTuning.Style.BOTH;
-        float walkWeight = style == BeamTuning.Style.BOTH ? 0.25f : 1.0f;
-        float waveWeight = style == BeamTuning.Style.BOTH ? 0.9f : 1.0f;
-
         Vec3[] out = new Vec3[n + 1];
         for (int i = 0; i <= n; i++) {
             float t = i / (float) n;
             double ox = 0, oy = 0;
-            if (useWalk) {
-                float k = WALK_UNIT * BeamTuning.amplitude * ampScale * walkWeight;
+            {
+                float k = WALK_UNIT * BeamTuning.amplitude * ampScale;
                 ox += Mth.lerp(blend, walk.prev[beam][i][0], walk.cur[beam][i][0]) * k;
                 oy += Mth.lerp(blend, walk.prev[beam][i][1], walk.cur[beam][i][1]) * k;
-            }
-            if (useWave) {
-                // sin(pi*t) pins both ends and bellies the middle — a plucked string.
-                // The two incommensurate rates trace a slow loop instead of flat sway.
-                float bell = Mth.sin((float) Math.PI * t);
-                float k = WAVE_UNIT * BeamTuning.amplitude * ampScale * waveWeight;
-                ox += bell * k * Mth.sin(waveTime + phi);
-                oy += bell * k * Mth.cos(1.37f * waveTime + phi);
             }
             Vec3 base = from.add(to.subtract(from).scale(t));
             out[i] = base.add(u.scale(ox)).add(v.scale(oy));
@@ -222,13 +203,21 @@ public final class RitualBeamRenderer {
                              Vector3f color, float intensity) {
         float w = Math.max(0.005f, BeamTuning.width);
         if (BeamTuning.glow) {
-            ribbon(poseStack, buffer, pts, cam, color, w * 7.0f, 0.10f * intensity);
-            ribbon(poseStack, buffer, pts, cam, color, w * 3.0f, 0.26f * intensity);
+            ribbon(poseStack, buffer, pts, cam, color, w * 4.0f, 0.16f * intensity);
         }
-        ribbon(poseStack, buffer, pts, cam, color, w, 0.95f * intensity);
-        ribbon(poseStack, buffer, pts, cam, new Vector3f(1, 1, 1), w * 0.4f, 0.55f * intensity);
+        ribbon(poseStack, buffer, pts, cam, color, w * 1.6f, 0.55f * intensity);
+        ribbon(poseStack, buffer, pts, cam, new Vector3f(1, 1, 1), w * 0.7f, 0.85f * intensity);
     }
 
+    /**
+     * One camera-facing strip per segment, drawn as two quads that meet on the
+     * centre line: full alpha along the middle, zero at both outer edges.
+     *
+     * <p>A strip of constant alpha is what makes a billboard read as a pane of
+     * glass — its edge is a hard line at a fixed width, and the eye reads a flat
+     * sheet. Fading to nothing at the edges leaves no silhouette to read, so the
+     * same geometry reads as a glow around a filament instead.
+     */
     private static void ribbon(PoseStack poseStack, VertexConsumer buffer, Vec3[] pts, Vec3 cam,
                                Vector3f color, float halfWidth, float alpha) {
         var pose = poseStack.last().pose();
@@ -246,16 +235,24 @@ public final class RitualBeamRenderer {
                 continue;
             }
             side = side.normalize().scale(halfWidth);
-            quad(buffer, pose, p0.subtract(side), p0.add(side), p1.add(side), p1.subtract(side), r, g, b, a);
+            Vec3 l0 = p0.subtract(side), l1 = p1.subtract(side);
+            Vec3 r0 = p0.add(side), r1 = p1.add(side);
+            // left edge -> centre
+            vertex(buffer, pose, l0, r, g, b, 0);
+            vertex(buffer, pose, p0, r, g, b, a);
+            vertex(buffer, pose, p1, r, g, b, a);
+            vertex(buffer, pose, l1, r, g, b, 0);
+            // centre -> right edge
+            vertex(buffer, pose, p0, r, g, b, a);
+            vertex(buffer, pose, r0, r, g, b, 0);
+            vertex(buffer, pose, r1, r, g, b, 0);
+            vertex(buffer, pose, p1, r, g, b, a);
         }
     }
 
-    private static void quad(VertexConsumer buffer, org.joml.Matrix4f pose,
-                             Vec3 a, Vec3 b, Vec3 c, Vec3 d, int r, int g, int bl, int alpha) {
-        buffer.addVertex(pose, (float) a.x, (float) a.y, (float) a.z).setColor(r, g, bl, alpha);
-        buffer.addVertex(pose, (float) b.x, (float) b.y, (float) b.z).setColor(r, g, bl, alpha);
-        buffer.addVertex(pose, (float) c.x, (float) c.y, (float) c.z).setColor(r, g, bl, alpha);
-        buffer.addVertex(pose, (float) d.x, (float) d.y, (float) d.z).setColor(r, g, bl, alpha);
+    private static void vertex(VertexConsumer buffer, org.joml.Matrix4f pose, Vec3 p,
+                               int r, int g, int b, int alpha) {
+        buffer.addVertex(pose, (float) p.x, (float) p.y, (float) p.z).setColor(r, g, b, alpha);
     }
 
     // ---- the old look, kept so it can be compared against in the same world ----
