@@ -145,6 +145,11 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         return heldForTuning;
     }
 
+    /** Corner the ritual has chosen for its output, or -1 before the verdict. */
+    public int plannedOutputCorner() {
+        return plannedOutputCorner;
+    }
+
     public boolean isRitualRunning() {
         return phase != Phase.IDLE;
     }

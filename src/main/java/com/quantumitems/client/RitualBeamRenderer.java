@@ -131,13 +131,37 @@ public final class RitualBeamRenderer {
         };
     }
 
-    private static int colorFor(int beam, QuantumCoreBlockEntity.Phase phase, int recoloredCount) {
+    /** Is that corner's resonator holding something? Only laid stacks are inputs. */
+    private static boolean occupied(QuantumCoreBlockEntity core, int corner) {
+        return core.getLevel() != null
+                && core.getLevel().getBlockEntity(core.getBlockPos().offset(CORNERS[corner]))
+                        instanceof com.quantumitems.block.ResonatorBlockEntity resonator
+                && !resonator.isEmpty();
+    }
+
+    /**
+     * Gold marks the corner the ritual actually picked for its output, which
+     * the core syncs — pointing it anywhere else tells the player the result
+     * will land somewhere it will not. Inputs go cyan in the order they are
+     * met, and only occupied resonators are inputs at all.
+     */
+    private static int colorFor(int beam, QuantumCoreBlockEntity core, int recoloredCount) {
+        QuantumCoreBlockEntity.Phase phase = core.phase();
         boolean verdict = phase == QuantumCoreBlockEntity.Phase.JUDGEMENT
                 || phase == QuantumCoreBlockEntity.Phase.CRESCENDO;
-        if (verdict && beam == 3) {
+        if (verdict && beam == core.plannedOutputCorner()) {
             return COLOR_OUTPUT;
         }
-        return beam < recoloredCount ? COLOR_INPUT : COLOR_CHARGE;
+        if (!occupied(core, beam)) {
+            return COLOR_CHARGE;
+        }
+        int seen = 0;
+        for (int i = 0; i <= beam; i++) {
+            if (occupied(core, i)) {
+                seen++;
+            }
+        }
+        return seen <= recoloredCount ? COLOR_INPUT : COLOR_CHARGE;
     }
 
     @SubscribeEvent
@@ -202,7 +226,7 @@ public final class RitualBeamRenderer {
                 float w = Mth.lerp(partialTick, walk.prev[b][i][2], walk.cur[b][i][2]);
                 bright[i] = Mth.clamp(0.8f + w * 0.45f, 0.55f, 1.0f) * BeamTuning.brightness;
             }
-            tube(poseStack, consumer, pts, bright, colorFor(b, phase, recoloredCount), radius);
+            tube(poseStack, consumer, pts, bright, colorFor(b, core, recoloredCount), radius);
         }
         poseStack.popPose();
         return true;
@@ -321,7 +345,7 @@ public final class RitualBeamRenderer {
         int density = ramp > 0 ? 4 : 2;
         for (int i = 0; i < lit; i++) {
             Vec3 from = Vec3.atBottomCenterOf(core.getBlockPos().offset(CORNERS[i])).add(0, RESONATOR_TOP, 0);
-            int rgb = colorFor(i, core.phase(), recoloredCount);
+            int rgb = colorFor(i, core, recoloredCount);
             Vector3f color = new Vector3f(((rgb >> 16) & 0xFF) / 255f, ((rgb >> 8) & 0xFF) / 255f, (rgb & 0xFF) / 255f);
             for (int s = 0; s < density; s++) {
                 Vec3 point = from.lerp(focus, level.random.nextDouble());
