@@ -730,6 +730,18 @@ public final class QuantumEngine {
      * load / container-entity join (never during deserialization itself).
      */
     public void reconcileContainer(net.minecraft.world.Container container) {
+        // A loot container that has not been opened yet rolls its whole table
+        // the moment ANY slot is read — getItem and isEmpty both call
+        // unpackLootTable. Filling it writes items, which marks the block
+        // changed, which asks a neighbour for its comparator signal, which can
+        // pull in another chunk. Doing that from a chunk-load handler parks the
+        // server thread inside its own chunk pipeline and the world stops
+        // forever. Nothing has been placed in a sealed container by definition,
+        // so there is no window in it to heal: leave it sealed.
+        if (container instanceof net.minecraft.world.RandomizableContainer loot
+                && loot.getLootTable() != null) {
+            return;
+        }
         Set<Long> seen = new java.util.HashSet<>();
         boolean changed = false;
         for (int i = 0; i < container.getContainerSize(); i++) {

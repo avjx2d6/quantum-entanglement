@@ -44,6 +44,7 @@ public final class ServerEvents {
     public static void onServerStopped(ServerStoppedEvent event) {
         QuantumEngine.stop();
         ActiveRitualCores.clear();
+        NEXT_TICK.clear();
     }
 
     /**
@@ -73,11 +74,29 @@ public final class ServerEvents {
      * alone by the engine, so a copy that somehow materializes in a player
      * inventory (creative clone, /give, mod quirks) is caught here.
      */
+    /**
+     * Work parked for the next tick. {@code MinecraftServer.execute} does NOT
+     * defer when the caller is already the server thread — it runs the task
+     * inline — so a chunk-load or entity-join handler that "deferred" through
+     * it stayed inside the chunk pipeline, where touching the world can
+     * deadlock. This queue actually waits for the next tick.
+     */
+    private static final java.util.ArrayDeque<Runnable> NEXT_TICK = new java.util.ArrayDeque<>();
+
+    private static void onNextTick(Runnable task) {
+        NEXT_TICK.add(task);
+    }
+
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
         QuantumEngine engine = QuantumEngine.onServerThread();
         if (engine == null) {
+            NEXT_TICK.clear();
             return;
+        }
+        // drain a snapshot: a task that queues more work waits for the tick after
+        for (int pending = NEXT_TICK.size(); pending > 0 && !NEXT_TICK.isEmpty(); pending--) {
+            NEXT_TICK.poll().run();
         }
         engine.flushCreativeRetirements();
         if (event.getServer().getTickCount() % 100 != 0) {
@@ -137,7 +156,7 @@ public final class ServerEvents {
                 || !(event.getChunk() instanceof net.minecraft.world.level.chunk.LevelChunk chunk)) {
             return;
         }
-        level.getServer().execute(() -> {
+        onNextTick(() -> {
             QuantumEngine engine = QuantumEngine.onServerThread();
             if (engine == null
                     || level.getChunkSource().getChunkNow(chunk.getPos().x, chunk.getPos().z) != chunk) {
@@ -166,7 +185,7 @@ public final class ServerEvents {
         }
         if (event.getEntity() instanceof Container container
                 && event.getLevel() instanceof net.minecraft.server.level.ServerLevel level) {
-            level.getServer().execute(() -> {
+            onNextTick(() -> {
                 QuantumEngine deferredEngine = QuantumEngine.onServerThread();
                 if (deferredEngine != null && !event.getEntity().isRemoved()) {
                     deferredEngine.reconcileContainer(container);

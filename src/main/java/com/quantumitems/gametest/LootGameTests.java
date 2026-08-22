@@ -75,4 +75,29 @@ public class LootGameTests {
         }
         helper.succeed();
     }
+
+    /**
+     * The load-time heal must never read a sealed loot container. Reading any
+     * slot of one rolls its whole table (getItem calls unpackLootTable), which
+     * writes items, marks the block changed, and asks a neighbour for its
+     * comparator signal — a world lookup that can pull in another chunk. From
+     * the chunk-load handler that parked the server thread inside its own chunk
+     * pipeline and the world hung with no error at all. A sealed container also
+     * cannot hold a window, so there is nothing in it to heal.
+     */
+    @GameTest(template = "box", templateNamespace = "quantumitems", timeoutTicks = 100)
+    public void reconcileLeavesSealedLootChestSealed(GameTestHelper helper) {
+        net.minecraft.core.BlockPos pos = new net.minecraft.core.BlockPos(1, 1, 1);
+        helper.setBlock(pos, net.minecraft.world.level.block.Blocks.CHEST);
+        net.minecraft.world.level.block.entity.ChestBlockEntity chest =
+                (net.minecraft.world.level.block.entity.ChestBlockEntity) helper.getBlockEntity(pos);
+        chest.setLootTable(BuiltInLootTables.SIMPLE_DUNGEON, 1234L);
+
+        com.quantumitems.engine.QuantumEngine.onServerThread().reconcileContainer(chest);
+
+        if (chest.getLootTable() == null) {
+            helper.fail("Reconcile unpacked a sealed loot chest — that rolls the table and can deadlock chunk load");
+        }
+        helper.succeed();
+    }
 }
