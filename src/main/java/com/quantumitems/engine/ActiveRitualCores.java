@@ -50,6 +50,12 @@ public final class ActiveRitualCores {
         CORES.clear();
     }
 
+    /** Every running core in this dimension; empty when none. Never null. */
+    public static java.util.Collection<BlockPos> positions(Level level) {
+        Set<BlockPos> set = CORES.get(level.dimension());
+        return set == null ? java.util.List.of() : set;
+    }
+
     /** The closest running core within pull radius, or null. */
     @javax.annotation.Nullable
     public static BlockPos nearestActiveCore(Level level, Vec3 position) {

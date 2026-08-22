@@ -1,15 +1,23 @@
 package com.quantumitems.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.quantumitems.QuantumItemsMod;
 import com.quantumitems.block.QuantumCoreBlockEntity;
+import com.quantumitems.engine.ActiveRitualCores;
+import net.createmod.catnip.outliner.LineOutline;
+import net.createmod.catnip.render.DefaultSuperRenderTypeBuffer;
+import net.createmod.catnip.render.SuperRenderTypeBuffer;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import org.joml.Vector3f;
 
 import java.util.HashMap;
@@ -18,30 +26,45 @@ import java.util.Map;
 /**
  * The ritual beams, drawn on the client from state the core already syncs.
  *
- * <p>The beams used to be sprayed server-side as coloured dust: a packet per
- * burst to every tracking player, and "louder" could only mean "spray more".
- * Here the whole script — which beams are lit, which recoloured, which one goes
- * gold, and how hard the crescendo pushes — is derived from {@code phase} and
- * {@code phaseAge}, which the block entity already sends. No packets, and the
- * intensity can follow a curve instead of a particle count.
+ * <p>They used to be sprayed server-side as coloured dust: a packet per burst
+ * to every tracking player, and "louder" could only mean "spray more". The
+ * whole script — which beams are lit, which recoloured, which one goes gold,
+ * how hard the crescendo pushes — follows from {@code phase} and
+ * {@code phaseAge}, which the block entity already sends, so none of it needs
+ * the network and the intensity can ride a curve instead of a particle count.
  *
- * <p>Both endpoints are fixed for the life of the circle, so every beam is
- * exactly the same length (2.83 blocks). That kills the need for the adaptive
- * node-count maths a general-purpose beam needs: the node count is just a
- * constant.
+ * <p>Drawn from the level render event rather than the core's block-entity
+ * renderer. A BER only runs while its own block is on screen, which made every
+ * beam in the circle vanish the moment the core left the edge of view.
+ *
+ * <p>The line itself is Catnip's {@link LineOutline}: a real cuboid segment,
+ * not a camera-facing strip. Billboards are what made the first attempt read as
+ * panes of glass — each segment is a flat quad, and neighbouring segments that
+ * move independently visibly overlap.
+ *
+ * <p>Both endpoints are fixed for the life of a circle, so every beam is
+ * exactly the same length. That removes the adaptive node-count maths a
+ * general-purpose beam needs; the node count is simply a constant.
  */
+@EventBusSubscriber(modid = QuantumItemsMod.MOD_ID, value = Dist.CLIENT)
 public final class RitualBeamRenderer {
 
     private static final BlockPos[] CORNERS = {
             new BlockPos(-2, 0, -2), new BlockPos(2, 0, -2),
             new BlockPos(-2, 0, 2), new BlockPos(2, 0, 2)};
 
-    private static final Vector3f COLOR_CHARGE = new Vector3f(0.75f, 0.55f, 1.0f);
-    private static final Vector3f COLOR_INPUT = new Vector3f(0.35f, 0.9f, 1.0f);
-    private static final Vector3f COLOR_OUTPUT = new Vector3f(1.0f, 0.84f, 0.3f);
+    private static final int COLOR_CHARGE = 0xBF8CFF;
+    private static final int COLOR_INPUT = 0x59E6FF;
+    private static final int COLOR_OUTPUT = 0xFFD64D;
 
     /** Deflection of one walk step, in blocks, before amplitude is applied. */
     private static final float WALK_UNIT = 0.085f;
+    /** Top face of the resonator model — the beam lands on it, not above it. */
+    private static final double RESONATOR_TOP = 1.0;
+    /** The shard inside the upper frame. */
+    private static final double FOCUS_HEIGHT = 1.45;
+
+    private static final LineOutline LINE = new LineOutline();
 
     private RitualBeamRenderer() {
     }
@@ -53,7 +76,6 @@ public final class RitualBeamRenderer {
     private static final class WalkState {
         long lastTick = Long.MIN_VALUE;
         int nodes = -1;
-        /** [beam][node][axis] offsets, plus the previous tick for interpolation. */
         float[][][] cur, prev;
 
         void resize(int n) {
@@ -79,11 +101,6 @@ public final class RitualBeamRenderer {
         }
     }
 
-    /** Drops state for cores that are gone; called when a core stops running. */
-    public static void forget(BlockPos pos) {
-        WALKS.remove(pos);
-    }
-
     public static void forgetAll() {
         WALKS.clear();
     }
@@ -106,51 +123,78 @@ public final class RitualBeamRenderer {
         };
     }
 
-    public static void render(QuantumCoreBlockEntity core, float partialTick, PoseStack poseStack,
-                              MultiBufferSource buffers) {
-        QuantumCoreBlockEntity.Phase phase = core.phase();
-        int age = core.phaseAge();
-        int lit = connectedBeams(phase, age);
-        if (lit <= 0 || core.getLevel() == null) {
-            return;
-        }
-        // crescendo pushes amplitude and speed along one curve, the same shape
-        // the riser sound climbs on
-        float ramp = phase == QuantumCoreBlockEntity.Phase.CRESCENDO
-                ? Mth.clamp((age + partialTick) / QuantumCoreBlockEntity.CRESCENDO_TICKS, 0, 1) : 0;
-        float ampScale = 1.0f + ramp * 1.8f;
-        float intensity = 0.75f + ramp * 0.35f;
-
-        if (BeamTuning.style == BeamTuning.Style.PARTICLES) {
-            spawnDust(core, lit, recolored(phase, age), ramp);
-            return;
-        }
-
-        int n = Mth.clamp(BeamTuning.nodes, 3, 64);
-        WalkState walk = advanceWalk(core, n);
-        float time = (core.getLevel().getGameTime() % 100000L) + partialTick;
-        float walkBlend = partialTick;
-
-        Vec3 cam = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
-        Vec3 camLocal = cam.subtract(Vec3.atLowerCornerOf(core.getBlockPos()));
-        VertexConsumer buffer = buffers.getBuffer(QuantumRenderTypes.RITUAL_BEAM);
-
-        Vec3 focus = new Vec3(0.5, 1.45, 0.5); // the shard, in block-local space
-        for (int b = 0; b < lit; b++) {
-            Vec3 from = new Vec3(CORNERS[b].getX() + 0.5, 1.3, CORNERS[b].getZ() + 0.5);
-            Vector3f color = colorFor(b, phase, recolored(phase, age));
-            Vec3[] pts = buildBeam(walk, b, n, from, focus, walkBlend, ampScale);
-            draw(poseStack, buffer, pts, camLocal, color, intensity);
-        }
-    }
-
-    private static Vector3f colorFor(int beam, QuantumCoreBlockEntity.Phase phase, int recoloredCount) {
+    private static int colorFor(int beam, QuantumCoreBlockEntity.Phase phase, int recoloredCount) {
         boolean verdict = phase == QuantumCoreBlockEntity.Phase.JUDGEMENT
                 || phase == QuantumCoreBlockEntity.Phase.CRESCENDO;
         if (verdict && beam == 3) {
             return COLOR_OUTPUT;
         }
         return beam < recoloredCount ? COLOR_INPUT : COLOR_CHARGE;
+    }
+
+    @SubscribeEvent
+    public static void onRenderLevel(RenderLevelStageEvent event) {
+        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES) {
+            return;
+        }
+        ClientLevel level = Minecraft.getInstance().level;
+        if (level == null || ActiveRitualCores.positions(level).isEmpty()) {
+            return;
+        }
+        float partialTick = event.getPartialTick().getGameTimeDeltaPartialTick(false);
+        Vec3 camera = event.getCamera().getPosition();
+        PoseStack poseStack = event.getPoseStack();
+        SuperRenderTypeBuffer buffer = DefaultSuperRenderTypeBuffer.getInstance();
+        boolean drewAnything = false;
+
+        for (BlockPos pos : ActiveRitualCores.positions(level)) {
+            if (!(level.getBlockEntity(pos) instanceof QuantumCoreBlockEntity core)) {
+                continue;
+            }
+            drewAnything |= renderCore(core, partialTick, poseStack, buffer, camera);
+        }
+        if (drewAnything) {
+            buffer.draw();
+        }
+    }
+
+    private static boolean renderCore(QuantumCoreBlockEntity core, float partialTick, PoseStack poseStack,
+                                      SuperRenderTypeBuffer buffer, Vec3 camera) {
+        QuantumCoreBlockEntity.Phase phase = core.phase();
+        int age = core.phaseAge();
+        int lit = connectedBeams(phase, age);
+        if (lit <= 0 || core.getLevel() == null) {
+            return false;
+        }
+        // the crescendo pushes amplitude along the same curve the riser climbs
+        float ramp = phase == QuantumCoreBlockEntity.Phase.CRESCENDO
+                ? Mth.clamp((age + partialTick) / QuantumCoreBlockEntity.CRESCENDO_TICKS, 0, 1) : 0;
+        float ampScale = 1.0f + ramp * 1.8f;
+        int recoloredCount = recolored(phase, age);
+
+        if (BeamTuning.style == BeamTuning.Style.PARTICLES) {
+            spawnDust(core, lit, recoloredCount, ramp);
+            return false;
+        }
+
+        int n = Mth.clamp(BeamTuning.nodes, 3, 64);
+        WalkState walk = advanceWalk(core, n);
+        Vec3 focus = Vec3.atCenterOf(core.getBlockPos()).add(0, FOCUS_HEIGHT - 0.5, 0);
+
+        LINE.getParams()
+                .disableLineNormals()
+                .disableCull()
+                .lineWidth(Math.max(0.005f, BeamTuning.width) * (1.0f + ramp * 0.6f));
+
+        for (int b = 0; b < lit; b++) {
+            Vec3 from = Vec3.atBottomCenterOf(core.getBlockPos().offset(CORNERS[b])).add(0, RESONATOR_TOP, 0);
+            LINE.getParams().colored(colorFor(b, phase, recoloredCount));
+            Vec3[] pts = buildBeam(walk, b, n, from, focus, partialTick, ampScale);
+            for (int i = 0; i < pts.length - 1; i++) {
+                LINE.set(pts[i], pts[i + 1]).render(poseStack, buffer, camera, partialTick);
+            }
+        }
+        return true;
     }
 
     private static WalkState advanceWalk(QuantumCoreBlockEntity core, int n) {
@@ -171,7 +215,7 @@ public final class RitualBeamRenderer {
         return st;
     }
 
-    /** Node positions in block-local space, offset in the plane across the beam. */
+    /** Node positions in world space, offset in the plane across the beam. */
     private static Vec3[] buildBeam(WalkState walk, int beam, int n, Vec3 from, Vec3 to,
                                     float blend, float ampScale) {
         Vec3 dir = to.subtract(from).normalize();
@@ -185,74 +229,12 @@ public final class RitualBeamRenderer {
         Vec3[] out = new Vec3[n + 1];
         for (int i = 0; i <= n; i++) {
             float t = i / (float) n;
-            double ox = 0, oy = 0;
-            {
-                float k = WALK_UNIT * BeamTuning.amplitude * ampScale;
-                ox += Mth.lerp(blend, walk.prev[beam][i][0], walk.cur[beam][i][0]) * k;
-                oy += Mth.lerp(blend, walk.prev[beam][i][1], walk.cur[beam][i][1]) * k;
-            }
-            Vec3 base = from.add(to.subtract(from).scale(t));
-            out[i] = base.add(u.scale(ox)).add(v.scale(oy));
+            float k = WALK_UNIT * BeamTuning.amplitude * ampScale;
+            double ox = Mth.lerp(blend, walk.prev[beam][i][0], walk.cur[beam][i][0]) * k;
+            double oy = Mth.lerp(blend, walk.prev[beam][i][1], walk.cur[beam][i][1]) * k;
+            out[i] = from.add(to.subtract(from).scale(t)).add(u.scale(ox)).add(v.scale(oy));
         }
         return out;
-    }
-
-    // ---- drawing: camera-facing quads per segment, additive ----
-
-    private static void draw(PoseStack poseStack, VertexConsumer buffer, Vec3[] pts, Vec3 cam,
-                             Vector3f color, float intensity) {
-        float w = Math.max(0.005f, BeamTuning.width);
-        if (BeamTuning.glow) {
-            ribbon(poseStack, buffer, pts, cam, color, w * 4.0f, 0.16f * intensity);
-        }
-        ribbon(poseStack, buffer, pts, cam, color, w * 1.6f, 0.55f * intensity);
-        ribbon(poseStack, buffer, pts, cam, new Vector3f(1, 1, 1), w * 0.7f, 0.85f * intensity);
-    }
-
-    /**
-     * One camera-facing strip per segment, drawn as two quads that meet on the
-     * centre line: full alpha along the middle, zero at both outer edges.
-     *
-     * <p>A strip of constant alpha is what makes a billboard read as a pane of
-     * glass — its edge is a hard line at a fixed width, and the eye reads a flat
-     * sheet. Fading to nothing at the edges leaves no silhouette to read, so the
-     * same geometry reads as a glow around a filament instead.
-     */
-    private static void ribbon(PoseStack poseStack, VertexConsumer buffer, Vec3[] pts, Vec3 cam,
-                               Vector3f color, float halfWidth, float alpha) {
-        var pose = poseStack.last().pose();
-        int r = (int) (color.x() * 255), g = (int) (color.y() * 255), b = (int) (color.z() * 255);
-        int a = (int) (Mth.clamp(alpha, 0, 1) * 255);
-        for (int i = 0; i < pts.length - 1; i++) {
-            Vec3 p0 = pts[i], p1 = pts[i + 1];
-            Vec3 seg = p1.subtract(p0);
-            if (seg.lengthSqr() < 1.0e-9) {
-                continue;
-            }
-            Vec3 toCam = cam.subtract(p0.add(p1).scale(0.5));
-            Vec3 side = seg.cross(toCam);
-            if (side.lengthSqr() < 1.0e-9) {
-                continue;
-            }
-            side = side.normalize().scale(halfWidth);
-            Vec3 l0 = p0.subtract(side), l1 = p1.subtract(side);
-            Vec3 r0 = p0.add(side), r1 = p1.add(side);
-            // left edge -> centre
-            vertex(buffer, pose, l0, r, g, b, 0);
-            vertex(buffer, pose, p0, r, g, b, a);
-            vertex(buffer, pose, p1, r, g, b, a);
-            vertex(buffer, pose, l1, r, g, b, 0);
-            // centre -> right edge
-            vertex(buffer, pose, p0, r, g, b, a);
-            vertex(buffer, pose, r0, r, g, b, 0);
-            vertex(buffer, pose, r1, r, g, b, 0);
-            vertex(buffer, pose, p1, r, g, b, a);
-        }
-    }
-
-    private static void vertex(VertexConsumer buffer, org.joml.Matrix4f pose, Vec3 p,
-                               int r, int g, int b, int alpha) {
-        buffer.addVertex(pose, (float) p.x, (float) p.y, (float) p.z).setColor(r, g, b, alpha);
     }
 
     // ---- the old look, kept so it can be compared against in the same world ----
@@ -265,8 +247,9 @@ public final class RitualBeamRenderer {
         Vec3 focus = Vec3.atCenterOf(core.getBlockPos()).add(0, 0.95, 0);
         int density = ramp > 0 ? 4 : 2;
         for (int i = 0; i < lit; i++) {
-            Vec3 from = Vec3.atCenterOf(core.getBlockPos().offset(CORNERS[i])).add(0, 0.8, 0);
-            Vector3f color = colorFor(i, core.phase(), recoloredCount);
+            Vec3 from = Vec3.atBottomCenterOf(core.getBlockPos().offset(CORNERS[i])).add(0, RESONATOR_TOP, 0);
+            int rgb = colorFor(i, core.phase(), recoloredCount);
+            Vector3f color = new Vector3f(((rgb >> 16) & 0xFF) / 255f, ((rgb >> 8) & 0xFF) / 255f, (rgb & 0xFF) / 255f);
             for (int s = 0; s < density; s++) {
                 Vec3 point = from.lerp(focus, level.random.nextDouble());
                 level.addParticle(new DustParticleOptions(color, 1.0f), point.x, point.y, point.z, 0, 0, 0);

@@ -30,8 +30,6 @@ public final class BeamTuning {
     public static float decay = 0.8f;
     /** Random walk kick per tick. */
     public static float spread = 0.7f;
-    /** Extra additive passes around the filament. */
-    public static boolean glow = true;
     /** Width of the bright core filament, in blocks. */
     public static float width = 0.045f;
 
@@ -54,7 +52,6 @@ public final class BeamTuning {
                 + " nodes=" + nodes
                 + " decay=" + String.format("%.2f", decay)
                 + " spread=" + String.format("%.2f", spread)
-                + " width=" + String.format("%.3f", width)
-                + " glow=" + glow;
+                + " width=" + String.format("%.3f", width);
     }
 }

@@ -1,6 +1,5 @@
 package com.quantumitems.client;
 
-import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
@@ -49,12 +48,6 @@ public final class BeamTuningCommand {
                 .then(Commands.argument("v", IntegerArgumentType.integer(3, 64))
                         .executes(ctx -> {
                             BeamTuning.nodes = IntegerArgumentType.getInteger(ctx, "v");
-                            return report(ctx.getSource());
-                        })));
-        root.then(Commands.literal("glow")
-                .then(Commands.argument("v", BoolArgumentType.bool())
-                        .executes(ctx -> {
-                            BeamTuning.glow = BoolArgumentType.getBool(ctx, "v");
                             return report(ctx.getSource());
                         })));
 
