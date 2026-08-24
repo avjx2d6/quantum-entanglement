@@ -20,6 +20,17 @@ public final class ClientEvents {
             event.registerBlockEntityRenderer(ModRegistry.QUANTUM_CORE_BE.get(), QuantumCoreRenderer::new);
         }
 
+        /**
+         * The shard is drawn as a living knot rather than a block model. Vanilla
+         * only asks for a custom renderer when the baked model says so, which is
+         * why {@code item/quantum_shard.json} inherits from {@code builtin/entity}.
+         */
+        @SubscribeEvent
+        public static void registerClientExtensions(
+                net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent event) {
+            event.registerItem(new EntangledKnotRenderer.Extensions(), ModRegistry.QUANTUM_SHARD.get());
+        }
+
         @SubscribeEvent
         public static void onClientSetup(net.neoforged.fml.event.lifecycle.FMLClientSetupEvent event) {
             // Ponder is embedded (jarJar) and a required client dependency, so
