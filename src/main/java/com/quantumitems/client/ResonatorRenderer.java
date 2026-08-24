@@ -117,12 +117,14 @@ public class ResonatorRenderer implements BlockEntityRenderer<ResonatorBlockEnti
         float speed = awake ? 8.0f : 1.0f;
         int light = awake ? 0xF000F0
                 : LevelRenderer.getLightColor(resonator.getLevel(), resonator.getBlockPos());
+        // Height, size and both gem turns come from the cube in
+        // resonator.bbmodel, which the amethyst frame at y 5..7 is built around.
         poseStack.pushPose();
-        poseStack.translate(0.5, 0.5 + Mth.sin(time / 14.0f) * 0.03f, 0.5);
-        poseStack.mulPose(Axis.YP.rotationDegrees(time * speed));
-        poseStack.mulPose(Axis.XP.rotationDegrees(35.3f)); // gem tilt
-        poseStack.mulPose(Axis.ZP.rotationDegrees(45.0f));
-        poseStack.scale(0.28f, 0.28f, 0.28f);
+        poseStack.translate(0.5, ObserverEyeRender.CORE_HEIGHT
+                + Mth.sin(time / 14.0f) * 0.03f, 0.5);
+        poseStack.mulPose(Axis.YP.rotationDegrees(time * speed + ObserverEyeRender.GEM_YAW));
+        poseStack.mulPose(Axis.ZP.rotationDegrees(ObserverEyeRender.GEM_TIP));
+        poseStack.scale(ObserverEyeRender.SIZE, ObserverEyeRender.SIZE, ObserverEyeRender.SIZE);
         ObserverEyeRender.renderEyeCube(poseStack, buffers, light);
         poseStack.popPose();
     }

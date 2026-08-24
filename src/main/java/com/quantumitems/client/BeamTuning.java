@@ -35,16 +35,8 @@ public final class BeamTuning {
      * additive blending a full-strength beam washes out to white whatever its
      * colour is; the colour's own darkness lives in the constants in
      * {@link RitualBeamRenderer}.
-     *
-     * <p>0.5 was still clipping, and the reason is structural rather than a
-     * matter of taste: depth is tested but not written, so the far wall of the
-     * tube shows through the near one and every pixel of a beam gets its colour
-     * added twice. At 0.5 the cyan's blue channel came to 216 of 255 before any
-     * two beams even crossed, and near the focus all four overlap. 0.34 leaves
-     * the doubled strand around 150 — still plainly a lit strand, with room
-     * left for the crossings to be the bright thing.
      */
-    public static float brightness = 0.34f;
+    public static float brightness = 0.5f;
     /**
      * Line width in blocks. Segments are separate cuboids, so their end faces
      * meet at an angle at every node — the reference hides that by staying

@@ -184,7 +184,7 @@ public final class RitualBeamRenderer {
             return;
         }
         ClientLevel level = Minecraft.getInstance().level;
-        if (level == null || ActiveRitualCores.positions(level).isEmpty()) {
+        if (level == null || ActiveRitualCores.beingDrawn(level).isEmpty()) {
             return;
         }
         float partialTick = event.getPartialTick().getGameTimeDeltaPartialTick(false);
@@ -193,7 +193,7 @@ public final class RitualBeamRenderer {
         SuperRenderTypeBuffer buffer = DefaultSuperRenderTypeBuffer.getInstance();
         boolean drewAnything = false;
 
-        for (BlockPos pos : ActiveRitualCores.positions(level)) {
+        for (BlockPos pos : ActiveRitualCores.beingDrawn(level)) {
             if (!(level.getBlockEntity(pos) instanceof QuantumCoreBlockEntity core)) {
                 continue;
             }

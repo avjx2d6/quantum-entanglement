@@ -31,7 +31,8 @@ public final class ObserverEyeRender {
 
     /** Edge of the gem in blocks — 4 pixels, as modelled. */
     public static final float SIZE = 4 / 16f;
-    /** Y of the gem's centre inside the lower housing, from the block's floor. */
+    /** Y of the gem's centre inside its housing, from the block's floor. The
+     *  core and the resonator model it at the same height. */
     public static final float CORE_HEIGHT = 8.5f / 16f;
     /** The two turns that stand a cube on a vertex, in the order Blockbench applies them. */
     public static final float GEM_YAW = 45.0f;

@@ -268,9 +268,13 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, QuantumCoreBlockEntity core) {
-        boolean activePhases = core.phase == Phase.CONNECTING || core.phase == Phase.SCANNING
+        // The pull ends at the verdict — the orbs were released before the
+        // phase changed — but FAILURE still has its beams to break, and a core
+        // dropped from the drawn set would have them blink out instead.
+        boolean live = core.phase == Phase.CONNECTING || core.phase == Phase.SCANNING
                 || core.phase == Phase.JUDGEMENT || core.phase == Phase.CRESCENDO;
-        com.quantumitems.engine.ActiveRitualCores.report(level, pos, activePhases);
+        com.quantumitems.engine.ActiveRitualCores.report(level, pos, live,
+                live || core.phase == Phase.FAILURE);
         if (core.phase == Phase.IDLE) {
             return;
         }
@@ -290,7 +294,7 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         }
         core.phaseAge++;
         core.emitTheater(serverLevel);
-        if (activePhases) {
+        if (live) {
             core.drainExperience(serverLevel);
             core.pullExperienceOrbs(serverLevel);
         }
@@ -708,7 +712,7 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
     @Override
     public void setRemoved() {
         if (level != null) {
-            com.quantumitems.engine.ActiveRitualCores.report(level, worldPosition, false);
+            com.quantumitems.engine.ActiveRitualCores.report(level, worldPosition, false, false);
         }
         super.setRemoved();
     }

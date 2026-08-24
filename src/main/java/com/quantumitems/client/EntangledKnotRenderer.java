@@ -60,7 +60,7 @@ public final class EntangledKnotRenderer extends BlockEntityWithoutLevelRenderer
      * to land on this luma instead: greens stay deep, blues and violets come up
      * pale, which is also what real nacre does.
      */
-    private static final float TARGET_LUMA = 0.62f;
+    private static final float TARGET_LUMA = 0.52f;
     private static final float MAX_SATURATION = 0.85f;
     /** Split between the view-angle term and the band travelling along the strand. */
     private static final float VIEW_WEIGHT = 0.55f;
@@ -213,7 +213,13 @@ public final class EntangledKnotRenderer extends BlockEntityWithoutLevelRenderer
             // distance around the loop to the pulse, 0..0.5 either way round
             float d = Math.abs(((i / (float) NODES) - phase + 1.5f) % 1.0f - 0.5f);
             float head = Mth.clamp(1.0f - d * 5.0f, 0.0f, 1.0f);
-            bright[i] = Mth.clamp(0.45f + w * 0.20f + head * head * 0.75f, 0.30f, 1.0f);
+            // Sized against the additive doubling. Depth is tested but not
+            // written, so the far wall of the strand shows through the near one
+            // and every pixel is added twice; where the knot crosses itself
+            // that becomes four times over. At 0.40 base and 0.52 ramp luma a
+            // plain strand lands near 0.42 doubled, a crossing near 0.83, and
+            // only the pulse's own peak is allowed to reach white.
+            bright[i] = Mth.clamp(0.40f + w * 0.18f + head * head * 0.50f, 0.26f, 1.0f);
         }
         pts[NODES] = pts[0];
         bright[NODES] = bright[0];

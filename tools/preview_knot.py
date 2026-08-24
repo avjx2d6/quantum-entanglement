@@ -36,7 +36,7 @@ WALK_UNIT = 0.050
 DECAY = 0.80
 SPREAD = 0.70
 HUE_MIN, HUE_MAX = 0.38, 0.88
-TARGET_LUMA = 0.62
+TARGET_LUMA = 0.52
 MAX_SATURATION = 0.85
 VIEW_WEIGHT = 0.55
 BAND_WEIGHT = 1.0 - VIEW_WEIGHT
@@ -141,7 +141,7 @@ def brightness(phase):
     for i in range(NODES):
         d = abs(((i / NODES) - phase + 1.5) % 1.0 - 0.5)
         head = np.clip(1.0 - d * 5.0, 0, 1)
-        b[i] = np.clip(0.45 + head * head * 0.75, 0.30, 1.0)
+        b[i] = np.clip(0.40 + head * head * 0.50, 0.26, 1.0)
     b[NODES] = b[0]
     return b
 
