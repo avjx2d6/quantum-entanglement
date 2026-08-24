@@ -12,6 +12,7 @@ import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
+import org.joml.Vector3f;
 
 /**
  * The shard drawn as a knot of the same living strand the ritual beams are made
@@ -36,7 +37,70 @@ import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
  */
 public final class EntangledKnotRenderer extends BlockEntityWithoutLevelRenderer {
 
-    private static final int COLOR = 0x21BED9;          // the input beams' cyan
+    // ---- colour: thin film, not a paint job ----
+
+    /**
+     * The knot has no colour of its own. Its hue comes from the angle the
+     * surface is seen at, the way oil on water or the inside of a shell does,
+     * so it crawls across the strand as the knot turns instead of sitting
+     * still. That is also what keeps it from reading as any of the three beam
+     * colours: those are flat and this one never is.
+     *
+     * <p>The arc runs green → cyan → violet → magenta and stops there. Taking
+     * it the whole way round the wheel would pick up yellows and reds and the
+     * thing would read as a novelty rainbow rather than as a film.
+     */
+    private static final float HUE_MIN = 0.38f;         // ~137°, green
+    private static final float HUE_MAX = 0.88f;         // ~317°, magenta
+    /**
+     * Held perceptually even along the whole arc. At one fixed saturation the
+     * hues are nowhere near equally bright — pure green carries three quarters
+     * of the luma and pure blue about seven percent — so half the knot went
+     * dark and simply vanished in a 16-pixel slot. Saturation is solved per hue
+     * to land on this luma instead: greens stay deep, blues and violets come up
+     * pale, which is also what real nacre does.
+     */
+    private static final float TARGET_LUMA = 0.62f;
+    private static final float MAX_SATURATION = 0.85f;
+    /** Split between the view-angle term and the band travelling along the strand. */
+    private static final float VIEW_WEIGHT = 0.55f;
+    private static final float BAND_WEIGHT = 1.0f - VIEW_WEIGHT;
+    /** Bands around the loop. Two, because the strand itself winds around twice. */
+    private static final float BANDS = 2.0f;
+    /** Ticks for the film to crawl one full arc on a knot nobody is turning. */
+    private static final float DRIFT_PERIOD = 130.0f;
+
+    /** The hue arc, resolved once — this is sampled per ring vertex per frame. */
+    private static final int[] RAMP = new int[64];
+
+    static {
+        for (int i = 0; i < RAMP.length; i++) {
+            float h = HUE_MIN + (HUE_MAX - HUE_MIN) * (i / (float) (RAMP.length - 1));
+            // At value 1 the luma of a hue falls linearly with saturation, from
+            // white down to the pure hue's own luma — so the saturation that
+            // hits the target is one division rather than a search. Greens and
+            // cyans reach the saturation ceiling while still too bright, and
+            // desaturating them further would just bleach them, so the rest of
+            // the correction comes off the value instead. Luma is linear in
+            // value as well, which makes that a second division.
+            float pure = luma(Mth.hsvToRgb(h, 1.0f, 1.0f));
+            float s = Mth.clamp((1.0f - TARGET_LUMA) / (1.0f - pure), 0.0f, MAX_SATURATION);
+            float v = Mth.clamp(TARGET_LUMA / (1.0f - s * (1.0f - pure)), 0.0f, 1.0f);
+            RAMP[i] = Mth.hsvToRgb(h, s, v) & 0xFFFFFF;
+        }
+    }
+
+    private static float luma(int rgb) {
+        return (0.2126f * ((rgb >> 16) & 0xFF)
+                + 0.7152f * ((rgb >> 8) & 0xFF)
+                + 0.0722f * (rgb & 0xFF)) / 255.0f;
+    }
+
+    private static int film(float along, float facing, float drift) {
+        float band = 0.5f - 0.5f * Mth.cos((along * BANDS + drift) * Mth.TWO_PI);
+        float t = Mth.clamp(VIEW_WEIGHT * (1.0f - facing) + BAND_WEIGHT * band, 0.0f, 1.0f);
+        return RAMP[(int) (t * (RAMP.length - 1))];
+    }
 
     /**
      * Half-width of the knot in model space, where 1.0 is a full block. The
@@ -156,8 +220,17 @@ public final class EntangledKnotRenderer extends BlockEntityWithoutLevelRenderer
 
         poseStack.pushPose();
         poseStack.translate(0.5, 0.5, 0.5);   // renderByItem starts at the model's corner
+
+        // Which way the eye is, expressed in the knot's own space. positiveZ
+        // gives the model-space direction that the pose maps onto view +Z,
+        // which is exactly "toward the camera" — and it holds for the GUI's
+        // orthographic pass too, flipped Y scale and all.
+        Vector3f toCamera = poseStack.last().pose().positiveZ(new Vector3f()).normalize();
+        float drift = (time / DRIFT_PERIOD) % 1.0f;
+        Vec3 eye = new Vec3(toCamera.x(), toCamera.y(), toCamera.z());
+
         StrandGeometry.tube(poseStack, buffers.getBuffer(QuantumRenderTypes.RITUAL_BEAM),
-                pts, bright, COLOR, RADIUS,
+                pts, bright, (along, facing) -> film(along, facing, drift), eye, RADIUS,
                 context == ItemDisplayContext.GUI ? SIDES_GUI : SIDES_WORLD,
                 true);
         poseStack.popPose();

@@ -15,6 +15,7 @@ Writes into preview/:
     knot_slot.png       the same at 16 px, upscaled — what a hotbar really shows
     knot_spin.png       the world angle through one turn around Y
     knot_writhe.png     consecutive ticks, to judge how alive it looks
+    knot_film.png       the iridescence crawling, with nothing else moving
 
 Keep the constants below in step with EntangledKnotRenderer and with the
 display block of models/item/quantum_shard.json, or the preview lies.
@@ -34,7 +35,13 @@ SIDES_GUI = 5
 WALK_UNIT = 0.050
 DECAY = 0.80
 SPREAD = 0.70
-COLOR = np.array([0x21, 0xBE, 0xD9], float) / 255.0
+HUE_MIN, HUE_MAX = 0.38, 0.88
+TARGET_LUMA = 0.62
+MAX_SATURATION = 0.85
+VIEW_WEIGHT = 0.55
+BAND_WEIGHT = 1.0 - VIEW_WEIGHT
+BANDS = 2.0
+DRIFT_PERIOD = 130.0
 
 # --- must match the display block of item/quantum_shard.json ---
 GUI_TILT = 90.0     # face-on: where the trefoil is legible
@@ -45,6 +52,34 @@ OUT = "preview/"
 
 def unit(v):
     return v / np.linalg.norm(v)
+
+
+def hsv_to_rgb(h, s, v):
+    """Mth.hsvToRgb, as floats."""
+    i = int(h * 6) % 6
+    f = h * 6 - int(h * 6)
+    p, q, t = v * (1 - s), v * (1 - f * s), v * (1 - (1 - f) * s)
+    return [(v, t, p), (q, v, p), (p, v, t), (p, q, v), (t, p, v), (v, p, q)][i]
+
+
+def _ramp():
+    out = []
+    for i in range(64):
+        h = HUE_MIN + (HUE_MAX - HUE_MIN) * i / 63
+        pure = np.dot((0.2126, 0.7152, 0.0722), hsv_to_rgb(h, 1.0, 1.0))
+        s = min((1 - TARGET_LUMA) / (1 - pure), MAX_SATURATION)
+        v = min(TARGET_LUMA / (1 - s * (1 - pure)), 1.0)
+        out.append(hsv_to_rgb(h, s, v))
+    return np.array(out)
+
+
+RAMP = _ramp()
+
+
+def film(along, facing, drift):
+    band = 0.5 - 0.5 * np.cos((along * BANDS + drift) * 2 * np.pi)
+    t = np.clip(VIEW_WEIGHT * (1 - facing) + BAND_WEIGHT * band, 0, 1)
+    return RAMP[int(t * 63)]
 
 
 def curve():
@@ -75,14 +110,16 @@ def rings(pts, radius, sides):
     # transport around a loop arrives rotated; unwind that evenly
     twist = np.arctan2(np.dot(tan[0], np.cross(u[n], u[0])), np.dot(u[n], u[0]))
     out = np.zeros((n + 1, sides, 3))
+    nrm = np.zeros((n + 1, sides, 3))
     for i in range(n + 1):
         a = twist * i / n
         ui = u[i] * np.cos(a) + np.cross(tan[i], u[i]) * np.sin(a)
         vi = unit(np.cross(tan[i], ui))
         for k in range(sides):
             ang = 2 * np.pi * k / sides
-            out[i, k] = pts[i] + ui * np.cos(ang) * radius + vi * np.sin(ang) * radius
-    return out
+            nrm[i, k] = ui * np.cos(ang) + vi * np.sin(ang)
+            out[i, k] = pts[i] + nrm[i, k] * radius
+    return out, nrm
 
 
 def walk(ticks, seed=5):
@@ -121,7 +158,7 @@ def rot_y(deg):
     return np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])
 
 
-def _triangle(img, p, q, r, wp, wq, wr, gain):
+def _triangle(img, p, q, r, cp, cq, cr, gain):
     px = img.shape[0]
     lo_x = max(int(min(p[0], q[0], r[0])), 0)
     hi_x = min(int(max(p[0], q[0], r[0])) + 1, px - 1)
@@ -140,14 +177,22 @@ def _triangle(img, p, q, r, wp, wq, wr, gain):
     m = (l0 >= 0) & (l1 >= 0) & (l2 >= 0)
     if not m.any():
         return
-    w = (l0 * wp + l1 * wq + l2 * wr)[m]
-    img[px - 1 - ys[m], xs[m]] += COLOR[None] * w[:, None] * gain
+    c = (l0[..., None] * cp + l1[..., None] * cq + l2[..., None] * cr)[m]
+    img[px - 1 - ys[m], xs[m]] += c * gain
 
 
-def render(matrix, px, offsets, phase=0.0, sides=SIDES, gain=0.40, bg=0.055):
+def render(matrix, px, offsets, phase=0.0, drift=0.0, sides=SIDES, gain=0.40, bg=0.055):
     pts = nodes(offsets)
-    ring = rings(pts, RADIUS, sides) @ matrix.T
+    ring, normals = rings(pts, RADIUS, sides)
+    ring = ring @ matrix.T
+    normals = normals @ matrix.T          # the tint works in view space here
     bright = brightness(phase)
+    # the eye is down +Z once everything has been rotated into view
+    eye = np.array([0.0, 0.0, 1.0])
+    col = np.zeros((NODES + 1, sides, 3))
+    for i in range(NODES + 1):
+        for k in range(sides):
+            col[i, k] = film(i / NODES, abs(np.dot(normals[i, k], eye)), drift) * bright[i]
     img = np.full((px, px, 3), bg)
     half = SIZE * 1.15
     xy = (ring[:, :, :2] / (2 * half) + 0.5) * px
@@ -155,8 +200,8 @@ def render(matrix, px, offsets, phase=0.0, sides=SIDES, gain=0.40, bg=0.055):
         for k in range(sides):
             k2 = (k + 1) % sides
             a, b, c, d = xy[i, k], xy[i, k2], xy[i + 1, k2], xy[i + 1, k]
-            _triangle(img, a, b, c, bright[i], bright[i], bright[i + 1], gain)
-            _triangle(img, a, c, d, bright[i], bright[i + 1], bright[i + 1], gain)
+            _triangle(img, a, b, c, col[i, k], col[i, k2], col[i + 1, k2], gain)
+            _triangle(img, a, c, d, col[i, k], col[i + 1, k2], col[i + 1, k], gain)
     return Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8))
 
 
@@ -171,12 +216,14 @@ def strip(images, path):
 os.makedirs(OUT, exist_ok=True)
 settled = walk(70)
 
-render(rot_x(GUI_TILT), 512, settled, 0.30).save(OUT + "knot_gui.png")
-render(rot_x(GUI_TILT), 16, settled, 0.30, sides=SIDES_GUI) \
+render(rot_x(GUI_TILT), 512, settled, 0.30, 0.0).save(OUT + "knot_gui.png")
+render(rot_x(GUI_TILT), 16, settled, 0.30, 0.0, sides=SIDES_GUI) \
     .resize((256, 256), Image.NEAREST).save(OUT + "knot_slot.png")
-strip([render(rot_y(a) @ rot_x(WORLD_TILT), 220, settled, a / 360.0)
+strip([render(rot_y(a) @ rot_x(WORLD_TILT), 220, settled, a / 360.0, a / 360.0)
        for a in range(0, 360, 45)], "knot_spin.png")
-strip([render(rot_x(GUI_TILT), 220, walk(70 + k), 0.30) for k in range(6)],
+strip([render(rot_x(GUI_TILT), 220, walk(70 + k), 0.30, 0.0) for k in range(6)],
       "knot_writhe.png")
+strip([render(rot_x(GUI_TILT), 220, settled, 0.30, d / 6.0) for d in range(6)],
+      "knot_film.png")
 
 print("previews written to", OUT)
