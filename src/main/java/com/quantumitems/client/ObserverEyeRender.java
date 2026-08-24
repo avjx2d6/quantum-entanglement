@@ -11,15 +11,31 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.inventory.InventoryMenu;
 
 /**
- * The Observer: a small 3D gem-cube textured with the author's Eye of
- * Elsewhere sprite on every face, drawn with manual quads (no baked-model
- * registration). Rotated like a gem and spun by the caller, it reads as a
- * floating faceted eye through the wall gaps of the hollow blocks —
- * placeholder until the author's Blockbench model replaces it.
+ * The Observer: a small gem-cube stood on one corner, drawn with manual quads.
+ *
+ * <p>It lives in code rather than in the block models for a reason that is not
+ * a matter of preference. Standing a cube on its vertex is a turn of 45° about
+ * Y and then 54.7356° — atan(√2) — about Z, and a Java block element takes one
+ * axis and one of five angles. Blockbench will happily export the two-axis
+ * rotation, and {@code BlockElement.Deserializer} then throws on the missing
+ * "axis" key, which fails the WHOLE model rather than that one cube. So the
+ * housing is a model and the gem inside it is not.
+ *
+ * <p>The geometry and the per-face UVs below are the author's cube out of
+ * quantum_core_lower_e.bbmodel, transcribed: a 4-pixel cube whose six faces are
+ * unwrapped across one 16×16 sprite, two of them mirrored.
  */
 public final class ObserverEyeRender {
     private static final ResourceLocation EYE_TEXTURE =
-            ResourceLocation.fromNamespaceAndPath("quantumitems", "item/eye_of_elsewhere");
+            ResourceLocation.fromNamespaceAndPath("quantumitems", "block/observer_eye");
+
+    /** Edge of the gem in blocks — 4 pixels, as modelled. */
+    public static final float SIZE = 4 / 16f;
+    /** Y of the gem's centre inside the lower housing, from the block's floor. */
+    public static final float CORE_HEIGHT = 8.5f / 16f;
+    /** The two turns that stand a cube on a vertex, in the order Blockbench applies them. */
+    public static final float GEM_YAW = 45.0f;
+    public static final float GEM_TIP = 54.7356f;
 
     private ObserverEyeRender() {
     }
@@ -31,7 +47,8 @@ public final class ObserverEyeRender {
         VertexConsumer buffer = buffers.getBuffer(RenderType.cutout());
         PoseStack.Pose pose = poseStack.last();
         float h = 0.5f;
-        // six faces: {normal, four corners CCW from outside}
+        // six faces: {normal, four corners from outside: top-left, top-right,
+        // bottom-right, bottom-left} — the same order a face's uv rect is read in
         float[][][] faces = {
                 {{0, 0, -1}, {h, h, -h}, {-h, h, -h}, {-h, -h, -h}, {h, -h, -h}},   // north
                 {{0, 0, 1}, {-h, h, h}, {h, h, h}, {h, -h, h}, {-h, -h, h}},        // south
@@ -40,12 +57,27 @@ public final class ObserverEyeRender {
                 {{0, 1, 0}, {-h, h, -h}, {h, h, -h}, {h, h, h}, {-h, h, h}},        // up
                 {{0, -1, 0}, {-h, -h, h}, {h, -h, h}, {h, -h, -h}, {-h, -h, -h}}    // down
         };
-        float u0 = sprite.getU0(), u1 = sprite.getU1(), v0 = sprite.getV0(), v1 = sprite.getV1();
-        float[][] uv = {{u0, v0}, {u1, v0}, {u1, v1}, {u0, v1}};
-        for (float[][] face : faces) {
-            float[] n = face[0];
+        // uv rects in sprite pixels, same order; up and down run backwards
+        // because that is how they are unwrapped on the sheet
+        float[][] rects = {
+                {0, 0, 4, 4},       // north
+                {4, 0, 8, 4},       // south
+                {4, 4, 8, 8},       // west
+                {0, 4, 4, 8},       // east
+                {4, 12, 0, 8},      // up
+                {12, 0, 8, 4}       // down
+        };
+        for (int f = 0; f < faces.length; f++) {
+            float[] n = faces[f][0];
+            float[] r = rects[f];
+            float[][] uv = {
+                    {sprite.getU(r[0] / 16f), sprite.getV(r[1] / 16f)},
+                    {sprite.getU(r[2] / 16f), sprite.getV(r[1] / 16f)},
+                    {sprite.getU(r[2] / 16f), sprite.getV(r[3] / 16f)},
+                    {sprite.getU(r[0] / 16f), sprite.getV(r[3] / 16f)}
+            };
             for (int i = 1; i <= 4; i++) {
-                float[] c = face[i];
+                float[] c = faces[f][i];
                 buffer.addVertex(pose, c[0], c[1], c[2])
                         .setColor(255, 255, 255, 255)
                         .setUv(uv[i - 1][0], uv[i - 1][1])

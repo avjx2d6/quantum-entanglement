@@ -1,6 +1,4 @@
 {
-  "format_version": "1.21.11",
-  "credit": "Made with Blockbench",
   "parent": "minecraft:block/block",
   "textures": {
     "amet": "minecraft:block/amethyst_block",
@@ -11,7 +9,6 @@
   },
   "elements": [
     {
-      "name": "down",
       "from": [
         1,
         0,
@@ -22,15 +19,6 @@
         1,
         15
       ],
-      "rotation": {
-        "angle": 0,
-        "axis": "y",
-        "origin": [
-          8,
-          0.5,
-          8
-        ]
-      },
       "faces": {
         "north": {
           "uv": [
@@ -86,7 +74,8 @@
           ],
           "texture": "#deep"
         }
-      }
+      },
+      "name": "down"
     },
     {
       "from": [
@@ -136,7 +125,8 @@
           ],
           "texture": "#amet"
         }
-      }
+      },
+      "name": "cube"
     },
     {
       "from": [
@@ -186,7 +176,8 @@
           ],
           "texture": "#amet"
         }
-      }
+      },
+      "name": "cube"
     },
     {
       "from": [
@@ -236,7 +227,8 @@
           ],
           "texture": "#amet"
         }
-      }
+      },
+      "name": "cube"
     },
     {
       "from": [
@@ -286,57 +278,8 @@
           ],
           "texture": "#amet"
         }
-      }
-    },
-    {
-      "from": [
-        12,
-        12,
-        4
-      ],
-      "to": [
-        15,
-        15,
-        12
-      ],
-      "faces": {
-        "east": {
-          "uv": [
-            4,
-            1,
-            12,
-            4
-          ],
-          "texture": "#deep"
-        },
-        "west": {
-          "uv": [
-            4,
-            1,
-            12,
-            4
-          ],
-          "texture": "#deep"
-        },
-        "up": {
-          "uv": [
-            12,
-            4,
-            15,
-            12
-          ],
-          "texture": "#deep"
-        },
-        "down": {
-          "uv": [
-            12,
-            4,
-            15,
-            12
-          ],
-          "texture": "#deep"
-        }
-      }
+      },
+      "name": "cube"
     },
     {
       "from": [
@@ -404,7 +347,8 @@
           ],
           "texture": "#deep"
         }
-      }
+      },
+      "name": "cube"
     },
     {
       "from": [
@@ -472,7 +416,8 @@
           ],
           "texture": "#deep"
         }
-      }
+      },
+      "name": "cube"
     },
     {
       "from": [
@@ -522,42 +467,59 @@
           ],
           "texture": "#deep"
         }
-      }
-    }
-  ],
-  "groups": [
-    0,
-    {
-      "name": "collums",
-      "origin": [
-        0,
-        0,
-        0
-      ],
-      "scope": 0,
-      "color": 0,
-      "children": [
-        1,
-        2,
-        3,
-        4
-      ]
+      },
+      "name": "cube"
     },
     {
-      "name": "up",
-      "origin": [
-        0,
-        0,
-        0
+      "from": [
+        12,
+        12,
+        4
       ],
-      "scope": 0,
-      "color": 0,
-      "children": [
-        5,
-        6,
-        7,
-        8
-      ]
+      "to": [
+        15,
+        15,
+        12
+      ],
+      "faces": {
+        "east": {
+          "uv": [
+            4,
+            1,
+            12,
+            4
+          ],
+          "texture": "#deep"
+        },
+        "west": {
+          "uv": [
+            4,
+            1,
+            12,
+            4
+          ],
+          "texture": "#deep"
+        },
+        "up": {
+          "uv": [
+            12,
+            4,
+            15,
+            12
+          ],
+          "texture": "#deep"
+        },
+        "down": {
+          "uv": [
+            12,
+            4,
+            15,
+            12
+          ],
+          "texture": "#deep"
+        }
+      },
+      "name": "cube"
     }
   ]
 }

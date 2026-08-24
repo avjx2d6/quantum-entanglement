@@ -53,11 +53,13 @@ public class QuantumCoreRenderer implements BlockEntityRenderer<QuantumCoreBlock
         int observerLight = running ? 0xF000F0
                 : LevelRenderer.getLightColor(core.getLevel(), core.getBlockPos());
         poseStack.pushPose();
-        poseStack.translate(0.5, 0.55 + Mth.sin(time / 16.0f) * 0.03f, 0.5);
-        poseStack.mulPose(Axis.YP.rotationDegrees(time * observerSpeed));
-        poseStack.mulPose(Axis.XP.rotationDegrees(35.3f)); // gem tilt
-        poseStack.mulPose(Axis.ZP.rotationDegrees(45.0f));
-        poseStack.scale(0.4f, 0.4f, 0.4f);
+        // Height, size and the two gem turns all come from the cube in
+        // quantum_core_lower_e.bbmodel; only the bob and the spin are ours.
+        poseStack.translate(0.5, ObserverEyeRender.CORE_HEIGHT
+                + Mth.sin(time / 16.0f) * 0.03f, 0.5);
+        poseStack.mulPose(Axis.YP.rotationDegrees(time * observerSpeed + ObserverEyeRender.GEM_YAW));
+        poseStack.mulPose(Axis.ZP.rotationDegrees(ObserverEyeRender.GEM_TIP));
+        poseStack.scale(ObserverEyeRender.SIZE, ObserverEyeRender.SIZE, ObserverEyeRender.SIZE);
         ObserverEyeRender.renderEyeCube(poseStack, buffers, observerLight);
         poseStack.popPose();
 

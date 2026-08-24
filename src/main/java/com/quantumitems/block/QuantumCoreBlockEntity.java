@@ -7,7 +7,6 @@ import com.quantumitems.QuantumNetworks;
 import com.quantumitems.engine.QuantumEngine;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
@@ -18,7 +17,6 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
-import org.joml.Vector3f;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -85,11 +83,6 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
             default -> 0;
         };
     }
-
-    private static final Vector3f COLOR_CHARGE = new Vector3f(0.75f, 0.55f, 1.0f);
-    private static final Vector3f COLOR_INPUT = new Vector3f(0.35f, 0.9f, 1.0f);
-    private static final Vector3f COLOR_OUTPUT = new Vector3f(1.0f, 0.84f, 0.3f);
-    private static final Vector3f COLOR_FAIL = new Vector3f(1.0f, 0.2f, 0.15f);
 
     private Phase phase = Phase.IDLE;
     private int phaseAge;
@@ -451,22 +444,16 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         // the crescendo can ramp on a curve instead of spraying denser dust.
         // What stays here is the aftermath: one-shot bursts that have to agree
         // for everyone watching.
-        if (phase != Phase.SUCCESS && phase != Phase.FAILURE) {
+        // Failure is drawn client-side too now: the beams do not switch off, the
+        // focus lets go and the four strands hang, sag and drain dark from the
+        // middle outward. Sprayed red dust could not show a line going slack.
+        if (phase != Phase.SUCCESS) {
             return;
         }
-        Vec3 focus = beamFocus();
         for (BlockPos corner : CORNERS) {
             Vec3 from = Vec3.atCenterOf(worldPosition.offset(corner)).add(0, 0.8, 0);
-            if (phase == Phase.SUCCESS) {
-                level.sendParticles(ParticleTypes.END_ROD,
-                        from.x, from.y + 0.3, from.z, 1, 0.15, 0.2, 0.15, 0.01);
-            } else {
-                Vec3 point = from.lerp(focus, level.random.nextDouble());
-                level.sendParticles(new DustParticleOptions(COLOR_FAIL, 1.2f),
-                        point.x, point.y, point.z, 2, 0.08, 0.08, 0.08, 0);
-                level.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE,
-                        focus.x, focus.y, focus.z, 1, 0.1, 0.1, 0.1, 0.01);
-            }
+            level.sendParticles(ParticleTypes.END_ROD,
+                    from.x, from.y + 0.3, from.z, 1, 0.15, 0.2, 0.15, 0.01);
         }
     }
 

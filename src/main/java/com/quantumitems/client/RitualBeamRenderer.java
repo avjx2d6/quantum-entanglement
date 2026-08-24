@@ -56,6 +56,12 @@ public final class RitualBeamRenderer {
     private static final int COLOR_CHARGE = 0x8243E0;   // deep violet
     private static final int COLOR_INPUT = 0x21BED9;    // deep cyan
     private static final int COLOR_OUTPUT = 0xE0B01B;   // deep amber
+    private static final int COLOR_FAIL = 0xE02718;     // deep red
+
+    /** How far the focus end falls once the machine lets go of it, in blocks. */
+    private static final float FAIL_DROP = 1.15f;
+    /** Extra droop at the middle of a slack strand, in blocks. */
+    private static final float FAIL_SAG = 0.55f;
 
     /** Deflection of one walk step, in blocks, before amplitude is applied. */
     private static final float WALK_UNIT = 0.085f;
@@ -116,9 +122,16 @@ public final class RitualBeamRenderer {
     private static int connectedBeams(QuantumCoreBlockEntity.Phase phase, int age) {
         return switch (phase) {
             case CONNECTING -> Math.min(4, 1 + age / QuantumCoreBlockEntity.BEAM_STEP_TICKS);
-            case SCANNING, JUDGEMENT, CRESCENDO -> 4;
+            case SCANNING, JUDGEMENT, CRESCENDO, FAILURE -> 4;
             default -> 0;
         };
+    }
+
+    /** 0 while the ritual is alive, 0→1 across the failure phase. */
+    private static float failure(QuantumCoreBlockEntity.Phase phase, int age, float partialTick) {
+        return phase == QuantumCoreBlockEntity.Phase.FAILURE
+                ? Mth.clamp((age + partialTick) / QuantumCoreBlockEntity.FAILURE_TICKS, 0, 1)
+                : 0;
     }
 
     private static int recolored(QuantumCoreBlockEntity.Phase phase, int age) {
@@ -145,6 +158,9 @@ public final class RitualBeamRenderer {
      */
     private static int colorFor(int beam, QuantumCoreBlockEntity core, int recoloredCount) {
         QuantumCoreBlockEntity.Phase phase = core.phase();
+        if (phase == QuantumCoreBlockEntity.Phase.FAILURE) {
+            return COLOR_FAIL;
+        }
         boolean verdict = phase == QuantumCoreBlockEntity.Phase.JUDGEMENT
                 || phase == QuantumCoreBlockEntity.Phase.CRESCENDO;
         if (verdict && beam == core.plannedOutputCorner()) {
@@ -199,7 +215,9 @@ public final class RitualBeamRenderer {
         // the crescendo pushes amplitude along the same curve the riser climbs
         float ramp = phase == QuantumCoreBlockEntity.Phase.CRESCENDO
                 ? Mth.clamp((age + partialTick) / QuantumCoreBlockEntity.CRESCENDO_TICKS, 0, 1) : 0;
-        float ampScale = 1.0f + ramp * 1.8f;
+        float fail = failure(phase, age, partialTick);
+        // a failing beam enters at the crescendo's agitation and settles out of it
+        float ampScale = fail > 0 ? 1.0f + 1.8f * (1 - fail) : 1.0f + ramp * 1.8f;
         int recoloredCount = recolored(phase, age);
 
         if (BeamTuning.style == BeamTuning.Style.PARTICLES) {
@@ -210,6 +228,12 @@ public final class RitualBeamRenderer {
         int n = Mth.clamp(BeamTuning.nodes, 3, 64);
         WalkState walk = advanceWalk(core, n);
         Vec3 focus = Vec3.atCenterOf(core.getBlockPos()).add(0, FOCUS_HEIGHT - 0.5, 0);
+        // On a failure the machine lets go of the focus first: that end drops
+        // under gravity while the resonators keep holding theirs, so the four
+        // strands are left hanging rather than simply switched off.
+        if (fail > 0) {
+            focus = focus.subtract(0, FAIL_DROP * fail * fail, 0);
+        }
 
         float radius = Math.max(0.005f, BeamTuning.width) * (1.0f + ramp * 0.6f) * 0.5f;
         var consumer = buffer.getBuffer(QuantumRenderTypes.RITUAL_BEAM);
@@ -218,11 +242,17 @@ public final class RitualBeamRenderer {
         poseStack.translate(-camera.x, -camera.y, -camera.z);
         for (int b = 0; b < lit; b++) {
             Vec3 from = Vec3.atBottomCenterOf(core.getBlockPos().offset(CORNERS[b])).add(0, RESONATOR_TOP, 0);
-            Vec3[] pts = buildBeam(walk, b, n, from, focus, partialTick, ampScale);
+            Vec3[] pts = buildBeam(walk, b, n, from, focus, partialTick, ampScale, fail);
             float[] bright = new float[n + 1];
             for (int i = 0; i <= n; i++) {
                 float w = Mth.lerp(partialTick, walk.prev[b][i][2], walk.cur[b][i][2]);
                 bright[i] = Mth.clamp(0.8f + w * 0.45f, 0.55f, 1.0f) * BeamTuning.brightness;
+                if (fail > 0) {
+                    // the light drains out of the focus end and runs back along
+                    // the strand toward the resonator, which goes dark last
+                    float t = i / (float) n;
+                    bright[i] *= 1 - Mth.clamp((fail - (1 - t) * 0.55f) / 0.45f, 0, 1);
+                }
             }
             StrandGeometry.tube(poseStack, consumer, pts, bright,
                     colorFor(b, core, recoloredCount), radius, SIDES, false);
@@ -249,9 +279,14 @@ public final class RitualBeamRenderer {
         return st;
     }
 
-    /** Node positions in world space, offset in the plane across the beam. */
+    /**
+     * Node positions in world space, offset in the plane across the beam, plus
+     * the sag a slack strand takes on once the ritual has failed. The sag is a
+     * parabola pinned at both ends, so the resonator's end stays put and the
+     * fall reads as the middle giving way rather than the whole line sliding.
+     */
     private static Vec3[] buildBeam(WalkState walk, int beam, int n, Vec3 from, Vec3 to,
-                                    float blend, float ampScale) {
+                                    float blend, float ampScale, float fail) {
         Vec3 dir = to.subtract(from).normalize();
         Vec3 u = dir.cross(new Vec3(0, 1, 0));
         if (u.lengthSqr() < 1.0e-6) {
@@ -266,7 +301,9 @@ public final class RitualBeamRenderer {
             float k = WALK_UNIT * BeamTuning.amplitude * ampScale;
             double ox = Mth.lerp(blend, walk.prev[beam][i][0], walk.cur[beam][i][0]) * k;
             double oy = Mth.lerp(blend, walk.prev[beam][i][1], walk.cur[beam][i][1]) * k;
-            out[i] = from.add(to.subtract(from).scale(t)).add(u.scale(ox)).add(v.scale(oy));
+            double sag = fail > 0 ? FAIL_SAG * fail * fail * 4 * t * (1 - t) : 0;
+            out[i] = from.add(to.subtract(from).scale(t)).add(u.scale(ox)).add(v.scale(oy))
+                    .subtract(0, sag, 0);
         }
         return out;
     }
