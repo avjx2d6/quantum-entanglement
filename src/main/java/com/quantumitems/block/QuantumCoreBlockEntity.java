@@ -269,12 +269,12 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
 
     public static void tick(Level level, BlockPos pos, BlockState state, QuantumCoreBlockEntity core) {
         // The pull ends at the verdict — the orbs were released before the
-        // phase changed — but FAILURE still has its beams to break, and a core
-        // dropped from the drawn set would have them blink out instead.
+        // phase changed — but both verdicts still have a second of beam left to
+        // draw, and a core dropped from the drawn set has them blink out.
         boolean live = core.phase == Phase.CONNECTING || core.phase == Phase.SCANNING
                 || core.phase == Phase.JUDGEMENT || core.phase == Phase.CRESCENDO;
         com.quantumitems.engine.ActiveRitualCores.report(level, pos, live,
-                live || core.phase == Phase.FAILURE);
+                live || core.phase == Phase.FAILURE || core.phase == Phase.SUCCESS);
         if (core.phase == Phase.IDLE) {
             return;
         }
@@ -289,11 +289,9 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
             // /quantum ritual hold: the clock stops so the beams keep running
             // while their look is being tuned. Nothing else about the ritual
             // advances, so no entanglement can happen from a held core.
-            core.emitTheater(serverLevel);
             return;
         }
         core.phaseAge++;
-        core.emitTheater(serverLevel);
         if (live) {
             core.drainExperience(serverLevel);
             core.pullExperienceOrbs(serverLevel);
@@ -402,18 +400,15 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         launcherId = null;
     }
 
-    /** Beam lines explode outward, one sharp crack, then darkness. */
+    /**
+     * One sharp crack. The picture that goes with it is the SUCCESS phase,
+     * drawn client-side off the synced phase: the four strands let go of their
+     * resonators and are drawn into the focus while a ring of the same strand
+     * is thrown out flat over the circle. What used to be here was 104 packets
+     * of CRIT and END_ROD sprayed along the beam lines to every watching
+     * player, plus a FLASH — and none of it could show a line being pulled in.
+     */
     private void burst(ServerLevel level) {
-        Vec3 focus = beamFocus();
-        for (BlockPos corner : CORNERS) {
-            Vec3 from = Vec3.atCenterOf(worldPosition.offset(corner)).add(0, 0.8, 0);
-            for (int i = 0; i <= 12; i++) {
-                Vec3 point = from.lerp(focus, i / 12.0);
-                level.sendParticles(ParticleTypes.CRIT, point.x, point.y, point.z, 3, 0.15, 0.15, 0.15, 0.25);
-                level.sendParticles(ParticleTypes.END_ROD, point.x, point.y, point.z, 1, 0.1, 0.1, 0.1, 0.08);
-            }
-        }
-        level.sendParticles(ParticleTypes.FLASH, focus.x, focus.y, focus.z, 1, 0, 0, 0, 0);
         level.playSound(null, worldPosition, ModRegistry.RITUAL_BURST.get(), SoundSource.BLOCKS, 2.5f, 1.0f);
     }
 
@@ -430,34 +425,6 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
             if (state.is(ModRegistry.QUANTUM_CORE.get()) && state.getValue(QuantumCoreBlock.GLOW) != glow) {
                 level.setBlock(pos, state.setValue(QuantumCoreBlock.GLOW, glow), 3);
             }
-        }
-    }
-
-    private Vec3 beamFocus() {
-        return Vec3.atCenterOf(worldPosition).add(0, 0.95, 0); // the shard inside the upper frame
-    }
-
-    /**
-     * Beam script (author's storyboard): beams connect one by one, inputs
-     * recolor one by one, the planned output goes gold, the crescendo
-     * doubles the density, failure bleeds red.
-     */
-    private void emitTheater(ServerLevel level) {
-        // The lit beams are drawn client-side by RitualBeamRenderer, off the
-        // phase and phaseAge the block entity already syncs — no packets, and
-        // the crescendo can ramp on a curve instead of spraying denser dust.
-        // What stays here is the aftermath: one-shot bursts that have to agree
-        // for everyone watching.
-        // Failure is drawn client-side too now: the beams do not switch off, the
-        // focus lets go and the four strands hang, sag and drain dark from the
-        // middle outward. Sprayed red dust could not show a line going slack.
-        if (phase != Phase.SUCCESS) {
-            return;
-        }
-        for (BlockPos corner : CORNERS) {
-            Vec3 from = Vec3.atCenterOf(worldPosition.offset(corner)).add(0, 0.8, 0);
-            level.sendParticles(ParticleTypes.END_ROD,
-                    from.x, from.y + 0.3, from.z, 1, 0.15, 0.2, 0.15, 0.01);
         }
     }
 

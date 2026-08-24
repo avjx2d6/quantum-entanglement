@@ -63,6 +63,10 @@ public final class RitualBeamRenderer {
     /** Extra droop at the middle of a slack strand, in blocks. */
     private static final float FAIL_SAG = 0.55f;
 
+    /** The discharge ring stops just past the resonators, which sit at 2.83. */
+    private static final float RING_MAX = 4.2f;
+    private static final int RING_NODES = 28;
+
     /** Deflection of one walk step, in blocks, before amplitude is applied. */
     private static final float WALK_UNIT = 0.085f;
     /** Top face of the resonator model — the beam lands on it, not above it. */
@@ -122,7 +126,7 @@ public final class RitualBeamRenderer {
     private static int connectedBeams(QuantumCoreBlockEntity.Phase phase, int age) {
         return switch (phase) {
             case CONNECTING -> Math.min(4, 1 + age / QuantumCoreBlockEntity.BEAM_STEP_TICKS);
-            case SCANNING, JUDGEMENT, CRESCENDO, FAILURE -> 4;
+            case SCANNING, JUDGEMENT, CRESCENDO, FAILURE, SUCCESS -> 4;
             default -> 0;
         };
     }
@@ -131,6 +135,13 @@ public final class RitualBeamRenderer {
     private static float failure(QuantumCoreBlockEntity.Phase phase, int age, float partialTick) {
         return phase == QuantumCoreBlockEntity.Phase.FAILURE
                 ? Mth.clamp((age + partialTick) / QuantumCoreBlockEntity.FAILURE_TICKS, 0, 1)
+                : 0;
+    }
+
+    /** 0 while the ritual is alive, 0→1 across the success phase. */
+    private static float success(QuantumCoreBlockEntity.Phase phase, int age, float partialTick) {
+        return phase == QuantumCoreBlockEntity.Phase.SUCCESS
+                ? Mth.clamp((age + partialTick) / QuantumCoreBlockEntity.SUCCESS_TICKS, 0, 1)
                 : 0;
     }
 
@@ -160,6 +171,9 @@ public final class RitualBeamRenderer {
         QuantumCoreBlockEntity.Phase phase = core.phase();
         if (phase == QuantumCoreBlockEntity.Phase.FAILURE) {
             return COLOR_FAIL;
+        }
+        if (phase == QuantumCoreBlockEntity.Phase.SUCCESS) {
+            return COLOR_OUTPUT;   // the verdict went the way the gold beam promised
         }
         boolean verdict = phase == QuantumCoreBlockEntity.Phase.JUDGEMENT
                 || phase == QuantumCoreBlockEntity.Phase.CRESCENDO;
@@ -216,8 +230,16 @@ public final class RitualBeamRenderer {
         float ramp = phase == QuantumCoreBlockEntity.Phase.CRESCENDO
                 ? Mth.clamp((age + partialTick) / QuantumCoreBlockEntity.CRESCENDO_TICKS, 0, 1) : 0;
         float fail = failure(phase, age, partialTick);
-        // a failing beam enters at the crescendo's agitation and settles out of it
-        float ampScale = fail > 0 ? 1.0f + 1.8f * (1 - fail) : 1.0f + ramp * 1.8f;
+        float won = success(phase, age, partialTick);
+        // A failing beam enters at the crescendo's agitation and settles out of
+        // it; a succeeding one is snapped, and whips harder than the crescendo
+        // ever pushed before it goes.
+        float ampScale = 1.0f + ramp * 1.8f;
+        if (fail > 0) {
+            ampScale = 1.0f + 1.8f * (1 - fail);
+        } else if (won > 0) {
+            ampScale = 1.0f + 4.5f * (1 - won) * (1 - won);
+        }
         int recoloredCount = recolored(phase, age);
 
         if (BeamTuning.style == BeamTuning.Style.PARTICLES) {
@@ -240,8 +262,17 @@ public final class RitualBeamRenderer {
 
         poseStack.pushPose();
         poseStack.translate(-camera.x, -camera.y, -camera.z);
+        if (won > 0) {
+            shockRing(poseStack, consumer, focus, won);
+        }
         for (int b = 0; b < lit; b++) {
             Vec3 from = Vec3.atBottomCenterOf(core.getBlockPos().offset(CORNERS[b])).add(0, RESONATOR_TOP, 0);
+            if (won > 0) {
+                // The entanglement is made and the four become one: each strand
+                // lets go of its resonator and is drawn into the focus, so it
+                // shortens from the outside in rather than simply fading.
+                from = from.add(focus.subtract(from).scale(Mth.clamp(Math.pow(won, 0.6), 0, 0.995)));
+            }
             Vec3[] pts = buildBeam(walk, b, n, from, focus, partialTick, ampScale, fail);
             float[] bright = new float[n + 1];
             for (int i = 0; i <= n; i++) {
@@ -252,6 +283,14 @@ public final class RitualBeamRenderer {
                     // the strand toward the resonator, which goes dark last
                     float t = i / (float) n;
                     bright[i] *= 1 - Mth.clamp((fail - (1 - t) * 0.55f) / 0.45f, 0, 1);
+                }
+                if (won > 0) {
+                    // A spike steep enough to be a flash rather than a glare —
+                    // (1-t)^4 has spent itself in three ticks — over a fade slow
+                    // enough that the strand is still visibly being reeled in
+                    // when the ring reaches the resonators.
+                    float left = 1 - won;
+                    bright[i] *= (1 + left * left * left * left) * (float) Math.pow(left, 1.2);
                 }
             }
             StrandGeometry.tube(poseStack, consumer, pts, bright,
@@ -277,6 +316,39 @@ public final class RitualBeamRenderer {
         }
         st.lastTick = now;
         return st;
+    }
+
+    /**
+     * The discharge: a ring of the same strand thrown out flat from the focus,
+     * sweeping out over the four resonators and gone.
+     *
+     * <p>It replaces a single {@code FLASH} particle. A flash is a sprite that
+     * happens at a point; the circle of resonators is what the ritual is, and a
+     * ring leaving through them says the circle has just spent itself. The tube
+     * closes on itself here — see {@link StrandGeometry}'s loop handling, which
+     * the shard's knot needs for the same reason.
+     */
+    private static void shockRing(PoseStack poseStack, com.mojang.blaze3d.vertex.VertexConsumer consumer,
+                                  Vec3 focus, float won) {
+        // out fast, then slowing — an impulse spending itself against the air
+        float spread = 1 - (1 - won) * (1 - won);
+        double radius = Mth.lerp(spread, 0.25f, RING_MAX);
+        float fade = (float) Math.pow(1 - won, 1.3);
+        Vec3[] pts = new Vec3[RING_NODES + 1];
+        float[] bright = new float[RING_NODES + 1];
+        for (int i = 0; i < RING_NODES; i++) {
+            double a = 2 * Math.PI * i / RING_NODES;
+            // a little out of round, so it reads as a discharge and not as a hoop
+            double wobble = radius * 0.06 * Math.sin(a * 5 + won * 9);
+            pts[i] = focus.add((radius + wobble) * Math.cos(a), 0, (radius + wobble) * Math.sin(a));
+            bright[i] = Mth.clamp(fade * (0.85f + 0.15f * (float) Math.sin(a * 3)), 0, 1)
+                    * BeamTuning.brightness * 1.3f;
+        }
+        pts[RING_NODES] = pts[0];
+        bright[RING_NODES] = bright[0];
+        // the ring thins as it grows: the same light spread around a longer line
+        float radiusOut = Math.max(0.005f, BeamTuning.width) * 0.5f * (1.4f - 0.9f * spread);
+        StrandGeometry.tube(poseStack, consumer, pts, bright, COLOR_OUTPUT, radiusOut, SIDES, true);
     }
 
     /**
