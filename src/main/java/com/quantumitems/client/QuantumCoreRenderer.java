@@ -50,17 +50,17 @@ public class QuantumCoreRenderer implements BlockEntityRenderer<QuantumCoreBlock
         // is what reads as acceleration, where a linear ramp is never
         // noticeably faster than it was a moment ago.
         //
-        // 48 at the peak is 2.7 turns a second. The earlier ceiling of 29 was
-        // rejected for strobing, but that was while the angle jumped at every
-        // phase boundary; a spin that is genuinely integrated stays readable
-        // far past it, because each frame's step is small even when the tick's
-        // is not.
+        // 96 at the peak is 5.3 turns a second. Ceilings of 20 and then 29 were
+        // both rejected for strobing, and both times the real fault was the
+        // angle jumping at every phase boundary rather than the speed: once the
+        // spin is genuinely integrated the frame's step stays small even when
+        // the tick's does not, and it keeps reading as a turning solid.
         float wind = core.phaseAge() / (float) QuantumCoreBlockEntity.CRESCENDO_TICKS;
         float observerSpeed = switch (core.phase()) {
-            case IDLE -> 1.5f;
-            case CRESCENDO -> 4.0f + 44.0f * wind * wind;
-            case SUCCESS, FAILURE -> 1.0f;
-            default -> 6.0f;
+            case IDLE -> 3.0f;
+            case CRESCENDO -> 8.0f + 88.0f * wind * wind;
+            case SUCCESS, FAILURE -> 2.0f;
+            default -> 12.0f;
         };
         poseStack.pushPose();
         // Height, size and the two gem turns all come from the cube in
@@ -100,18 +100,25 @@ public class QuantumCoreRenderer implements BlockEntityRenderer<QuantumCoreBlock
         };
         int light = LevelRenderer.getLightColor(core.getLevel(), core.getBlockPos().above());
         poseStack.pushPose();
-        poseStack.translate(0.5, 1.4 + Mth.sin(time / 10.0f) * 0.04f, 0.5);
-        poseStack.mulPose(Axis.YP.rotationDegrees(angle));
-        poseStack.scale(0.7f, 0.7f, 0.7f);
         // The shard is being consumed, and it is the only place the knot is
-        // allowed to thrash. Held flat through the scripted phases and thrown
-        // at the crescendo squared, so the last third is where it comes apart.
-        EntangledKnotRenderer.agitation = switch (core.phase()) {
-            case CONNECTING, SCANNING, JUDGEMENT -> 0.25f;
-            case CRESCENDO -> 0.25f + 0.75f * Mth.square(
-                    Mth.clamp(age / QuantumCoreBlockEntity.CRESCENDO_TICKS, 0, 1));
+        // allowed to thrash. Squaring the crescendo put nearly all of it in the
+        // last two seconds, where it went unseen; ^1.2 spends it across the
+        // whole phase, and the floor comes up so the earlier phases are not
+        // flat either.
+        float fury = switch (core.phase()) {
+            case CONNECTING, SCANNING, JUDGEMENT -> 0.4f;
+            case CRESCENDO -> 0.4f + 0.6f * (float) Math.pow(
+                    Mth.clamp(age / QuantumCoreBlockEntity.CRESCENDO_TICKS, 0, 1), 1.2);
             default -> 0.0f;
         };
+        EntangledKnotRenderer.agitation = fury;
+        poseStack.translate(0.5, 1.4 + Mth.sin(time / 10.0f) * 0.04f, 0.5);
+        poseStack.mulPose(Axis.YP.rotationDegrees(angle));
+        // It swells as it overloads. At 0.7 the knot is a third of a block
+        // across and spinning, which is small enough to hide any amount of
+        // writhing — growing it is what makes the writhing visible at all.
+        float grow = 0.7f * (1 + 0.55f * fury);
+        poseStack.scale(grow, grow, grow);
         try {
             itemRenderer.renderStatic(shard, ItemDisplayContext.GROUND, light, packedOverlay,
                     poseStack, buffers, core.getLevel(), 0);
