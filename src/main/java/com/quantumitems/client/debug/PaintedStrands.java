@@ -113,7 +113,7 @@ public final class PaintedStrands {
 
     @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES || STRANDS.isEmpty()) {
+        if (!QuantumRenderTypes.isStrandStage(event.getStage()) || STRANDS.isEmpty()) {
             return;
         }
         Minecraft mc = Minecraft.getInstance();

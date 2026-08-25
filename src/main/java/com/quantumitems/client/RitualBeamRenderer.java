@@ -214,7 +214,7 @@ public final class RitualBeamRenderer {
 
     @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES) {
+        if (!QuantumRenderTypes.isStrandStage(event.getStage())) {
             return;
         }
         ClientLevel level = Minecraft.getInstance().level;
