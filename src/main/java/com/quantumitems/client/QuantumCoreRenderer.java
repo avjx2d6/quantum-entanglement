@@ -45,26 +45,29 @@ public class QuantumCoreRenderer implements BlockEntityRenderer<QuantumCoreBlock
         boolean running = core.isRitualRunning();
 
         // --- the observer inside the lower housing ---
-        // Degrees per tick. The crescendo used to reach 29, which is most of a
-        // revolution every twelve frames — past that the gem stops reading as a
-        // turning solid and just strobes. 14 is about 0.8 turns a second, fast
-        // enough to look driven and slow enough to still be a shape.
+        // Degrees per tick. A LINEAR 5 -> 14 across nine seconds is a wind-up
+        // nobody can see happening: at every moment it is barely faster than a
+        // moment ago. Squaring it holds the gem slow for most of the crescendo
+        // and spends the whole change in the last third, which is what reads as
+        // acceleration. 20 is the ceiling — the old 29 was most of a revolution
+        // every twelve frames, past which it stops being a turning solid.
+        float wind = core.phaseAge() / (float) QuantumCoreBlockEntity.CRESCENDO_TICKS;
         float observerSpeed = switch (core.phase()) {
             case IDLE -> 1.2f;
-            case CRESCENDO -> 5.0f + 9.0f * core.phaseAge() / QuantumCoreBlockEntity.CRESCENDO_TICKS;
+            case CRESCENDO -> 2.0f + 18.0f * wind * wind;
             case SUCCESS, FAILURE -> 0.8f;
-            default -> 5.0f;
+            default -> 3.0f;
         };
-        int observerLight = running ? 0xF000F0
-                : LevelRenderer.getLightColor(core.getLevel(), core.getBlockPos());
         poseStack.pushPose();
         // Height, size and the two gem turns all come from the cube in
         // quantum_core_lower_e.bbmodel; only the bob and the spin are ours.
         poseStack.translate(0.5, ObserverEyeRender.CORE_HEIGHT
                 + Mth.sin(time / 16.0f) * 0.03f, 0.5);
-        ObserverEyeRender.renderCorona(poseStack, buffers, time, running ? 1.0f : 0.25f);
-        poseStack.mulPose(Axis.YP.rotationDegrees(
-                SpinClock.advance(core.getBlockPos(), time, observerSpeed) + ObserverEyeRender.GEM_YAW));
+        float spin = SpinClock.advance(core.getBlockPos(), time, observerSpeed);
+        int observerLight = SpinClock.lit(
+                LevelRenderer.getLightColor(core.getLevel(), core.getBlockPos()),
+                SpinClock.glow(core.getBlockPos(), running ? 1.0f : 0.0f));
+        poseStack.mulPose(Axis.YP.rotationDegrees(spin + ObserverEyeRender.GEM_YAW));
         poseStack.mulPose(Axis.ZP.rotationDegrees(ObserverEyeRender.GEM_TIP));
         poseStack.scale(ObserverEyeRender.SIZE, ObserverEyeRender.SIZE, ObserverEyeRender.SIZE);
         ObserverEyeRender.renderEyeCube(poseStack, buffers, observerLight);
@@ -96,8 +99,23 @@ public class QuantumCoreRenderer implements BlockEntityRenderer<QuantumCoreBlock
         poseStack.translate(0.5, 1.4 + Mth.sin(time / 10.0f) * 0.04f, 0.5);
         poseStack.mulPose(Axis.YP.rotationDegrees(angle));
         poseStack.scale(0.7f, 0.7f, 0.7f);
-        itemRenderer.renderStatic(shard, ItemDisplayContext.GROUND, light, packedOverlay,
-                poseStack, buffers, core.getLevel(), 0);
+        // The shard is being consumed, and it is the only place the knot is
+        // allowed to thrash. Held flat through the scripted phases and thrown
+        // at the crescendo squared, so the last third is where it comes apart.
+        EntangledKnotRenderer.agitation = switch (core.phase()) {
+            case CONNECTING, SCANNING, JUDGEMENT -> 0.25f;
+            case CRESCENDO -> 0.25f + 0.75f * Mth.square(
+                    Mth.clamp(age / QuantumCoreBlockEntity.CRESCENDO_TICKS, 0, 1));
+            default -> 0.0f;
+        };
+        try {
+            itemRenderer.renderStatic(shard, ItemDisplayContext.GROUND, light, packedOverlay,
+                    poseStack, buffers, core.getLevel(), 0);
+        } finally {
+            // Never leave it set: a throw in there would have every knot in the
+            // world thrashing for the rest of the session.
+            EntangledKnotRenderer.agitation = 0.0f;
+        }
         poseStack.popPose();
     }
 }

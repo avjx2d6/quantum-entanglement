@@ -8,9 +8,7 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.Mth;
 import net.minecraft.world.inventory.InventoryMenu;
-import net.minecraft.world.phys.Vec3;
 
 /**
  * The Observer: a small gem-cube stood on one corner, drawn with manual quads.
@@ -40,82 +38,7 @@ public final class ObserverEyeRender {
     public static final float GEM_YAW = 45.0f;
     public static final float GEM_TIP = 54.7356f;
 
-    // ---- the corona ----
-
-    /** Deep teal, the eye's own colour rather than any of the beams'. */
-    private static final int CORONA_COLOR = 0x18C4A6;
-    private static final int ARCS = 4;
-    private static final int ARC_NODES = 6;
-    /** Just clear of the gem, whose circumradius on a corner is 0.217. */
-    private static final float CORONA_RADIUS = 0.225f;
-    private static final float CORONA_WIDTH = 0.010f;
-    /** Ticks an arc takes to fade in, crawl and go. */
-    private static final float ARC_LIFE = 26.0f;
-
     private ObserverEyeRender() {
-    }
-
-    /**
-     * Short arcs crawling over an invisible sphere around the gem, so the
-     * observer is doing something even when nothing is happening.
-     *
-     * <p>It replaces nothing — the six PORTAL motes that marked an eaten
-     * experience orb went unnoticed by the author for weeks, which is a fair
-     * verdict on them. The observer is the one part of the machine that is
-     * always present and was always still.
-     *
-     * <p>Draw this in a pose that is translated to the gem's centre but NOT
-     * rotated or scaled with it: the arcs orbit the gem, they do not ride it.
-     *
-     * @param intensity 0 for an idle observer, 1 for one working
-     */
-    public static void renderCorona(PoseStack poseStack, MultiBufferSource buffers,
-                                    float time, float intensity) {
-        var consumer = buffers.getBuffer(QuantumRenderTypes.RITUAL_BEAM);
-        int live = 1 + (int) (intensity * (ARCS - 1));
-        for (int arc = 0; arc < live; arc++) {
-            // Each arc has its own offset life, so they do not pulse in unison.
-            float phase = time / ARC_LIFE + arc * 0.41f;
-            int generation = Mth.floor(phase);
-            float age = phase - generation;
-            // in and out over its life; nothing pops
-            float fade = Mth.sin(age * Mth.PI);
-            if (fade <= 0.02f) {
-                continue;
-            }
-            Vec3 from = onSphere(generation * 31 + arc * 7);
-            Vec3 to = onSphere(generation * 31 + arc * 7 + 3);
-            // Too close and there is no arc; too near antipodal and the lerp
-            // passes through the origin, where normalize has no answer.
-            if (Math.abs(from.dot(to)) > 0.9) {
-                to = from.cross(new Vec3(0, 1, 0)).normalize();
-            }
-            Vec3[] pts = new Vec3[ARC_NODES + 1];
-            float[] bright = new float[ARC_NODES + 1];
-            for (int i = 0; i <= ARC_NODES; i++) {
-                float t = i / (float) ARC_NODES;
-                // slerp along the great circle, then bulge with the crawl
-                Vec3 on = from.scale(1 - t).add(to.scale(t)).normalize();
-                float bulge = 1 + 0.18f * Mth.sin((t * 2 + age * 3 + arc) * Mth.TWO_PI);
-                pts[i] = on.scale(CORONA_RADIUS * bulge);
-                // taper to nothing at both tips, so an arc has no cut ends
-                bright[i] = fade * Mth.sin(t * Mth.PI) * (0.55f + 0.45f * intensity);
-            }
-            StrandGeometry.tube(poseStack, consumer, pts, bright, CORONA_COLOR,
-                    CORONA_WIDTH, 4, false);
-        }
-    }
-
-    /** A stable point on the unit sphere from an integer. */
-    private static Vec3 onSphere(int seed) {
-        int h = seed * 0x9E3779B9;
-        h ^= h >>> 15;
-        h *= 0x85EBCA6B;
-        h ^= h >>> 13;
-        double y = ((h >>> 8) / (double) (1 << 24)) * 2 - 1;
-        double a = ((h & 0xFF) / 255.0) * Math.PI * 2;
-        double r = Math.sqrt(Math.max(0, 1 - y * y));
-        return new Vec3(Math.cos(a) * r, y, Math.sin(a) * r);
     }
 
     /** Draws a unit cube centered at the origin of the current pose; scale beforehand. */

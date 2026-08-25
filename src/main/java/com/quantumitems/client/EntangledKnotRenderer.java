@@ -140,27 +140,45 @@ public final class EntangledKnotRenderer extends BlockEntityWithoutLevelRenderer
      * strands wandering 3σ straight at each other leaves a 0.11 gap against a
      * 0.06 tube. Past roughly 0.08 the knot starts tying itself shut.
      */
-    private static final float WALK_UNIT = 0.038f;      // blocks per unit of walk
+    private static final float WALK_UNIT = 0.050f;      // blocks per unit of walk
     private static final float DECAY = 0.80f;
     private static final float SPREAD = 0.70f;
     /** Ticks for the bright pulse to travel once around the loop. */
     private static final float PULSE_PERIOD = 50.0f;
 
+    // ---- what the knot does while it is being consumed ----
+
     /**
-     * A ripple running around the strand, on top of the walk.
+     * How hard the knot is being worked, 0 in a hand or on the floor and 1 at
+     * the end of the crescendo. Set by {@link QuantumCoreRenderer} around its
+     * one {@code renderStatic} call and cleared straight after.
      *
-     * <p>The walk alone is noise: every node jitters independently, so at this
-     * amplitude it reads as a faint shimmer and the knot looks like a still
-     * object. This is coherent instead — a helical wave travelling around the
-     * loop, so the strand visibly moves through itself. Some of the walk's
-     * budget is handed over to pay for it; the clearance sum is what matters,
-     * not which of the two spends it.
+     * <p>A static field rather than a parameter because the path in between is
+     * vanilla's — the renderer is reached through the baked model, and there is
+     * nowhere to thread an argument. Client rendering is single-threaded and
+     * the field never outlives the call, so this cannot be read by anything
+     * else in between.
+     *
+     * <p>Everything below is gated on it: an inventory knot is deliberately
+     * calm, and none of this shows anywhere but on the core.
      */
-    private static final float WAVE = 0.030f;
+    public static float agitation;
+
+    /** A ripple running around the strand. Coherent, unlike the per-node walk. */
+    private static final float WAVE = 0.055f;
     /** Turns of the helix around the loop. */
     private static final float WAVE_TURNS = 3.0f;
-    /** Ticks for the ripple to travel once around. */
-    private static final float WAVE_PERIOD = 34.0f;
+    /** Ticks for the ripple to travel once around, at full agitation. */
+    private static final float WAVE_PERIOD = 14.0f;
+    /** Multiplier on the walk when the ritual is at full tilt. */
+    private static final float WALK_FURY = 2.4f;
+
+    /** Chords arcing across the knot while it is worked. */
+    private static final int ARCS = 5;
+    private static final int ARC_NODES = 5;
+    private static final float ARC_LIFE = 7.0f;
+    private static final float ARC_WIDTH = 0.012f;
+    private static final int ARC_COLOR = 0xC8F0FF;   // near white: these are the discharge
 
     // ---- the fixed curve, and the frame the writhe is applied in ----
 
@@ -228,12 +246,16 @@ public final class EntangledKnotRenderer extends BlockEntityWithoutLevelRenderer
         Vec3[] pts = new Vec3[NODES + 1];
         float[] bright = new float[NODES + 1];
         float phase = (time / PULSE_PERIOD) % 1.0f;
+        float fury = Mth.clamp(agitation, 0, 1);
+        float walk = WALK_UNIT * (1 + WALK_FURY * fury);
         for (int i = 0; i < NODES; i++) {
-            float a = Mth.lerp(partial, PREV[i][0], CUR[i][0]) * WALK_UNIT;
-            float b = Mth.lerp(partial, PREV[i][1], CUR[i][1]) * WALK_UNIT;
-            float ripple = ((i / (float) NODES) * WAVE_TURNS - time / WAVE_PERIOD) * Mth.TWO_PI;
-            a += WAVE * Mth.cos(ripple);
-            b += WAVE * Mth.sin(ripple);
+            float a = Mth.lerp(partial, PREV[i][0], CUR[i][0]) * walk;
+            float b = Mth.lerp(partial, PREV[i][1], CUR[i][1]) * walk;
+            if (fury > 0) {
+                float ripple = ((i / (float) NODES) * WAVE_TURNS - time / WAVE_PERIOD) * Mth.TWO_PI;
+                a += WAVE * fury * Mth.cos(ripple);
+                b += WAVE * fury * Mth.sin(ripple);
+            }
             pts[i] = BASE[i].add(OFF_U[i].scale(a)).add(OFF_V[i].scale(b));
 
             float w = Mth.lerp(partial, PREV[i][2], CUR[i][2]);
@@ -266,7 +288,66 @@ public final class EntangledKnotRenderer extends BlockEntityWithoutLevelRenderer
                 pts, bright, (along, facing) -> film(along, facing, drift), eye, RADIUS,
                 context == ItemDisplayContext.GUI ? SIDES_GUI : SIDES_WORLD,
                 true);
+        if (fury > 0.05f) {
+            arcs(poseStack, buffers, pts, time, fury);
+        }
         poseStack.popPose();
+    }
+
+    /**
+     * Discharge jumping straight across the knot from one part of the strand to
+     * another. A loop that passes through itself has plenty of pairs of points
+     * that are near in space and far apart along the line, and an arc between
+     * two of those says what the object is far better than any amount of extra
+     * wobble: it is one thing touching itself at a distance.
+     *
+     * <p>Each arc lives a few ticks and its endpoints come from a hash of its
+     * generation, so it is the same arc on every frame of its life and a new
+     * one afterwards.
+     */
+    private static void arcs(PoseStack poseStack, MultiBufferSource buffers,
+                             Vec3[] knot, float time, float fury) {
+        var consumer = buffers.getBuffer(QuantumRenderTypes.RITUAL_BEAM);
+        int live = Math.max(1, Math.round(ARCS * fury));
+        for (int arc = 0; arc < live; arc++) {
+            float phase = time / ARC_LIFE + arc * 0.37f;
+            int generation = Mth.floor(phase);
+            float fade = Mth.sin((phase - generation) * Mth.PI);
+            if (fade <= 0.05f) {
+                continue;
+            }
+            int seed = generation * 977 + arc * 61;
+            int from = hash(seed) % NODES;
+            // far enough along the strand that the arc crosses rather than
+            // hugging the line it came from
+            int to = (from + NODES / 4 + hash(seed + 5) % (NODES / 2)) % NODES;
+            Vec3 a = knot[from];
+            Vec3 b = knot[to];
+            // Bow away from the knot's centre. Two near-opposite points sum to
+            // nothing, where normalize has no answer — bow along the chord's
+            // own perpendicular instead.
+            Vec3 mid = a.add(b).scale(0.5);
+            Vec3 bow = mid.lengthSqr() > 1.0e-6
+                    ? mid.normalize().scale(0.06 * fury)
+                    : b.subtract(a).cross(new Vec3(0, 1, 0)).normalize().scale(0.06 * fury);
+            Vec3[] pts = new Vec3[ARC_NODES + 1];
+            float[] bright = new float[ARC_NODES + 1];
+            for (int i = 0; i <= ARC_NODES; i++) {
+                float t = i / (float) ARC_NODES;
+                pts[i] = a.add(b.subtract(a).scale(t)).add(bow.scale(Math.sin(t * Math.PI)));
+                bright[i] = fade * Mth.sin(t * Mth.PI) * (0.5f + 0.5f * fury);
+            }
+            StrandGeometry.tube(poseStack, consumer, pts, bright, ARC_COLOR, ARC_WIDTH, 4, false);
+        }
+    }
+
+    /** Stable non-negative pseudo-random from an integer. */
+    private static int hash(int seed) {
+        int h = seed * 0x9E3779B9;
+        h ^= h >>> 15;
+        h *= 0x85EBCA6B;
+        h ^= h >>> 13;
+        return h >>> 1;
     }
 
     /**

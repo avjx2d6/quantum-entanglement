@@ -436,11 +436,24 @@ public class RitualGameTests {
         helper.succeed();
     }
 
+    /**
+     * Advancements are awarded to a ServerPlayer that is actually in the
+     * player list, so the mock has to be the real thing rather than the
+     * GameType stand-in {@code makeMockPlayer} returns. Vanilla marks this one
+     * for removal without offering a replacement in 1.21.1, so the suppression
+     * is deliberate and lives in exactly one place — when a substitute appears,
+     * this is the only line to change.
+     */
+    @SuppressWarnings("removal")
+    private static net.minecraft.server.level.ServerPlayer mockServerPlayer(GameTestHelper helper) {
+        return helper.makeMockServerPlayerInLevel();
+    }
+
     /** A successful ritual awards the igniter the "entangled" advancement. */
     @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 450)
     public void ritualSuccessAwardsEntangled(GameTestHelper helper) {
         buildCircle(helper);
-        net.minecraft.server.level.ServerPlayer player = helper.makeMockServerPlayerInLevel();
+        net.minecraft.server.level.ServerPlayer player = mockServerPlayer(helper);
         resonator(helper, 0).setItem(0, new ItemStack(Items.BREAD, 20));
         core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()), player);
         helper.runAfterDelay(APPLY_TICKS + 10, () -> {
@@ -458,7 +471,7 @@ public class RitualGameTests {
     @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 300)
     public void ritualFailureAwardsYourOwnFault(GameTestHelper helper) {
         buildCircle(helper);
-        net.minecraft.server.level.ServerPlayer player = helper.makeMockServerPlayerInLevel();
+        net.minecraft.server.level.ServerPlayer player = mockServerPlayer(helper);
         resonator(helper, 0).setItem(0, new ItemStack(Items.GOLD_INGOT, 16));
         resonator(helper, 1).setItem(0, new ItemStack(Items.IRON_INGOT, 16)); // mismatch → fail
         core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()), player);

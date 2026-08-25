@@ -32,7 +32,10 @@ public abstract class BundleContentsMutableMixin {
         if (stack.isEmpty() || !stack.has(ModRegistry.QUANTUM_LINK.get())) {
             return;
         }
-        if (!stack.getItem().canFitInsideContainerItems()) {
+        // The stack extension, not Item's own deprecated method: NeoForge lets
+        // an item answer this per stack, and asking the Item skips that — a
+        // modded item that refuses only some of its stacks would be misread.
+        if (!stack.canFitInsideContainerItems()) {
             return; // vanilla refuses this item outright and moves nothing;
                     // dissolving the network for a no-op gesture would be theft
         }

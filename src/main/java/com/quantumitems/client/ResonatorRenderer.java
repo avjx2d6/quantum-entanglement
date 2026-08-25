@@ -115,16 +115,16 @@ public class ResonatorRenderer implements BlockEntityRenderer<ResonatorBlockEnti
         float time = resonator.getLevel().getGameTime() + partialTick;
         boolean awake = resonator.isLockedByRitual();
         float speed = awake ? 6.0f : 1.0f;
-        int light = awake ? 0xF000F0
-                : LevelRenderer.getLightColor(resonator.getLevel(), resonator.getBlockPos());
         // Height, size and both gem turns come from the cube in
         // resonator.bbmodel, which the amethyst frame at y 5..7 is built around.
         poseStack.pushPose();
         poseStack.translate(0.5, ObserverEyeRender.CORE_HEIGHT
                 + Mth.sin(time / 14.0f) * 0.03f, 0.5);
-        ObserverEyeRender.renderCorona(poseStack, buffers, time, awake ? 0.8f : 0.15f);
-        poseStack.mulPose(Axis.YP.rotationDegrees(
-                SpinClock.advance(resonator.getBlockPos(), time, speed) + ObserverEyeRender.GEM_YAW));
+        float spin = SpinClock.advance(resonator.getBlockPos(), time, speed);
+        int light = SpinClock.lit(
+                LevelRenderer.getLightColor(resonator.getLevel(), resonator.getBlockPos()),
+                SpinClock.glow(resonator.getBlockPos(), awake ? 1.0f : 0.0f));
+        poseStack.mulPose(Axis.YP.rotationDegrees(spin + ObserverEyeRender.GEM_YAW));
         poseStack.mulPose(Axis.ZP.rotationDegrees(ObserverEyeRender.GEM_TIP));
         poseStack.scale(ObserverEyeRender.SIZE, ObserverEyeRender.SIZE, ObserverEyeRender.SIZE);
         ObserverEyeRender.renderEyeCube(poseStack, buffers, light);
