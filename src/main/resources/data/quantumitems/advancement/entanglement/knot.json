@@ -1,8 +1,8 @@
 {
   "display": {
-    "icon": { "id": "quantumitems:quantum_shard" },
-    "title": { "translate": "advancement.quantumitems.shard.title" },
-    "description": { "translate": "advancement.quantumitems.shard.description" },
+    "icon": { "id": "quantumitems:quantum_knot" },
+    "title": { "translate": "advancement.quantumitems.knot.title" },
+    "description": { "translate": "advancement.quantumitems.knot.description" },
     "frame": "task",
     "background": "minecraft:textures/block/deepslate.png",
     "show_toast": true,
@@ -12,7 +12,7 @@
   "criteria": {
     "obtained": {
       "trigger": "minecraft:inventory_changed",
-      "conditions": { "items": [ { "items": "quantumitems:quantum_shard" } ] }
+      "conditions": { "items": [ { "items": "quantumitems:quantum_knot" } ] }
     }
   },
   "requirements": [ [ "obtained" ] ]

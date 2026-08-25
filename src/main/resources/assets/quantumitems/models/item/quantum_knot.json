@@ -2,7 +2,7 @@
   "__comment": "No elements: EntangledKnotRenderer draws the knot, and builtin/entity is what makes vanilla ask for it. X=90 is face-on, where the trefoil reads; world contexts are tilted so the spin never takes them edge-on.",
   "parent": "minecraft:builtin/entity",
   "textures": {
-    "particle": "quantumitems:item/quantum_shard"
+    "particle": "quantumitems:item/quantum_knot"
   },
   "display": {
     "gui": {

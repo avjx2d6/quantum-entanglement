@@ -147,7 +147,7 @@ public class QuantumCoreBlock extends Block implements EntityBlock {
     protected ItemInteractionResult useItemOn(ItemStack heldStack, BlockState state, Level level, BlockPos pos,
                                               Player player, InteractionHand hand, BlockHitResult hitResult) {
         boolean emptyHanded = heldStack.isEmpty();
-        if (!emptyHanded && !heldStack.is(ModRegistry.QUANTUM_SHARD.get())) {
+        if (!emptyHanded && !heldStack.is(ModRegistry.QUANTUM_KNOT.get())) {
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }
         if (level.isClientSide) {

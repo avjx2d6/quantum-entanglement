@@ -82,7 +82,7 @@ public class RitualGameTests {
     public void ritualCreatesNetworkFromPlainStack(GameTestHelper helper) {
         buildCircle(helper);
         resonator(helper, 0).setItem(0, new ItemStack(Items.BREAD, 20));
-        if (!core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()))) {
+        if (!core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_KNOT.get()))) {
             helper.fail("Ritual refused to start on a valid structure");
         }
         helper.runAfterDelay(APPLY_TICKS, () -> {
@@ -118,7 +118,7 @@ public class RitualGameTests {
     @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 450)
     public void ritualBurnsShardOnEmptyCircle(GameTestHelper helper) {
         buildCircle(helper);
-        if (!core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()))) {
+        if (!core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_KNOT.get()))) {
             helper.fail("Commitment is commitment: the shard goes in even over an empty circle");
         }
         helper.runAfterDelay(CANCEL_TICKS, () -> {
@@ -141,7 +141,7 @@ public class RitualGameTests {
     @GameTest(template = "arena", templateNamespace = "quantumitems", timeoutTicks = 100)
     public void shardLiesInertOnUnfinishedCore(GameTestHelper helper) {
         placeCore(helper, CORE); // both halves, but no floor and no resonators
-        ItemStack held = new ItemStack(ModRegistry.QUANTUM_SHARD.get(), 3);
+        ItemStack held = new ItemStack(ModRegistry.QUANTUM_KNOT.get(), 3);
         if (!core(helper).placeShard(held)) {
             helper.fail("Shard must lie on the core like on a resonator");
         }
@@ -155,7 +155,7 @@ public class RitualGameTests {
             helper.fail("The inert shard must be visible on the core");
         }
         ItemStack takenBack = core(helper).takeShard();
-        if (!takenBack.is(ModRegistry.QUANTUM_SHARD.get()) || takenBack.getCount() != 1) {
+        if (!takenBack.is(ModRegistry.QUANTUM_KNOT.get()) || takenBack.getCount() != 1) {
             helper.fail("Empty-hand take must return the inert shard, got " + takenBack);
         }
         if (!core(helper).displayedShard().isEmpty()) {
@@ -172,7 +172,7 @@ public class RitualGameTests {
         int id = networks.createNetwork(plain);
         resonator(helper, 0).setItem(0, makeWindow(helper, id, 1, plain));
         resonator(helper, 1).setItem(0, makeWindow(helper, id, 2, plain));
-        if (!core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()))) {
+        if (!core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_KNOT.get()))) {
             helper.fail("Ritual refused to start");
         }
         helper.runAfterDelay(APPLY_TICKS, () -> {
@@ -210,7 +210,7 @@ public class RitualGameTests {
         ItemStack window1 = makeWindow(helper, id, 1, plain);
         ItemStack window2 = makeWindow(helper, id, 2, plain); // stays "elsewhere in the world"
         resonator(helper, 0).setItem(0, window1);
-        core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()));
+        core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_KNOT.get()));
         helper.runAfterDelay(CANCEL_TICKS, () -> {
             QuantumNetworks.Network network = networks.network(id);
             if (network == null || network.aliveMembers.size() != 2) {
@@ -234,7 +234,7 @@ public class RitualGameTests {
         buildCircle(helper);
         resonator(helper, 0).setItem(0, new ItemStack(Items.BREAD, 5));
         resonator(helper, 1).setItem(0, new ItemStack(Items.APPLE, 7));
-        core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()));
+        core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_KNOT.get()));
         helper.runAfterDelay(CANCEL_TICKS, () -> {
             ItemStack a = resonator(helper, 0).getItem(0);
             ItemStack b = resonator(helper, 1).getItem(0);
@@ -252,7 +252,7 @@ public class RitualGameTests {
     public void ritualRefusesDamageableItems(GameTestHelper helper) {
         buildCircle(helper);
         resonator(helper, 0).setItem(0, new ItemStack(Items.IRON_PICKAXE));
-        core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()));
+        core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_KNOT.get()));
         helper.runAfterDelay(CANCEL_TICKS, () -> {
             ItemStack stack = resonator(helper, 0).getItem(0);
             if (stack.has(ModRegistry.QUANTUM_LINK.get())) {
@@ -269,7 +269,7 @@ public class RitualGameTests {
     public void circleIsLockedDuringRitual(GameTestHelper helper) {
         buildCircle(helper);
         resonator(helper, 0).setItem(0, new ItemStack(Items.BREAD, 20));
-        core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()));
+        core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_KNOT.get()));
         helper.runAfterDelay(10, () -> {
             if (!resonator(helper, 0).isLockedByRitual() || !resonator(helper, 3).isLockedByRitual()) {
                 helper.fail("Circle must be locked while the ritual runs");
@@ -295,7 +295,7 @@ public class RitualGameTests {
         for (int i = 0; i < 4; i++) {
             resonator(helper, i).setItem(0, makeWindow(helper, id, i + 1, plain));
         }
-        core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()));
+        core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_KNOT.get()));
         helper.runAfterDelay(CANCEL_TICKS, () -> {
             QuantumNetworks.Network network = networks.network(id);
             if (network == null || network.aliveMembers.size() != 4) {
@@ -318,7 +318,7 @@ public class RitualGameTests {
     public void droppedWindowWipesSiblingsOnResonators(GameTestHelper helper) {
         buildCircle(helper);
         resonator(helper, 0).setItem(0, new ItemStack(Items.BREAD, 20));
-        core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()));
+        core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_KNOT.get()));
         helper.runAfterDelay(APPLY_TICKS, () -> {
             // the exchange take, exactly as ResonatorBlock does it
             ItemStack taken = resonator(helper, 0).removeItemNoUpdate(0);
@@ -421,13 +421,13 @@ public class RitualGameTests {
     public void foreignBlockInsideCircleInvalidatesStructure(GameTestHelper helper) {
         buildCircle(helper);
         helper.setBlock(CORE.offset(1, 0, 1), Blocks.STONE); // clutter inside the circle
-        ItemStack held = new ItemStack(ModRegistry.QUANTUM_SHARD.get());
+        ItemStack held = new ItemStack(ModRegistry.QUANTUM_KNOT.get());
         core(helper).placeShard(held);
         if (core(helper).phase() != QuantumCoreBlockEntity.Phase.IDLE) {
             helper.fail("Cluttered circle must not launch, phase " + core(helper).phase());
         }
         helper.setBlock(CORE.offset(1, 0, 1), Blocks.AIR);
-        ItemStack second = new ItemStack(ModRegistry.QUANTUM_SHARD.get());
+        ItemStack second = new ItemStack(ModRegistry.QUANTUM_KNOT.get());
         core(helper).takeShard();
         core(helper).placeShard(second);
         if (core(helper).phase() == QuantumCoreBlockEntity.Phase.IDLE) {
@@ -455,7 +455,7 @@ public class RitualGameTests {
         buildCircle(helper);
         net.minecraft.server.level.ServerPlayer player = mockServerPlayer(helper);
         resonator(helper, 0).setItem(0, new ItemStack(Items.BREAD, 20));
-        core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()), player);
+        core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_KNOT.get()), player);
         helper.runAfterDelay(APPLY_TICKS + 10, () -> {
             if (!hasAdvancement(helper, player, "entanglement/entangled")) {
                 helper.fail("Ritual success must award the entangled advancement to the igniter");
@@ -474,7 +474,7 @@ public class RitualGameTests {
         net.minecraft.server.level.ServerPlayer player = mockServerPlayer(helper);
         resonator(helper, 0).setItem(0, new ItemStack(Items.GOLD_INGOT, 16));
         resonator(helper, 1).setItem(0, new ItemStack(Items.IRON_INGOT, 16)); // mismatch → fail
-        core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_SHARD.get()), player);
+        core(helper).placeShard(new ItemStack(ModRegistry.QUANTUM_KNOT.get()), player);
         // failure lands at the scan verdict (~CONNECTING+SCANNING); give it room
         helper.runAfterDelay(QuantumCoreBlockEntity.ticksUntilCancel() + 20, () -> {
             if (!hasAdvancement(helper, player, "entanglement/your_own_fault")) {
@@ -499,7 +499,7 @@ public class RitualGameTests {
     public void coreNeverHoldsAShardWindow(GameTestHelper helper) {
         placeCore(helper, CORE); // no circle: the shard lies inert, no ritual to race
         QuantumNetworks networks = QuantumNetworks.get(helper.getLevel().getServer());
-        ItemStack plain = new ItemStack(ModRegistry.QUANTUM_SHARD.get(), 1);
+        ItemStack plain = new ItemStack(ModRegistry.QUANTUM_KNOT.get(), 1);
         int id = networks.createNetwork(plain);
         ItemStack held = makeWindow(helper, id, 1, plain);
         ItemStack sibling = makeWindow(helper, id, 2, plain);
@@ -518,7 +518,7 @@ public class RitualGameTests {
         if (onCore.has(ModRegistry.QUANTUM_LINK.get())) {
             helper.fail("The core must never hold a live window, got " + onCore);
         }
-        if (!onCore.is(ModRegistry.QUANTUM_SHARD.get()) || onCore.getCount() != 1) {
+        if (!onCore.is(ModRegistry.QUANTUM_KNOT.get()) || onCore.getCount() != 1) {
             helper.fail("The core must hold exactly one plain shard, got " + onCore);
         }
         if (networks.network(id) != null) {
@@ -535,7 +535,7 @@ public class RitualGameTests {
     public void coreTakesOnePlainShardFromAPool(GameTestHelper helper) {
         placeCore(helper, CORE);
         QuantumNetworks networks = QuantumNetworks.get(helper.getLevel().getServer());
-        ItemStack plain = new ItemStack(ModRegistry.QUANTUM_SHARD.get(), 4);
+        ItemStack plain = new ItemStack(ModRegistry.QUANTUM_KNOT.get(), 4);
         int id = networks.createNetwork(plain);
         ItemStack held = makeWindow(helper, id, 1, plain);
         ItemStack sibling = makeWindow(helper, id, 2, plain);

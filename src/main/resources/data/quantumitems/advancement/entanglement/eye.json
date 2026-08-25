@@ -1,5 +1,5 @@
 {
-  "parent": "quantumitems:entanglement/shard",
+  "parent": "quantumitems:entanglement/knot",
   "display": {
     "icon": { "id": "quantumitems:eye_of_elsewhere" },
     "title": { "translate": "advancement.quantumitems.eye.title" },

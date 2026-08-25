@@ -44,7 +44,7 @@ public class LootGameTests {
         for (int i = 0; i < rolls; i++) {
             List<ItemStack> loot = table.getRandomItems(params);
             for (ItemStack stack : loot) {
-                if (stack.is(ModRegistry.QUANTUM_SHARD.get())) {
+                if (stack.is(ModRegistry.QUANTUM_KNOT.get())) {
                     shards += stack.getCount();
                 }
             }

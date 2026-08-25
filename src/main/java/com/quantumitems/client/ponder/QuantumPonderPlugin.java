@@ -43,7 +43,7 @@ public class QuantumPonderPlugin implements PonderPlugin {
         helper.forComponents(
                         ModRegistry.QUANTUM_CORE_ITEM.getId(),
                         ModRegistry.RESONATOR_ITEM.getId(),
-                        ModRegistry.QUANTUM_SHARD.getId(),
+                        ModRegistry.QUANTUM_KNOT.getId(),
                         ModRegistry.EYE_OF_ELSEWHERE.getId())
                 .addStoryBoard("ritual_circle", QuantumScenes::circleAssembly, TAG_QUANTUM)
                 .addStoryBoard("ritual_circle", QuantumScenes::createNetwork, TAG_QUANTUM)
@@ -63,7 +63,7 @@ public class QuantumPonderPlugin implements PonderPlugin {
         helper.addToTag(TAG_QUANTUM)
                 .add(ModRegistry.QUANTUM_CORE_ITEM.getId())
                 .add(ModRegistry.RESONATOR_ITEM.getId())
-                .add(ModRegistry.QUANTUM_SHARD.getId())
+                .add(ModRegistry.QUANTUM_KNOT.getId())
                 .add(ModRegistry.EYE_OF_ELSEWHERE.getId());
     }
 }

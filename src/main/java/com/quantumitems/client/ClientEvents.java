@@ -23,12 +23,12 @@ public final class ClientEvents {
         /**
          * The shard is drawn as a living knot rather than a block model. Vanilla
          * only asks for a custom renderer when the baked model says so, which is
-         * why {@code item/quantum_shard.json} inherits from {@code builtin/entity}.
+         * why {@code item/quantum_knot.json} inherits from {@code builtin/entity}.
          */
         @SubscribeEvent
         public static void registerClientExtensions(
                 net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent event) {
-            event.registerItem(new EntangledKnotRenderer.Extensions(), ModRegistry.QUANTUM_SHARD.get());
+            event.registerItem(new EntangledKnotRenderer.Extensions(), ModRegistry.QUANTUM_KNOT.get());
         }
 
         @SubscribeEvent
@@ -75,23 +75,18 @@ public final class ClientEvents {
                 }
                 return;
             }
-            if (stack.is(ModRegistry.QUANTUM_SHARD.get())) {
-                tooltip.add(doctrine("tooltip.quantumitems.shard.lore"));
-                tooltip.add(doctrine("tooltip.quantumitems.shard.source"));
-            } else if (stack.is(ModRegistry.EYE_OF_ELSEWHERE.get())) {
-                tooltip.add(doctrine("tooltip.quantumitems.eye.lore"));
-            } else if (stack.is(ModRegistry.QUANTUM_CORE_ITEM.get())) {
-                tooltip.add(doctrine("tooltip.quantumitems.core.lore"));
-            } else if (stack.is(ModRegistry.RESONATOR_ITEM.get())) {
-                tooltip.add(doctrine("tooltip.quantumitems.resonator.lore"));
-            }
-            // Mechanics are taught by the embedded Ponder guide (hold the Ponder
-            // key on any of these items); tooltips stay to one line of flavour.
+            // Nothing else gets a tooltip. The four items used to carry a line
+            // of flavour apiece — "a splinter of somewhere else", "an eye that
+            // opens onto somewhere else" — which told a player nothing and
+            // pitched the mod as more cryptic than it is. What the machine does
+            // is taught by the embedded Ponder guide; what a window does is on
+            // the window, because that is the only one that is not obvious from
+            // holding the thing.
         }
 
         private static net.minecraft.network.chat.Component doctrine(String key) {
             return net.minecraft.network.chat.Component.translatable(key)
-                    .withStyle(net.minecraft.ChatFormatting.GRAY, net.minecraft.ChatFormatting.ITALIC);
+                    .withStyle(net.minecraft.ChatFormatting.GRAY);
         }
     }
 }

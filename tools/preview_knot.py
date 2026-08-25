@@ -19,7 +19,7 @@ Writes into preview/:
     knot_fury.png       agitation 0 -> 1, what the core does to it (arcs not shown)
 
 Keep the constants below in step with EntangledKnotRenderer and with the
-display block of models/item/quantum_shard.json, or the preview lies.
+display block of models/item/quantum_knot.json, or the preview lies.
 """
 
 import os
@@ -49,7 +49,7 @@ FURY_SWELL = 0.9
 WAVE_PERIOD = 8.0
 DRIFT_PERIOD = 130.0
 
-# --- must match the display block of item/quantum_shard.json ---
+# --- must match the display block of item/quantum_knot.json ---
 GUI_TILT = 90.0     # face-on: where the trefoil is legible
 WORLD_TILT = 50.0   # the core, the floor and item frames spin this around Y
 

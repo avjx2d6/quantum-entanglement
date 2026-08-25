@@ -1,7 +1,6 @@
 package com.quantumitems;
 
 import com.mojang.brigadier.CommandDispatcher;
-import com.quantumitems.block.QuantumCoreBlockEntity;
 import com.quantumitems.engine.QuantumEngine;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
@@ -34,72 +33,11 @@ public final class QuantumCommand {
                 .then(Commands.literal("remove")
                         .then(Commands.argument("id", com.mojang.brigadier.arguments.IntegerArgumentType.integer(1))
                                 .executes(ctx -> removeNetwork(ctx.getSource(),
-                                        com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "id")))))
-                .then(Commands.literal("ritual")
-                        .then(Commands.literal("hold")
-                                .then(Commands.literal("connecting").executes(ctx -> hold(ctx.getSource(),
-                                        QuantumCoreBlockEntity.Phase.CONNECTING)))
-                                .then(Commands.literal("scanning").executes(ctx -> hold(ctx.getSource(),
-                                        QuantumCoreBlockEntity.Phase.SCANNING)))
-                                .then(Commands.literal("judgement").executes(ctx -> hold(ctx.getSource(),
-                                        QuantumCoreBlockEntity.Phase.JUDGEMENT)))
-                                .then(Commands.literal("crescendo").executes(ctx -> hold(ctx.getSource(),
-                                        QuantumCoreBlockEntity.Phase.CRESCENDO))))
-                        .then(Commands.literal("release").executes(ctx -> release(ctx.getSource())))));
+                                        com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "id"))))));
     }
 
-    /**
-     * The nearest core to the caller. Deliberately a small box and loaded
-     * chunks only: {@code getBlockEntity} on an unloaded position drags the
-     * chunk in — generating it if it does not exist yet — so a generous search
-     * radius here would stall the server thread doing worldgen on a whim.
-     */
-    private static QuantumCoreBlockEntity nearestCore(CommandSourceStack src) {
-        net.minecraft.world.phys.Vec3 at = src.getPosition();
-        net.minecraft.core.BlockPos origin = net.minecraft.core.BlockPos.containing(at);
-        net.minecraft.server.level.ServerLevel level = src.getLevel();
-        QuantumCoreBlockEntity best = null;
-        double bestSq = 12 * 12;
-        for (net.minecraft.core.BlockPos pos : net.minecraft.core.BlockPos.betweenClosed(
-                origin.offset(-12, -6, -12), origin.offset(12, 6, 12))) {
-            if (!level.isLoaded(pos)) {
-                continue;
-            }
-            if (level.getBlockEntity(pos) instanceof QuantumCoreBlockEntity core) {
-                double sq = pos.distToCenterSqr(at);
-                if (sq < bestSq) {
-                    bestSq = sq;
-                    best = core;
-                }
-            }
-        }
-        return best;
-    }
 
-    private static int hold(CommandSourceStack src, QuantumCoreBlockEntity.Phase phase) {
-        QuantumCoreBlockEntity core = nearestCore(src);
-        if (core == null) {
-            src.sendFailure(Component.literal("No quantum core within 24 blocks."));
-            return 0;
-        }
-        core.holdForTuning(phase);
-        src.sendSuccess(() -> Component.literal("Core at " + core.getBlockPos().toShortString()
-                + " held in " + phase + " — /quantum ritual release to let it go")
-                .withStyle(ChatFormatting.AQUA), false);
-        return 1;
-    }
 
-    private static int release(CommandSourceStack src) {
-        QuantumCoreBlockEntity core = nearestCore(src);
-        if (core == null) {
-            src.sendFailure(Component.literal("No quantum core within 24 blocks."));
-            return 0;
-        }
-        core.releaseFromTuning();
-        src.sendSuccess(() -> Component.literal("Core released; the ritual clock runs again.")
-                .withStyle(ChatFormatting.AQUA), false);
-        return 1;
-    }
 
     private static int setDebug(CommandSourceStack src, boolean on) {
         QuantumDebug.setEnabled(on);

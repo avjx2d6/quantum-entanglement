@@ -9,7 +9,6 @@ import net.createmod.catnip.render.SuperRenderTypeBuffer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.phys.Vec3;
@@ -17,7 +16,6 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
-import org.joml.Vector3f;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -71,8 +69,26 @@ public final class RitualBeamRenderer {
     /** Enough that a fourteen-block circle does not read as a polygon. */
     private static final int RING_NODES = 64;
 
-    /** Deflection of one walk step, in blocks, before amplitude is applied. */
+    // The look, settled in-world with /qbeam and then frozen. That command and
+    // the BeamTuning class it drove are gone; these are the winning numbers.
+    /** Deflection of one walk step, in blocks. */
     private static final float WALK_UNIT = 0.085f;
+    /** Overall deflection from the straight line. */
+    private static final float AMPLITUDE = 0.9f;
+    /** Segments per beam. Every beam is 2.83 blocks, so this is simply fixed. */
+    private static final int NODES = 12;
+    /** Random walk pull-back per tick. Higher drifts slower AND wider. */
+    private static final float DECAY = 0.8f;
+    /** Random walk kick per tick. */
+    private static final float SPREAD = 0.7f;
+    /**
+     * How hard a beam emits. Depth is tested but not written, so the far wall
+     * of the tube shows through the near one and every pixel gets its colour
+     * added twice — which is what sets the ceiling here, not taste.
+     */
+    private static final float BRIGHTNESS = 0.5f;
+    /** Line width in blocks. Wider than this and the joints start showing. */
+    private static final float WIDTH = 0.6f / 16f;
     /** Top face of the resonator model — the beam lands on it, not above it. */
     private static final double RESONATOR_TOP = 1.0;
     /** The shard inside the upper frame. */
@@ -246,16 +262,11 @@ public final class RitualBeamRenderer {
         }
         int recoloredCount = recolored(phase, age);
 
-        if (BeamTuning.style == BeamTuning.Style.PARTICLES) {
-            spawnDust(core, lit, recoloredCount, ramp);
-            return false;
-        }
-
-        int n = Mth.clamp(BeamTuning.nodes, 3, 64);
+        int n = NODES;
         WalkState walk = advanceWalk(core, n);
         Vec3 focus = Vec3.atCenterOf(core.getBlockPos()).add(0, FOCUS_HEIGHT - 0.5, 0);
 
-        float radius = Math.max(0.005f, BeamTuning.width) * (1.0f + ramp * 0.6f) * 0.5f;
+        float radius = WIDTH * (1.0f + ramp * 0.6f) * 0.5f;
         var consumer = buffer.getBuffer(QuantumRenderTypes.RITUAL_BEAM);
 
         poseStack.pushPose();
@@ -276,7 +287,7 @@ public final class RitualBeamRenderer {
             float[] bright = new float[n + 1];
             for (int i = 0; i <= n; i++) {
                 float w = Mth.lerp(partialTick, walk.prev[b][i][2], walk.cur[b][i][2]);
-                bright[i] = Mth.clamp(0.8f + w * 0.45f, 0.55f, 1.0f) * BeamTuning.brightness;
+                bright[i] = Mth.clamp(0.8f + w * 0.45f, 0.55f, 1.0f) * BRIGHTNESS;
                 if (won > 0) {
                     // A spike steep enough to be a flash rather than a glare —
                     // (1-t)^4 has spent itself in three ticks — over a fade slow
@@ -309,7 +320,7 @@ public final class RitualBeamRenderer {
         long steps = Math.min(4, now - st.lastTick); // a lag spike must not spin the walk
         RandomSource random = core.getLevel().getRandom();
         for (long i = 0; i < steps; i++) {
-            st.step(random, BeamTuning.decay, BeamTuning.spread);
+            st.step(random, DECAY, SPREAD);
         }
         st.lastTick = now;
         return st;
@@ -339,12 +350,12 @@ public final class RitualBeamRenderer {
             double wobble = radius * 0.06 * Math.sin(a * 5 + won * 9);
             pts[i] = focus.add((radius + wobble) * Math.cos(a), 0, (radius + wobble) * Math.sin(a));
             bright[i] = Mth.clamp(fade * (0.85f + 0.15f * (float) Math.sin(a * 3)), 0, 1)
-                    * BeamTuning.brightness * 1.3f;
+                    * BRIGHTNESS * 1.3f;
         }
         pts[RING_NODES] = pts[0];
         bright[RING_NODES] = bright[0];
         // the ring thins as it grows: the same light spread around a longer line
-        float radiusOut = Math.max(0.005f, BeamTuning.width) * 0.5f * (1.4f - 0.9f * spread);
+        float radiusOut = WIDTH * 0.5f * (1.4f - 0.9f * spread);
         StrandGeometry.tube(poseStack, consumer, pts, bright, COLOR_WON, radiusOut, SIDES, true);
     }
 
@@ -446,31 +457,11 @@ public final class RitualBeamRenderer {
         Vec3[] out = new Vec3[n + 1];
         for (int i = 0; i <= n; i++) {
             float t = i / (float) n;
-            float k = WALK_UNIT * BeamTuning.amplitude * ampScale;
+            float k = WALK_UNIT * AMPLITUDE * ampScale;
             double ox = Mth.lerp(blend, walk.prev[beam][i][0], walk.cur[beam][i][0]) * k;
             double oy = Mth.lerp(blend, walk.prev[beam][i][1], walk.cur[beam][i][1]) * k;
             out[i] = from.add(to.subtract(from).scale(t)).add(u.scale(ox)).add(v.scale(oy));
         }
         return out;
-    }
-
-    // ---- the old look, kept so it can be compared against in the same world ----
-
-    private static void spawnDust(QuantumCoreBlockEntity core, int lit, int recoloredCount, float ramp) {
-        var level = core.getLevel();
-        if (level == null) {
-            return;
-        }
-        Vec3 focus = Vec3.atCenterOf(core.getBlockPos()).add(0, 0.95, 0);
-        int density = ramp > 0 ? 4 : 2;
-        for (int i = 0; i < lit; i++) {
-            Vec3 from = Vec3.atBottomCenterOf(core.getBlockPos().offset(CORNERS[i])).add(0, RESONATOR_TOP, 0);
-            int rgb = colorFor(i, core, recoloredCount);
-            Vector3f color = new Vector3f(((rgb >> 16) & 0xFF) / 255f, ((rgb >> 8) & 0xFF) / 255f, (rgb & 0xFF) / 255f);
-            for (int s = 0; s < density; s++) {
-                Vec3 point = from.lerp(focus, level.random.nextDouble());
-                level.addParticle(new DustParticleOptions(color, 1.0f), point.x, point.y, point.z, 0, 0, 0);
-            }
-        }
     }
 }

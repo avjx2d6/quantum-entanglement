@@ -280,7 +280,7 @@ public class QuantumScenes {
         scene.idle(10);
         scene.overlay().showText(95)
                 .colored(PonderPalette.RED)
-                .text("Break a rule and the circle collapses - the Knot is spent, the items untouched")
+                .text("If a rule is broken the ritual stops. The Knot is used up; your items stay where they are")
                 .attachKeyFrame()
                 .pointAt(util.vector().centerOf(CORE_UPPER).add(0, 0.3, 0));
         scene.idle(105);
@@ -301,7 +301,7 @@ public class QuantumScenes {
     private static void parkShard(SceneBuilder scene, SceneBuildingUtil util) {
         scene.world().modifyBlockEntityNBT(util.select().position(CORE_LOWER),
                 QuantumCoreBlockEntity.class,
-                nbt -> nbt.put("shard", new ItemStack(ModRegistry.QUANTUM_SHARD.get())
+                nbt -> nbt.put("shard", new ItemStack(ModRegistry.QUANTUM_KNOT.get())
                         .save(scene.world().getHolderLookupProvider())),
                 true);
     }

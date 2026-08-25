@@ -84,8 +84,13 @@ public final class ModRegistry {
     public static final DeferredItem<BlockItem> RESONATOR_ITEM =
             ITEMS.registerSimpleBlockItem(RESONATOR);
 
-    public static final DeferredItem<Item> QUANTUM_SHARD =
-            ITEMS.registerSimpleItem("quantum_shard", new Item.Properties().rarity(Rarity.RARE));
+    public static final DeferredItem<Item> QUANTUM_KNOT =
+            ITEMS.registerSimpleItem("quantum_knot", new Item.Properties().rarity(Rarity.RARE));
+
+    /** SCAFFOLDING — see {@link com.quantumitems.debug.StrandWandItem}; strip before release. */
+    public static final DeferredItem<Item> STRAND_WAND =
+            ITEMS.register("strand_wand",
+                    () -> new com.quantumitems.debug.StrandWandItem(new Item.Properties().stacksTo(1)));
 
     public static final DeferredItem<Item> EYE_OF_ELSEWHERE =
             ITEMS.registerSimpleItem("eye_of_elsewhere", new Item.Properties().rarity(Rarity.UNCOMMON));
@@ -104,12 +109,13 @@ public final class ModRegistry {
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> TAB =
             CREATIVE_TABS.register("main", () -> CreativeModeTab.builder()
                     .title(Component.translatable("itemGroup.quantumitems"))
-                    .icon(() -> new ItemStack(QUANTUM_SHARD.get()))
+                    .icon(() -> new ItemStack(QUANTUM_KNOT.get()))
                     .displayItems((parameters, output) -> {
-                        output.accept(QUANTUM_SHARD.get());
+                        output.accept(QUANTUM_KNOT.get());
                         output.accept(EYE_OF_ELSEWHERE.get());
                         output.accept(RESONATOR_ITEM.get());
                         output.accept(QUANTUM_CORE_ITEM.get());
+                        output.accept(STRAND_WAND.get());   // SCAFFOLDING
                     })
                     .build());
 

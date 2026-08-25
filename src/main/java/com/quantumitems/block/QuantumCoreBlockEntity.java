@@ -111,33 +111,6 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         return shard;
     }
 
-    /**
-     * Development aid (<code>/quantum ritual hold</code>): freezes the phase
-     * clock so a running ritual can be looked at for as long as it takes to
-     * tune it. Never saved, cleared by a restart, and a held core never
-     * completes — the ritual maths is downstream of the clock.
-     */
-    private transient boolean heldForTuning;
-
-    public void holdForTuning(Phase target) {
-        if (level == null || level.isClientSide) {
-            return;
-        }
-        phase = target;
-        phaseAge = 0;
-        heldForTuning = true;
-        setChanged();
-    }
-
-    public void releaseFromTuning() {
-        heldForTuning = false;
-        setChanged();
-    }
-
-    public boolean isHeldForTuning() {
-        return heldForTuning;
-    }
-
     /** Corner the ritual has chosen for its output, or -1 before the verdict. */
     public int plannedOutputCorner() {
         return plannedOutputCorner;
@@ -215,7 +188,7 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
 
     public boolean placeShard(ItemStack shardStack, @Nullable net.minecraft.world.entity.player.Player igniter) {
         if (level == null || level.isClientSide || phase != Phase.IDLE || !shard.isEmpty()
-                || !shardStack.is(ModRegistry.QUANTUM_SHARD.get())) {
+                || !shardStack.is(ModRegistry.QUANTUM_KNOT.get())) {
             return false;
         }
         // Shards stack, so they can be entangled — and the field below is a
@@ -234,7 +207,7 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
                     && shardStack.getCount() <= 1) {
                 engine.cashOutToPlain(shardStack);
             }
-            if (!shardStack.is(ModRegistry.QUANTUM_SHARD.get())) {
+            if (!shardStack.is(ModRegistry.QUANTUM_KNOT.get())) {
                 return false; // husk of a dead network: reconcile wiped it, nothing to place
             }
         }
@@ -282,12 +255,6 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
             return;
         }
         ServerLevel serverLevel = (ServerLevel) level;
-        if (core.heldForTuning) {
-            // /quantum ritual hold: the clock stops so the beams keep running
-            // while their look is being tuned. Nothing else about the ritual
-            // advances, so no entanglement can happen from a held core.
-            return;
-        }
         core.phaseAge++;
         switch (core.phase) {
             case CONNECTING -> {
