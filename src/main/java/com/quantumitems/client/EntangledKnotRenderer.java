@@ -165,19 +165,27 @@ public final class EntangledKnotRenderer extends BlockEntityWithoutLevelRenderer
     public static float agitation;
 
     /** A ripple running around the strand. Coherent, unlike the per-node walk. */
-    private static final float WAVE = 0.055f;
+    private static final float WAVE = 0.110f;
     /** Turns of the helix around the loop. */
     private static final float WAVE_TURNS = 3.0f;
     /** Ticks for the ripple to travel once around, at full agitation. */
-    private static final float WAVE_PERIOD = 14.0f;
-    /** Multiplier on the walk when the ritual is at full tilt. */
-    private static final float WALK_FURY = 2.4f;
+    private static final float WAVE_PERIOD = 8.0f;
+    /**
+     * Multiplier on the walk at full tilt. Deliberately past the clearance the
+     * resting knot is sized for: by the end of the crescendo the strand is
+     * meant to be passing through itself. Additive blending makes a crossing
+     * brighter rather than wrong, so overrunning it looks like overload, which
+     * is the point — this is the moment before the thing is burned.
+     */
+    private static final float WALK_FURY = 5.0f;
+    /** How much fatter and brighter the strand runs when it is being worked. */
+    private static final float FURY_SWELL = 0.9f;
 
     /** Chords arcing across the knot while it is worked. */
-    private static final int ARCS = 5;
+    private static final int ARCS = 9;
     private static final int ARC_NODES = 5;
-    private static final float ARC_LIFE = 7.0f;
-    private static final float ARC_WIDTH = 0.012f;
+    private static final float ARC_LIFE = 5.0f;
+    private static final float ARC_WIDTH = 0.016f;
     private static final int ARC_COLOR = 0xC8F0FF;   // near white: these are the discharge
 
     // ---- the fixed curve, and the frame the writhe is applied in ----
@@ -268,7 +276,8 @@ public final class EntangledKnotRenderer extends BlockEntityWithoutLevelRenderer
             // that becomes four times over. At 0.40 base and 0.52 ramp luma a
             // plain strand lands near 0.42 doubled, a crossing near 0.83, and
             // only the pulse's own peak is allowed to reach white.
-            bright[i] = Mth.clamp(0.55f + w * 0.18f + head * head * 0.65f, 0.34f, 1.4f);
+            bright[i] = Mth.clamp((0.55f + w * 0.18f + head * head * 0.65f)
+                    * (1 + FURY_SWELL * fury), 0.34f, 2.4f);
         }
         pts[NODES] = pts[0];
         bright[NODES] = bright[0];
@@ -285,7 +294,8 @@ public final class EntangledKnotRenderer extends BlockEntityWithoutLevelRenderer
         Vec3 eye = new Vec3(toCamera.x(), toCamera.y(), toCamera.z());
 
         StrandGeometry.tube(poseStack, buffers.getBuffer(QuantumRenderTypes.RITUAL_BEAM),
-                pts, bright, (along, facing) -> film(along, facing, drift), eye, RADIUS,
+                pts, bright, (along, facing) -> film(along, facing, drift), eye,
+                RADIUS * (1 + FURY_SWELL * fury),
                 context == ItemDisplayContext.GUI ? SIDES_GUI : SIDES_WORLD,
                 true);
         if (fury > 0.05f) {

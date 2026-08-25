@@ -268,13 +268,10 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, QuantumCoreBlockEntity core) {
-        // The pull ends at the verdict — the orbs were released before the
-        // phase changed — but both verdicts still have a second of beam left to
-        // draw, and a core dropped from the drawn set has them blink out.
-        boolean live = core.phase == Phase.CONNECTING || core.phase == Phase.SCANNING
-                || core.phase == Phase.JUDGEMENT || core.phase == Phase.CRESCENDO;
-        com.quantumitems.engine.ActiveRitualCores.report(level, pos, live,
-                live || core.phase == Phase.FAILURE || core.phase == Phase.SUCCESS);
+        // Both verdicts still have a second of beam left to draw, so a core
+        // dropped from the set the moment the ritual ends has them blink out.
+        com.quantumitems.engine.ActiveRitualCores.report(level, pos,
+                core.phase != Phase.IDLE);
         if (core.phase == Phase.IDLE) {
             return;
         }
@@ -292,10 +289,6 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
             return;
         }
         core.phaseAge++;
-        if (live) {
-            core.drainExperience(serverLevel);
-            core.pullExperienceOrbs(serverLevel);
-        }
         switch (core.phase) {
             case CONNECTING -> {
                 if (core.phaseAge % BEAM_STEP_TICKS == 1 && core.phaseAge / BEAM_STEP_TICKS < 4) {
@@ -338,7 +331,6 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
                     int result = core.performRitual(serverLevel, true);
                     core.shard = ItemStack.EMPTY; // burned: the rules are taught, not refunded
                     core.setGlow(serverLevel, 0);
-                    core.releaseClaimedOrbs(serverLevel);
                     if (result >= 0) {
                         core.burst(serverLevel);
                         core.enterPhase(Phase.SUCCESS);
@@ -370,7 +362,6 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
     private void cancelRitual(ServerLevel level) {
         shard = ItemStack.EMPTY;
         setGlow(level, 0);
-        releaseClaimedOrbs(level);
         level.playSound(null, worldPosition, ModRegistry.RITUAL_CANCEL.get(), SoundSource.BLOCKS, 2.5f, 0.95f);
         enterPhase(Phase.FAILURE);
         awardFailure(level);
@@ -425,98 +416,6 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
             if (state.is(ModRegistry.QUANTUM_CORE.get()) && state.getValue(QuantumCoreBlock.GLOW) != glow) {
                 level.setBlock(pos, state.setValue(QuantumCoreBlock.GLOW, glow), 3);
             }
-        }
-    }
-
-    // --- experience drain: the Observer drinks what you have seen ---
-
-    private static final double XP_RADIUS = 7.0;
-    /** Mirrored in ExperienceOrbMixin — a claimed orb cannot be picked up. */
-    private static final String CLAIMED_TAG = "quantumitems_claimed";
-
-    private Vec3 observerEyePos() {
-        return Vec3.atCenterOf(worldPosition).add(0, 0.05, 0);
-    }
-
-    /**
-     * While the ritual runs, nearby players leak experience: a point at a
-     * time detaches as a REAL orb that the core then reels in. The closer
-     * you stand, the faster it bleeds. Creative and spectator players are
-     * exempt. Claimed orbs cannot be picked back up (author's ruling).
-     */
-    private void drainExperience(ServerLevel level) {
-        Vec3 eye = observerEyePos();
-        var box = new net.minecraft.world.phys.AABB(worldPosition).inflate(XP_RADIUS);
-        for (net.minecraft.world.entity.player.Player player
-                : level.getEntitiesOfClass(net.minecraft.world.entity.player.Player.class, box)) {
-            if (player.isCreative() || player.isSpectator()) {
-                continue;
-            }
-            double dist = player.position().distanceTo(eye);
-            if (dist > XP_RADIUS) {
-                continue;
-            }
-            int interval = dist < 2.5 ? 6 : dist < 5.0 ? 12 : 20;
-            if (phaseAge % interval != 0) {
-                continue;
-            }
-            if (player.experienceLevel <= 0 && player.experienceProgress <= 0.0f) {
-                continue; // nothing left to drink
-            }
-            player.giveExperiencePoints(-1);
-            // The orb leaves FROM the player (mid-body), not from a point
-            // toward the core — spawning it offset put it inside the absorb
-            // zone when the player stood close, so it blinked out unseen.
-            var orb = new net.minecraft.world.entity.ExperienceOrb(level,
-                    player.getX(), player.getY() + player.getBbHeight() * 0.6, player.getZ(), 1);
-            orb.addTag(CLAIMED_TAG); // claimed BEFORE entering the world: never insta-picked
-            level.addFreshEntity(orb);
-        }
-    }
-
-    /**
-     * ALL experience orbs in radius — leaked, mob-dropped, thrown bottles —
-     * drift slowly toward the Observer and vanish into it. Claimed orbs are
-     * un-pickable and their vanilla player attraction is switched off (see
-     * ExperienceOrbMixin); the claim self-heals if the core stops re-tagging.
-     */
-    private void pullExperienceOrbs(ServerLevel level) {
-        Vec3 eye = observerEyePos();
-        // Absorb on TOUCHING the two-block core column (slightly inflated),
-        // not at a point-distance from the eye: an orb resting on TOP of the
-        // core — a player standing on it feeds from up there — touches the
-        // column and is eaten, instead of hovering forever out of point range.
-        var column = new net.minecraft.world.phys.AABB(
-                worldPosition.getX(), worldPosition.getY(), worldPosition.getZ(),
-                worldPosition.getX() + 1, worldPosition.getY() + 2, worldPosition.getZ() + 1)
-                .inflate(0.3);
-        var box = new net.minecraft.world.phys.AABB(worldPosition).inflate(XP_RADIUS);
-        for (net.minecraft.world.entity.ExperienceOrb orb
-                : level.getEntitiesOfClass(net.minecraft.world.entity.ExperienceOrb.class, box)) {
-            // A freshly drained orb gets a moment of visible flight before it
-            // can be eaten — spawn-and-vanish reads as a glitch.
-            if (orb.tickCount > 8 && column.contains(orb.position())) {
-                // Six motes in a tenth of a block went unnoticed for weeks.
-                // The observer's own corona carries the idle state; this is
-                // the punctuation for an orb actually going in, so it has to
-                // read as an event from across the room.
-                level.sendParticles(ParticleTypes.PORTAL, eye.x, eye.y, eye.z, 30, 0.35, 0.35, 0.35, 0.35);
-                level.sendParticles(ParticleTypes.ELECTRIC_SPARK, eye.x, eye.y, eye.z, 6, 0.1, 0.1, 0.1, 0.15);
-                level.playSound(null, worldPosition, SoundEvents.AMETHYST_BLOCK_CHIME,
-                        SoundSource.BLOCKS, 0.4f, 1.8f);
-                orb.discard();
-                continue;
-            }
-            orb.addTag(CLAIMED_TAG); // pickup block; the ORB's own tick steers it (both sides)
-        }
-    }
-
-    /** Ritual over: leftover claimed orbs become ordinary orbs again. */
-    private void releaseClaimedOrbs(ServerLevel level) {
-        var box = new net.minecraft.world.phys.AABB(worldPosition).inflate(XP_RADIUS + 2);
-        for (net.minecraft.world.entity.ExperienceOrb orb
-                : level.getEntitiesOfClass(net.minecraft.world.entity.ExperienceOrb.class, box)) {
-            orb.removeTag(CLAIMED_TAG);
         }
     }
 
@@ -684,7 +583,7 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
     @Override
     public void setRemoved() {
         if (level != null) {
-            com.quantumitems.engine.ActiveRitualCores.report(level, worldPosition, false, false);
+            com.quantumitems.engine.ActiveRitualCores.report(level, worldPosition, false);
         }
         super.setRemoved();
     }

@@ -15,15 +15,12 @@
   "tooltip.quantumitems.core.lore": "The heart of the ritual circle.",
   "tooltip.quantumitems.resonator.lore": "A pedestal that steadies one stack for the rite.",
   "item.quantumitems.eye_of_elsewhere": "Eye of Elsewhere",
-
   "subtitles.quantumitems.ritual_hum": "Ritual hums",
   "subtitles.quantumitems.ritual_riser": "Ritual builds",
   "subtitles.quantumitems.ritual_burst": "Ritual succeeds",
   "subtitles.quantumitems.ritual_cancel": "Ritual collapses",
-
   "quantumitems.ponder.tag.quantum_entanglement": "Quantum Entanglement",
   "quantumitems.ponder.tag.quantum_entanglement.description": "Entangle item stacks so distant windows share a single pool of items.",
-
   "quantumitems.ponder.circle.header": "Assembling the Ritual Circle",
   "quantumitems.ponder.circle.text_1": "The ritual circle is built on a 5×5 floor of Amethyst Blocks",
   "quantumitems.ponder.circle.text_2": "Place a Resonator on each of the four corners",
@@ -31,26 +28,21 @@
   "quantumitems.ponder.circle.text_4": "The Quantum Core stands at the center of the circle",
   "quantumitems.ponder.circle.text_5": "The space above the floor must stay clear of other blocks",
   "quantumitems.ponder.circle.text_6": "Once the circle is complete, it is ready to entangle items",
-
   "quantumitems.ponder.create.header": "Creating a Network",
   "quantumitems.ponder.create.text_1": "Lay a single stack on just one Resonator",
   "quantumitems.ponder.create.text_2": "Then place a Quantum Shard on the Core to start the ritual",
-  "quantumitems.ponder.create.text_3": "While the ritual runs, it pulls experience from nearby players",
-  "quantumitems.ponder.create.text_4": "One Shard turns that stack into two entangled windows",
-  "quantumitems.ponder.create.text_5": "The Shard is spent either way, success or failure",
-
+  "quantumitems.ponder.create.text_3": "One Shard turns that stack into two entangled windows",
+  "quantumitems.ponder.create.text_4": "The Shard is spent either way, success or failure",
   "quantumitems.ponder.expand.header": "Growing a Network",
   "quantumitems.ponder.expand.text_1": "To grow a network, first lay out every window it already has",
   "quantumitems.ponder.expand.text_2": "Then run the ritual again with another Shard",
   "quantumitems.ponder.expand.text_3": "Each ritual entangles one more window into the network",
   "quantumitems.ponder.expand.text_4": "The network caps at four windows — one for each Resonator",
-
   "quantumitems.ponder.failure.header": "When the Ritual Fails",
   "quantumitems.ponder.failure.text_1": "The ritual is strict — mixed or mismatched stacks are a mistake",
   "quantumitems.ponder.failure.text_2": "Start it anyway, and the circle rejects the pattern",
   "quantumitems.ponder.failure.text_3": "It ends in a loud collapse — the Shard is spent, the items untouched",
   "quantumitems.ponder.failure.text_4": "Empty Resonators, stray stacks, or a network not fully laid out fail the same way",
-
   "advancement.quantumitems.shard.title": "Shard of Elsewhere",
   "advancement.quantumitems.shard.description": "Find a Quantum Shard where the old city sleeps in the dark",
   "advancement.quantumitems.eye.title": "Eye of Elsewhere",

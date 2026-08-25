@@ -3,49 +3,45 @@ package com.quantumitems.engine;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.Vec3;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Positions of cores currently running a ritual, per dimension, reported by
- * BOTH sides' block-entity ticks. Pure data, no client classes — so the
- * ExperienceOrb mixin can consult it on either side. This is what lets the
- * CLIENT know an orb is claimed: entity command tags do not sync, and the
- * client's own orb simulation kept steering orbs toward the player (the
- * jitter-and-rubber-band bug).
+ * Positions of cores with a ritual in progress, per dimension, reported from
+ * the block-entity tick.
  *
- * <p>Two memberships, because they answer different questions and stopped
- * agreeing the moment failure got an animation. A core that has just failed
- * must not still be dragging experience orbs toward itself — it released them
- * on the way in — but its beams have a second of dying left to draw. One set
- * for the pull, one for the drawing.
+ * <p>This is how the beam renderer finds its work. It cannot ask the level for
+ * "every core in range" — that would mean walking block entities every frame —
+ * and it cannot hang off the cores' own block-entity renderers, because a BER
+ * only runs while its own block is on screen and the beams reach two blocks
+ * further out than the core does.
+ *
+ * <p>Membership lasts until the phase returns to IDLE rather than ending at the
+ * verdict: both SUCCESS and FAILURE have a second of beam left to draw, and a
+ * core dropped at the verdict has them blink out instead of finishing.
+ *
+ * <p>Reported by both sides. Only the client reads it, but the tick that
+ * reports is shared code, and one extra set on the server is cheaper than a
+ * side check in the hot path.
  */
 public final class ActiveRitualCores {
-    private static final double RADIUS_SQ = 8.5 * 8.5;
-    /** Cores whose ritual is live, and so are claiming nearby experience. */
-    private static final Map<ResourceKey<Level>, Set<BlockPos>> PULLING = new ConcurrentHashMap<>();
-    /** Cores the beam renderer still has something to draw for. */
-    private static final Map<ResourceKey<Level>, Set<BlockPos>> DRAWN = new ConcurrentHashMap<>();
+
+    private static final Map<ResourceKey<Level>, Set<BlockPos>> CORES = new ConcurrentHashMap<>();
 
     private ActiveRitualCores() {
     }
 
-    private static void put(Map<ResourceKey<Level>, Set<BlockPos>> map,
-                            Level level, BlockPos pos, boolean member) {
-        Set<BlockPos> set = map.computeIfAbsent(level.dimension(), k -> ConcurrentHashMap.newKeySet());
-        if (member) {
+    public static void report(Level level, BlockPos pos, boolean active) {
+        Set<BlockPos> set = CORES.computeIfAbsent(level.dimension(), k -> ConcurrentHashMap.newKeySet());
+        if (active) {
             set.add(pos.immutable());
         } else {
             set.remove(pos);
         }
-    }
-
-    public static void report(Level level, BlockPos pos, boolean pulling, boolean drawn) {
-        put(PULLING, level, pos, pulling);
-        put(DRAWN, level, pos, drawn);
     }
 
     /**
@@ -53,42 +49,20 @@ public final class ActiveRitualCores {
      * the level's own lifecycle does this: a client quitting to the title
      * drops its ClientLevel without unloading chunks, so the block entities
      * never report themselves inactive and the positions would haunt the next
-     * world opened under the same dimension key — steering its orbs at empty
-     * air forever.
+     * world opened under the same dimension key.
      */
     public static void clear(ResourceKey<Level> dimension) {
-        PULLING.remove(dimension);
-        DRAWN.remove(dimension);
+        CORES.remove(dimension);
     }
 
     /** Forgets everything; the server (and with it every dimension) is gone. */
     public static void clear() {
-        PULLING.clear();
-        DRAWN.clear();
+        CORES.clear();
     }
 
-    /** Every core with beams left to draw in this dimension; empty when none. */
-    public static java.util.Collection<BlockPos> beingDrawn(Level level) {
-        Set<BlockPos> set = DRAWN.get(level.dimension());
-        return set == null ? java.util.List.of() : set;
-    }
-
-    /** The closest running core within pull radius, or null. */
-    @javax.annotation.Nullable
-    public static BlockPos nearestActiveCore(Level level, Vec3 position) {
-        Set<BlockPos> set = PULLING.get(level.dimension());
-        if (set == null || set.isEmpty()) {
-            return null;
-        }
-        BlockPos best = null;
-        double bestSq = RADIUS_SQ;
-        for (BlockPos pos : set) {
-            double sq = position.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
-            if (sq < bestSq) {
-                bestSq = sq;
-                best = pos;
-            }
-        }
-        return best;
+    /** Every core with beams to draw in this dimension; empty when none. */
+    public static Collection<BlockPos> beingDrawn(Level level) {
+        Set<BlockPos> set = CORES.get(level.dimension());
+        return set == null ? List.of() : set;
     }
 }

@@ -6,7 +6,6 @@
   "mixins": [
     "AbstractContainerMenuMixin",
     "BundleContentsMutableMixin",
-    "ExperienceOrbMixin",
     "HopperBlockEntityMixin",
     "InvWrapperMixin",
     "InventoryMixin",

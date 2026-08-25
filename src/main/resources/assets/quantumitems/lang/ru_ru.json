@@ -15,15 +15,12 @@
   "tooltip.quantumitems.core.lore": "Сердце ритуального круга.",
   "tooltip.quantumitems.resonator.lore": "Постамент, что держит для обряда одну стопку.",
   "item.quantumitems.eye_of_elsewhere": "Сквозное око",
-
   "subtitles.quantumitems.ritual_hum": "Гул ритуала",
   "subtitles.quantumitems.ritual_riser": "Ритуал нарастает",
   "subtitles.quantumitems.ritual_burst": "Ритуал удался",
   "subtitles.quantumitems.ritual_cancel": "Ритуал рушится",
-
   "quantumitems.ponder.tag.quantum_entanglement": "Квантовая запутанность",
   "quantumitems.ponder.tag.quantum_entanglement.description": "Свяжите стопки предметов так, чтобы далёкие окна делили общий запас.",
-
   "quantumitems.ponder.circle.header": "Сборка ритуального круга",
   "quantumitems.ponder.circle.text_1": "Круг строится на полу 5×5 из аметистовых блоков",
   "quantumitems.ponder.circle.text_2": "Поставьте по резонатору в каждый из четырёх углов",
@@ -31,26 +28,21 @@
   "quantumitems.ponder.circle.text_4": "В центре круга стоит квантовое ядро",
   "quantumitems.ponder.circle.text_5": "Над полом не должно быть посторонних блоков",
   "quantumitems.ponder.circle.text_6": "Когда круг собран, он готов запутывать предметы",
-
   "quantumitems.ponder.create.header": "Создание сети",
   "quantumitems.ponder.create.text_1": "Положите одну стопку на один из резонаторов",
   "quantumitems.ponder.create.text_2": "Затем опустите на ядро квантовый осколок — начнётся ритуал",
-  "quantumitems.ponder.create.text_3": "Пока идёт ритуал, он вытягивает опыт из игроков поблизости",
-  "quantumitems.ponder.create.text_4": "Один осколок превращает стопку в два связанных окна",
-  "quantumitems.ponder.create.text_5": "Осколок сгорит в любом случае — и при успехе, и при провале",
-
+  "quantumitems.ponder.create.text_3": "Один осколок превращает стопку в два связанных окна",
+  "quantumitems.ponder.create.text_4": "Осколок сгорит в любом случае — и при успехе, и при провале",
   "quantumitems.ponder.expand.header": "Расширение сети",
   "quantumitems.ponder.expand.text_1": "Чтобы расширить сеть, сначала выложите все её окна",
   "quantumitems.ponder.expand.text_2": "Затем проведите ритуал ещё раз, с новым осколком",
   "quantumitems.ponder.expand.text_3": "Каждый ритуал добавляет в сеть ещё одно окно",
   "quantumitems.ponder.expand.text_4": "Предел сети — четыре окна, по одному на каждый резонатор",
-
   "quantumitems.ponder.failure.header": "Когда ритуал проваливается",
   "quantumitems.ponder.failure.text_1": "Ритуал строг: разные или неподходящие стопки — ошибка",
   "quantumitems.ponder.failure.text_2": "Запустите с ошибкой — и круг не примет такую раскладку",
   "quantumitems.ponder.failure.text_3": "Всё обрывается громким крахом: осколок сгорает, но предметы остаются целы",
   "quantumitems.ponder.failure.text_4": "Пустые резонаторы, лишние стопки или не вся сеть на месте — итог тот же",
-
   "advancement.quantumitems.shard.title": "Осколок оттуда",
   "advancement.quantumitems.shard.description": "Найдите квантовый осколок там, где во тьме спит древний город",
   "advancement.quantumitems.eye.title": "Сквозное око",

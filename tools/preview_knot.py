@@ -42,10 +42,11 @@ MAX_SATURATION = 0.95
 VIEW_WEIGHT = 0.55
 BAND_WEIGHT = 1.0 - VIEW_WEIGHT
 BANDS = 2.0
-WAVE = 0.055
+WAVE = 0.110
 WAVE_TURNS = 3.0
-WALK_FURY = 2.4
-WAVE_PERIOD = 14.0
+WALK_FURY = 5.0
+FURY_SWELL = 0.9
+WAVE_PERIOD = 8.0
 DRIFT_PERIOD = 130.0
 
 # --- must match the display block of item/quantum_shard.json ---
@@ -147,12 +148,12 @@ def nodes(offsets, time=0.0, fury=0.0):
     return np.vstack([p, p[0:1]])
 
 
-def brightness(phase):
+def brightness(phase, fury=0.0):
     b = np.zeros(NODES + 1)
     for i in range(NODES):
         d = abs(((i / NODES) - phase + 1.5) % 1.0 - 0.5)
         head = np.clip(1.0 - d * 5.0, 0, 1)
-        b[i] = np.clip(0.55 + head * head * 0.65, 0.34, 1.4)
+        b[i] = np.clip((0.55 + head * head * 0.65) * (1 + FURY_SWELL * fury), 0.34, 2.4)
     b[NODES] = b[0]
     return b
 
@@ -195,10 +196,10 @@ def _triangle(img, p, q, r, cp, cq, cr, gain):
 def render(matrix, px, offsets, phase=0.0, drift=0.0, sides=SIDES, gain=0.40, bg=0.055,
            time=0.0, fury=0.0):
     pts = nodes(offsets, time, fury)
-    ring, normals = rings(pts, RADIUS, sides)
+    ring, normals = rings(pts, RADIUS * (1 + FURY_SWELL * fury), sides)
     ring = ring @ matrix.T
     normals = normals @ matrix.T          # the tint works in view space here
-    bright = brightness(phase)
+    bright = brightness(phase, fury)
     # the eye is down +Z once everything has been rotated into view
     eye = np.array([0.0, 0.0, 1.0])
     col = np.zeros((NODES + 1, sides, 3))

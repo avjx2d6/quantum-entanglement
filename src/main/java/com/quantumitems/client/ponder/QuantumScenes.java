@@ -147,13 +147,6 @@ public class QuantumScenes {
                 .placeNearTarget();
         scene.idle(90);
 
-        scene.overlay().showText(70)
-                .colored(PonderPalette.GREEN)
-                .text("While it runs, the ritual pulls experience from nearby players")
-                .attachKeyFrame()
-                .pointAt(util.vector().centerOf(CORE_UPPER).add(0, 0.3, 0));
-        scene.idle(80);
-
         ritualFlash(scene, util);
         clearShard(scene, util);
 

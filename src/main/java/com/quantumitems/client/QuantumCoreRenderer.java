@@ -45,18 +45,22 @@ public class QuantumCoreRenderer implements BlockEntityRenderer<QuantumCoreBlock
         boolean running = core.isRitualRunning();
 
         // --- the observer inside the lower housing ---
-        // Degrees per tick. A LINEAR 5 -> 14 across nine seconds is a wind-up
-        // nobody can see happening: at every moment it is barely faster than a
-        // moment ago. Squaring it holds the gem slow for most of the crescendo
-        // and spends the whole change in the last third, which is what reads as
-        // acceleration. 20 is the ceiling — the old 29 was most of a revolution
-        // every twelve frames, past which it stops being a turning solid.
+        // Degrees per tick, squared across the crescendo so the gem holds slow
+        // for most of it and spends the whole change in the last third — that
+        // is what reads as acceleration, where a linear ramp is never
+        // noticeably faster than it was a moment ago.
+        //
+        // 48 at the peak is 2.7 turns a second. The earlier ceiling of 29 was
+        // rejected for strobing, but that was while the angle jumped at every
+        // phase boundary; a spin that is genuinely integrated stays readable
+        // far past it, because each frame's step is small even when the tick's
+        // is not.
         float wind = core.phaseAge() / (float) QuantumCoreBlockEntity.CRESCENDO_TICKS;
         float observerSpeed = switch (core.phase()) {
-            case IDLE -> 1.2f;
-            case CRESCENDO -> 2.0f + 18.0f * wind * wind;
-            case SUCCESS, FAILURE -> 0.8f;
-            default -> 3.0f;
+            case IDLE -> 1.5f;
+            case CRESCENDO -> 4.0f + 44.0f * wind * wind;
+            case SUCCESS, FAILURE -> 1.0f;
+            default -> 6.0f;
         };
         poseStack.pushPose();
         // Height, size and the two gem turns all come from the cube in

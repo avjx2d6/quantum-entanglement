@@ -22,8 +22,13 @@ import java.util.Map;
  */
 public final class SpinClock {
 
-    /** Fraction of the remaining speed error closed per tick. */
-    private static final float EASE = 0.09f;
+    /**
+     * Fraction of the remaining speed error closed per tick. Enough smoothing
+     * to swallow a step at a phase boundary, not so much that it lags a ramp:
+     * at 0.09 the gem was still a tenth short of the crescendo's peak when the
+     * crescendo ended.
+     */
+    private static final float EASE = 0.20f;
     /** A lag spike or a chunk reload must not spin the thing like a top. */
     private static final float MAX_STEP_TICKS = 4.0f;
     /** Slower than the spin: the observer lights up like something charging. */
