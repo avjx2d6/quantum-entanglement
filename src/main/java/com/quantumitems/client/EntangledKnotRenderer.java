@@ -57,11 +57,19 @@ public final class EntangledKnotRenderer extends BlockEntityWithoutLevelRenderer
      * hues are nowhere near equally bright — pure green carries three quarters
      * of the luma and pure blue about seven percent — so half the knot went
      * dark and simply vanished in a 16-pixel slot. Saturation is solved per hue
-     * to land on this luma instead: greens stay deep, blues and violets come up
-     * pale, which is also what real nacre does.
+     * to land on this luma instead.
+     *
+     * <p>The ceiling is what decides whether the knot reads as DEEP or as
+     * WASHED OUT, and it is not the same knob as how hard the thing emits.
+     * Scaling emission takes every channel down together and the strand goes
+     * see-through; raising saturation and paying for it in value takes the
+     * off-hue channels down and leaves the dominant one, so the same amount of
+     * light arrives as a colour instead of as a glow. At 0.95 and this luma the
+     * arc runs #056620 through #045F5F to #0C4EF7 and #FD0CBA — deep the whole
+     * way, where 0.85 gave pastels like #5685FF.
      */
-    private static final float TARGET_LUMA = 0.52f;
-    private static final float MAX_SATURATION = 0.85f;
+    private static final float TARGET_LUMA = 0.30f;
+    private static final float MAX_SATURATION = 0.95f;
     /** Split between the view-angle term and the band travelling along the strand. */
     private static final float VIEW_WEIGHT = 0.55f;
     private static final float BAND_WEIGHT = 1.0f - VIEW_WEIGHT;
@@ -132,11 +140,27 @@ public final class EntangledKnotRenderer extends BlockEntityWithoutLevelRenderer
      * strands wandering 3σ straight at each other leaves a 0.11 gap against a
      * 0.06 tube. Past roughly 0.08 the knot starts tying itself shut.
      */
-    private static final float WALK_UNIT = 0.050f;      // blocks per unit of walk
+    private static final float WALK_UNIT = 0.038f;      // blocks per unit of walk
     private static final float DECAY = 0.80f;
     private static final float SPREAD = 0.70f;
     /** Ticks for the bright pulse to travel once around the loop. */
     private static final float PULSE_PERIOD = 50.0f;
+
+    /**
+     * A ripple running around the strand, on top of the walk.
+     *
+     * <p>The walk alone is noise: every node jitters independently, so at this
+     * amplitude it reads as a faint shimmer and the knot looks like a still
+     * object. This is coherent instead — a helical wave travelling around the
+     * loop, so the strand visibly moves through itself. Some of the walk's
+     * budget is handed over to pay for it; the clearance sum is what matters,
+     * not which of the two spends it.
+     */
+    private static final float WAVE = 0.030f;
+    /** Turns of the helix around the loop. */
+    private static final float WAVE_TURNS = 3.0f;
+    /** Ticks for the ripple to travel once around. */
+    private static final float WAVE_PERIOD = 34.0f;
 
     // ---- the fixed curve, and the frame the writhe is applied in ----
 
@@ -207,6 +231,9 @@ public final class EntangledKnotRenderer extends BlockEntityWithoutLevelRenderer
         for (int i = 0; i < NODES; i++) {
             float a = Mth.lerp(partial, PREV[i][0], CUR[i][0]) * WALK_UNIT;
             float b = Mth.lerp(partial, PREV[i][1], CUR[i][1]) * WALK_UNIT;
+            float ripple = ((i / (float) NODES) * WAVE_TURNS - time / WAVE_PERIOD) * Mth.TWO_PI;
+            a += WAVE * Mth.cos(ripple);
+            b += WAVE * Mth.sin(ripple);
             pts[i] = BASE[i].add(OFF_U[i].scale(a)).add(OFF_V[i].scale(b));
 
             float w = Mth.lerp(partial, PREV[i][2], CUR[i][2]);
@@ -219,7 +246,7 @@ public final class EntangledKnotRenderer extends BlockEntityWithoutLevelRenderer
             // that becomes four times over. At 0.40 base and 0.52 ramp luma a
             // plain strand lands near 0.42 doubled, a crossing near 0.83, and
             // only the pulse's own peak is allowed to reach white.
-            bright[i] = Mth.clamp(0.40f + w * 0.18f + head * head * 0.50f, 0.26f, 1.0f);
+            bright[i] = Mth.clamp(0.55f + w * 0.18f + head * head * 0.65f, 0.34f, 1.4f);
         }
         pts[NODES] = pts[0];
         bright[NODES] = bright[0];

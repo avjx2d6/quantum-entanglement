@@ -57,15 +57,19 @@ public final class RitualBeamRenderer {
     private static final int COLOR_INPUT = 0x21BED9;    // deep cyan
     private static final int COLOR_OUTPUT = 0xE0B01B;   // deep amber
     private static final int COLOR_FAIL = 0xE02718;     // deep red
+    private static final int COLOR_WON = 0x1FD99A;      // deep green-turquoise
 
-    /** How far the focus end falls once the machine lets go of it, in blocks. */
-    private static final float FAIL_DROP = 1.15f;
-    /** Extra droop at the middle of a slack strand, in blocks. */
-    private static final float FAIL_SAG = 0.55f;
+    /** Blocks a fragment falls by the end of the failure phase. */
+    private static final float FAIL_GRAVITY = 2.6f;
+    /** Degrees a fragment tumbles through while it falls. */
+    private static final float FAIL_TUMBLE = 220.0f;
+    /** Points per fragment; neighbours share an endpoint, so the line starts whole. */
+    private static final int FRAGMENT_POINTS = 3;
 
-    /** The discharge ring stops just past the resonators, which sit at 2.83. */
-    private static final float RING_MAX = 4.2f;
-    private static final int RING_NODES = 28;
+    /** The discharge ring leaves the circle entirely — the resonators sit at 2.83. */
+    private static final float RING_MAX = 14.0f;
+    /** Enough that a fourteen-block circle does not read as a polygon. */
+    private static final int RING_NODES = 64;
 
     /** Deflection of one walk step, in blocks, before amplitude is applied. */
     private static final float WALK_UNIT = 0.085f;
@@ -173,7 +177,7 @@ public final class RitualBeamRenderer {
             return COLOR_FAIL;
         }
         if (phase == QuantumCoreBlockEntity.Phase.SUCCESS) {
-            return COLOR_OUTPUT;   // the verdict went the way the gold beam promised
+            return COLOR_WON;
         }
         boolean verdict = phase == QuantumCoreBlockEntity.Phase.JUDGEMENT
                 || phase == QuantumCoreBlockEntity.Phase.CRESCENDO;
@@ -250,12 +254,6 @@ public final class RitualBeamRenderer {
         int n = Mth.clamp(BeamTuning.nodes, 3, 64);
         WalkState walk = advanceWalk(core, n);
         Vec3 focus = Vec3.atCenterOf(core.getBlockPos()).add(0, FOCUS_HEIGHT - 0.5, 0);
-        // On a failure the machine lets go of the focus first: that end drops
-        // under gravity while the resonators keep holding theirs, so the four
-        // strands are left hanging rather than simply switched off.
-        if (fail > 0) {
-            focus = focus.subtract(0, FAIL_DROP * fail * fail, 0);
-        }
 
         float radius = Math.max(0.005f, BeamTuning.width) * (1.0f + ramp * 0.6f) * 0.5f;
         var consumer = buffer.getBuffer(QuantumRenderTypes.RITUAL_BEAM);
@@ -267,34 +265,33 @@ public final class RitualBeamRenderer {
         }
         for (int b = 0; b < lit; b++) {
             Vec3 from = Vec3.atBottomCenterOf(core.getBlockPos().offset(CORNERS[b])).add(0, RESONATOR_TOP, 0);
+            Vec3 to = focus;
             if (won > 0) {
-                // The entanglement is made and the four become one: each strand
-                // lets go of its resonator and is drawn into the focus, so it
-                // shortens from the outside in rather than simply fading.
-                from = from.add(focus.subtract(from).scale(Mth.clamp(Math.pow(won, 0.6), 0, 0.995)));
+                // The entanglement is made and the strand is paid back out into
+                // the resonator that fed it: the focus end travels outward, so
+                // the line shortens from the middle rather than fading in place.
+                to = focus.add(from.subtract(focus).scale(Mth.clamp(Math.pow(won, 0.6), 0, 0.995)));
             }
-            Vec3[] pts = buildBeam(walk, b, n, from, focus, partialTick, ampScale, fail);
+            Vec3[] pts = buildBeam(walk, b, n, from, to, partialTick, ampScale);
             float[] bright = new float[n + 1];
             for (int i = 0; i <= n; i++) {
                 float w = Mth.lerp(partialTick, walk.prev[b][i][2], walk.cur[b][i][2]);
                 bright[i] = Mth.clamp(0.8f + w * 0.45f, 0.55f, 1.0f) * BeamTuning.brightness;
-                if (fail > 0) {
-                    // the light drains out of the focus end and runs back along
-                    // the strand toward the resonator, which goes dark last
-                    float t = i / (float) n;
-                    bright[i] *= 1 - Mth.clamp((fail - (1 - t) * 0.55f) / 0.45f, 0, 1);
-                }
                 if (won > 0) {
                     // A spike steep enough to be a flash rather than a glare —
                     // (1-t)^4 has spent itself in three ticks — over a fade slow
-                    // enough that the strand is still visibly being reeled in
-                    // when the ring reaches the resonators.
+                    // enough that the strand is still visibly moving when the
+                    // ring reaches the resonators.
                     float left = 1 - won;
                     bright[i] *= (1 + left * left * left * left) * (float) Math.pow(left, 1.2);
                 }
             }
-            StrandGeometry.tube(poseStack, consumer, pts, bright,
-                    colorFor(b, core, recoloredCount), radius, SIDES, false);
+            int rgb = colorFor(b, core, recoloredCount);
+            if (fail > 0) {
+                brokenStrand(poseStack, consumer, pts, bright, rgb, radius, b, fail);
+            } else {
+                StrandGeometry.tube(poseStack, consumer, pts, bright, rgb, radius, SIDES, false);
+            }
         }
         poseStack.popPose();
         return true;
@@ -348,17 +345,96 @@ public final class RitualBeamRenderer {
         bright[RING_NODES] = bright[0];
         // the ring thins as it grows: the same light spread around a longer line
         float radiusOut = Math.max(0.005f, BeamTuning.width) * 0.5f * (1.4f - 0.9f * spread);
-        StrandGeometry.tube(poseStack, consumer, pts, bright, COLOR_OUTPUT, radiusOut, SIDES, true);
+        StrandGeometry.tube(poseStack, consumer, pts, bright, COLOR_WON, radiusOut, SIDES, true);
     }
 
     /**
-     * Node positions in world space, offset in the plane across the beam, plus
-     * the sag a slack strand takes on once the ritual has failed. The sag is a
-     * parabola pinned at both ends, so the resonator's end stays put and the
-     * fall reads as the middle giving way rather than the whole line sliding.
+     * The strand comes apart. Rather than one line going slack, it is drawn as
+     * short pieces that each fall and tumble on their own — which is what a
+     * thing under tension does when it lets go, and what a single sagging line
+     * could never show.
+     *
+     * <p>Neighbouring pieces share an endpoint, so at the instant of failure the
+     * line is still whole and only comes apart as they separate. Everything a
+     * piece needs — when it lets go, which way it tumbles — is derived from its
+     * beam and its index, never drawn from a random source: it has to be the
+     * same value on the next frame or the pieces would jitter in place.
+     *
+     * <p>They break from the focus outward, so the middle of the circle gives
+     * way first and the resonators are left holding the last of it.
      */
+    private static void brokenStrand(PoseStack poseStack, com.mojang.blaze3d.vertex.VertexConsumer consumer,
+                                     Vec3[] pts, float[] bright, int rgb, float radius,
+                                     int beam, float fail) {
+        int last = pts.length - 1;
+        for (int start = 0; start < last; start += FRAGMENT_POINTS - 1) {
+            int end = Math.min(start + FRAGMENT_POINTS - 1, last);
+            if (end - start < 1) {
+                break;
+            }
+            // 1 at the focus end, 0 at the resonator: the focus lets go first
+            float atFocus = (start + end) * 0.5f / last;
+            float scatter = hash01(beam * 31 + start);
+            float held = 0.30f * (1 - atFocus) + 0.10f * scatter;
+            float g = Math.max(0, (fail - held) / Math.max(1.0e-3f, 1 - held));
+            if (g <= 0) {
+                StrandGeometry.tube(poseStack, consumer, slice(pts, start, end),
+                        slice(bright, start, end), rgb, radius, SIDES, false);
+                continue;
+            }
+
+            Vec3[] piece = slice(pts, start, end);
+            Vec3 centre = Vec3.ZERO;
+            for (Vec3 p : piece) {
+                centre = centre.add(p);
+            }
+            centre = centre.scale(1.0 / piece.length);
+            // a fixed tumble axis per piece, spread around the circle by its hash
+            double spin = Math.toRadians(FAIL_TUMBLE * g * (scatter < 0.5f ? -1 : 1));
+            Vec3 axis = new Vec3(Math.cos(scatter * 6.283), 0.35, Math.sin(scatter * 6.283)).normalize();
+            double drop = FAIL_GRAVITY * g * g;
+            double drift = 0.35 * g * (scatter - 0.5);
+            for (int i = 0; i < piece.length; i++) {
+                Vec3 local = piece[i].subtract(centre);
+                // Rodrigues about the piece's own axis
+                Vec3 turned = local.scale(Math.cos(spin))
+                        .add(axis.cross(local).scale(Math.sin(spin)))
+                        .add(axis.scale(axis.dot(local) * (1 - Math.cos(spin))));
+                piece[i] = centre.add(turned).add(drift, -drop, drift);
+            }
+            float[] fade = slice(bright, start, end);
+            float left = 1 - g;
+            for (int i = 0; i < fade.length; i++) {
+                fade[i] *= left * left;
+            }
+            StrandGeometry.tube(poseStack, consumer, piece, fade, rgb, radius, SIDES, false);
+        }
+    }
+
+    private static Vec3[] slice(Vec3[] src, int from, int to) {
+        Vec3[] out = new Vec3[to - from + 1];
+        System.arraycopy(src, from, out, 0, out.length);
+        return out;
+    }
+
+    private static float[] slice(float[] src, int from, int to) {
+        float[] out = new float[to - from + 1];
+        System.arraycopy(src, from, out, 0, out.length);
+        return out;
+    }
+
+    /** Stable pseudo-random in 0..1 from an integer — the same every frame. */
+    private static float hash01(int seed) {
+        int h = seed * 0x9E3779B9;
+        h ^= h >>> 15;
+        h *= 0x85EBCA6B;
+        h ^= h >>> 13;
+        return (h >>> 8) / (float) (1 << 24);
+    }
+
+    /** Node positions in world space, offset in the plane across the beam. */
     private static Vec3[] buildBeam(WalkState walk, int beam, int n, Vec3 from, Vec3 to,
-                                    float blend, float ampScale, float fail) {
+                                    float blend, float ampScale) {
         Vec3 dir = to.subtract(from).normalize();
         Vec3 u = dir.cross(new Vec3(0, 1, 0));
         if (u.lengthSqr() < 1.0e-6) {
@@ -373,9 +449,7 @@ public final class RitualBeamRenderer {
             float k = WALK_UNIT * BeamTuning.amplitude * ampScale;
             double ox = Mth.lerp(blend, walk.prev[beam][i][0], walk.cur[beam][i][0]) * k;
             double oy = Mth.lerp(blend, walk.prev[beam][i][1], walk.cur[beam][i][1]) * k;
-            double sag = fail > 0 ? FAIL_SAG * fail * fail * 4 * t * (1 - t) : 0;
-            out[i] = from.add(to.subtract(from).scale(t)).add(u.scale(ox)).add(v.scale(oy))
-                    .subtract(0, sag, 0);
+            out[i] = from.add(to.subtract(from).scale(t)).add(u.scale(ox)).add(v.scale(oy));
         }
         return out;
     }

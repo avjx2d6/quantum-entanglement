@@ -32,15 +32,18 @@ SIZE = 0.34
 RADIUS = 0.030
 SIDES = 6
 SIDES_GUI = 5
-WALK_UNIT = 0.050
+WALK_UNIT = 0.038
 DECAY = 0.80
 SPREAD = 0.70
 HUE_MIN, HUE_MAX = 0.38, 0.88
-TARGET_LUMA = 0.52
-MAX_SATURATION = 0.85
+TARGET_LUMA = 0.30
+MAX_SATURATION = 0.95
 VIEW_WEIGHT = 0.55
 BAND_WEIGHT = 1.0 - VIEW_WEIGHT
 BANDS = 2.0
+WAVE = 0.030
+WAVE_TURNS = 3.0
+WAVE_PERIOD = 34.0
 DRIFT_PERIOD = 130.0
 
 # --- must match the display block of item/quantum_shard.json ---
@@ -131,8 +134,12 @@ def walk(ticks, seed=5):
     return x
 
 
-def nodes(offsets):
-    p = BASE + OFF_U * offsets[:, :1] * WALK_UNIT + OFF_V * offsets[:, 1:] * WALK_UNIT
+def nodes(offsets, time=0.0):
+    along = np.arange(NODES) / NODES
+    ripple = (along * WAVE_TURNS - time / WAVE_PERIOD) * 2 * np.pi
+    a = offsets[:, :1] * WALK_UNIT + (WAVE * np.cos(ripple))[:, None]
+    b = offsets[:, 1:] * WALK_UNIT + (WAVE * np.sin(ripple))[:, None]
+    p = BASE + OFF_U * a + OFF_V * b
     return np.vstack([p, p[0:1]])
 
 
@@ -141,7 +148,7 @@ def brightness(phase):
     for i in range(NODES):
         d = abs(((i / NODES) - phase + 1.5) % 1.0 - 0.5)
         head = np.clip(1.0 - d * 5.0, 0, 1)
-        b[i] = np.clip(0.40 + head * head * 0.50, 0.26, 1.0)
+        b[i] = np.clip(0.55 + head * head * 0.65, 0.34, 1.4)
     b[NODES] = b[0]
     return b
 
@@ -181,8 +188,8 @@ def _triangle(img, p, q, r, cp, cq, cr, gain):
     img[px - 1 - ys[m], xs[m]] += c * gain
 
 
-def render(matrix, px, offsets, phase=0.0, drift=0.0, sides=SIDES, gain=0.40, bg=0.055):
-    pts = nodes(offsets)
+def render(matrix, px, offsets, phase=0.0, drift=0.0, sides=SIDES, gain=0.40, bg=0.055, time=0.0):
+    pts = nodes(offsets, time)
     ring, normals = rings(pts, RADIUS, sides)
     ring = ring @ matrix.T
     normals = normals @ matrix.T          # the tint works in view space here
@@ -221,8 +228,8 @@ render(rot_x(GUI_TILT), 16, settled, 0.30, 0.0, sides=SIDES_GUI) \
     .resize((256, 256), Image.NEAREST).save(OUT + "knot_slot.png")
 strip([render(rot_y(a) @ rot_x(WORLD_TILT), 220, settled, a / 360.0, a / 360.0)
        for a in range(0, 360, 45)], "knot_spin.png")
-strip([render(rot_x(GUI_TILT), 220, walk(70 + k), 0.30, 0.0) for k in range(6)],
-      "knot_writhe.png")
+strip([render(rot_x(GUI_TILT), 220, walk(70 + k * 3), 0.30, 0.0, time=k * 3.0)
+       for k in range(6)], "knot_writhe.png")
 strip([render(rot_x(GUI_TILT), 220, settled, 0.30, d / 6.0) for d in range(6)],
       "knot_film.png")
 

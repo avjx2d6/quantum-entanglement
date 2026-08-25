@@ -496,7 +496,12 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
             // A freshly drained orb gets a moment of visible flight before it
             // can be eaten — spawn-and-vanish reads as a glitch.
             if (orb.tickCount > 8 && column.contains(orb.position())) {
-                level.sendParticles(ParticleTypes.PORTAL, eye.x, eye.y, eye.z, 6, 0.1, 0.1, 0.1, 0.05);
+                // Six motes in a tenth of a block went unnoticed for weeks.
+                // The observer's own corona carries the idle state; this is
+                // the punctuation for an orb actually going in, so it has to
+                // read as an event from across the room.
+                level.sendParticles(ParticleTypes.PORTAL, eye.x, eye.y, eye.z, 30, 0.35, 0.35, 0.35, 0.35);
+                level.sendParticles(ParticleTypes.ELECTRIC_SPARK, eye.x, eye.y, eye.z, 6, 0.1, 0.1, 0.1, 0.15);
                 level.playSound(null, worldPosition, SoundEvents.AMETHYST_BLOCK_CHIME,
                         SoundSource.BLOCKS, 0.4f, 1.8f);
                 orb.discard();

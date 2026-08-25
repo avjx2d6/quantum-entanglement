@@ -45,10 +45,15 @@ public class QuantumCoreRenderer implements BlockEntityRenderer<QuantumCoreBlock
         boolean running = core.isRitualRunning();
 
         // --- the observer inside the lower housing ---
+        // Degrees per tick. The crescendo used to reach 29, which is most of a
+        // revolution every twelve frames — past that the gem stops reading as a
+        // turning solid and just strobes. 14 is about 0.8 turns a second, fast
+        // enough to look driven and slow enough to still be a shape.
         float observerSpeed = switch (core.phase()) {
             case IDLE -> 1.2f;
-            case CRESCENDO -> 9.0f + 20.0f * core.phaseAge() / QuantumCoreBlockEntity.CRESCENDO_TICKS;
-            default -> 6.0f;
+            case CRESCENDO -> 5.0f + 9.0f * core.phaseAge() / QuantumCoreBlockEntity.CRESCENDO_TICKS;
+            case SUCCESS, FAILURE -> 0.8f;
+            default -> 5.0f;
         };
         int observerLight = running ? 0xF000F0
                 : LevelRenderer.getLightColor(core.getLevel(), core.getBlockPos());
@@ -57,7 +62,9 @@ public class QuantumCoreRenderer implements BlockEntityRenderer<QuantumCoreBlock
         // quantum_core_lower_e.bbmodel; only the bob and the spin are ours.
         poseStack.translate(0.5, ObserverEyeRender.CORE_HEIGHT
                 + Mth.sin(time / 16.0f) * 0.03f, 0.5);
-        poseStack.mulPose(Axis.YP.rotationDegrees(time * observerSpeed + ObserverEyeRender.GEM_YAW));
+        ObserverEyeRender.renderCorona(poseStack, buffers, time, running ? 1.0f : 0.25f);
+        poseStack.mulPose(Axis.YP.rotationDegrees(
+                SpinClock.advance(core.getBlockPos(), time, observerSpeed) + ObserverEyeRender.GEM_YAW));
         poseStack.mulPose(Axis.ZP.rotationDegrees(ObserverEyeRender.GEM_TIP));
         poseStack.scale(ObserverEyeRender.SIZE, ObserverEyeRender.SIZE, ObserverEyeRender.SIZE);
         ObserverEyeRender.renderEyeCube(poseStack, buffers, observerLight);

@@ -50,6 +50,8 @@ public final class ClientEvents {
         public static void onLevelUnload(net.neoforged.neoforge.event.level.LevelEvent.Unload event) {
             if (event.getLevel().isClientSide()) {
                 RitualHumSound.forgetAll();
+                RitualBeamRenderer.forgetAll();
+                SpinClock.forgetAll();
             }
         }
 
