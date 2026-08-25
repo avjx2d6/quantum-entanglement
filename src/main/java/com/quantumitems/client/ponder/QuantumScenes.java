@@ -141,7 +141,7 @@ public class QuantumScenes {
         parkShard(scene, util);
         scene.idle(10);
         scene.overlay().showText(80)
-                .text("Then place a Quantum Shard on the Core to start the ritual")
+                .text("Then place a Quantum Knot on the Core to start the ritual")
                 .attachKeyFrame()
                 .pointAt(util.vector().centerOf(CORE_UPPER).add(0, 0.3, 0))
                 .placeNearTarget();
@@ -157,7 +157,7 @@ public class QuantumScenes {
         scene.idle(10);
         scene.overlay().showText(90)
                 .colored(PonderPalette.GREEN)
-                .text("One Shard turns that stack into two entangled stacks")
+                .text("One Knot turns that stack into two entangled windows")
                 .attachKeyFrame()
                 .pointAt(util.vector().topOf(copyRes))
                 .placeNearTarget();
@@ -165,7 +165,7 @@ public class QuantumScenes {
 
         scene.overlay().showText(90)
                 .colored(PonderPalette.RED)
-                .text("The Shard is used up whether the ritual succeeds or fails")
+                .text("The Knot is spent either way, success or failure")
                 .pointAt(util.vector().centerOf(CORE_UPPER).add(0, 0.3, 0));
         scene.idle(100);
         scene.markAsFinished();
@@ -201,7 +201,7 @@ public class QuantumScenes {
         parkShard(scene, util);
         scene.idle(10);
         scene.overlay().showText(70)
-                .text("Then run the ritual again with another Shard")
+                .text("Then run the ritual again with another Knot")
                 .attachKeyFrame()
                 .pointAt(util.vector().centerOf(CORE_UPPER).add(0, 0.3, 0))
                 .placeNearTarget();
@@ -256,33 +256,37 @@ public class QuantumScenes {
                 be -> be.layDown(new ItemStack(Items.IRON_INGOT, 16), Direction.SOUTH));
         scene.idle(10);
         scene.overlay().showOutlineWithText(util.select().position(a).add(util.select().position(b)), 95)
-                .text("The ritual is strict - mixed or mismatched stacks are a mistake")
+                .text("A new network takes exactly ONE stack, and it must stack and not wear out")
                 .attachKeyFrame()
                 .pointAt(util.vector().topOf(a))
                 .placeNearTarget();
         scene.idle(105);
 
-        parkShard(scene, util);
-        scene.idle(10);
-        scene.overlay().showText(70)
-                .text("Start it anyway, and the circle rejects the pattern")
+        // The empty corner, not the core: this line is about where the new
+        // window appears, and it used to point at the machine instead.
+        BlockPos spare = RESONATORS[3];
+        scene.overlay().showOutlineWithText(util.select().position(spare), 90)
+                .colored(PonderPalette.BLUE)
+                .text("One Resonator must stay empty - that is where the new window appears")
                 .attachKeyFrame()
-                .pointAt(util.vector().centerOf(CORE_UPPER).add(0, 0.3, 0))
+                .pointAt(util.vector().topOf(spare))
                 .placeNearTarget();
-        scene.idle(80);
+        scene.idle(100);
 
+        parkShard(scene, util);
+        scene.idle(30);
         failFlash(scene, util);
         clearShard(scene, util);
         scene.idle(10);
         scene.overlay().showText(95)
                 .colored(PonderPalette.RED)
-                .text("It ends in a loud collapse - the Shard is spent, the items untouched")
+                .text("Break a rule and the circle collapses - the Knot is spent, the items untouched")
                 .attachKeyFrame()
                 .pointAt(util.vector().centerOf(CORE_UPPER).add(0, 0.3, 0));
         scene.idle(105);
 
         scene.overlay().showText(100)
-                .text("Empty pedestals, stray stacks, or a network not fully laid out fail the same way")
+                .text("Growing a network needs every one of its windows laid out, and nothing else")
                 .pointAt(util.vector().topOf(b))
                 .placeNearTarget();
         scene.idle(110);

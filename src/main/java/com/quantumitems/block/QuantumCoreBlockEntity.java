@@ -338,7 +338,6 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
                     } else {
                         // the locked circle should make this impossible; fail honestly if it happens
                         serverLevel.playSound(null, pos, ModRegistry.RITUAL_CANCEL.get(), SoundSource.BLOCKS, 2.5f, 0.95f);
-                        core.explainRefusal(serverLevel);
                         core.enterPhase(Phase.FAILURE);
                         core.awardFailure(serverLevel);
                     }
@@ -359,31 +358,13 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         }
     }
 
-    /** The loud "отмена": burn the shard, kill the hum, go red, say why. */
+    /** The loud "отмена": burn the shard, kill the hum, go red. */
     private void cancelRitual(ServerLevel level) {
         shard = ItemStack.EMPTY;
         setGlow(level, 0);
         level.playSound(null, worldPosition, ModRegistry.RITUAL_CANCEL.get(), SoundSource.BLOCKS, 2.5f, 0.95f);
-        explainRefusal(level);
         enterPhase(Phase.FAILURE);
         awardFailure(level);
-    }
-
-    /**
-     * Chat, not the action bar: the shard is gone and the player has to be able
-     * to read the reason after the fact, not catch it in the two seconds the
-     * action bar holds a line for.
-     */
-    private void explainRefusal(ServerLevel level) {
-        net.minecraft.server.level.ServerPlayer player = launcher(level);
-        if (player == null || refusal == null) {
-            return;
-        }
-        player.sendSystemMessage(net.minecraft.network.chat.Component
-                .translatable("message.quantumitems.refused")
-                .withStyle(net.minecraft.ChatFormatting.RED)
-                .append(net.minecraft.network.chat.Component.translatable(refusal.key)
-                        .withStyle(net.minecraft.ChatFormatting.GRAY)));
     }
 
     @Nullable
@@ -454,62 +435,15 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
      * the success path mutates resonator contents only through
      * whole-instance setItem (the engine adopts the canonicals).
      */
-    /**
-     * Why the last dry run said no, as a translation key.
-     *
-     * <p>"Unsuitable stacks" was the whole explanation a player got, for a rule
-     * with nine separate ways to fail, after burning a shard that drops from
-     * fifteen percent of ancient city chests. The verdict now says which rule,
-     * in chat, to whoever started it.
-     */
-    @Nullable
-    private Refusal refusal;
-
-    /** Every way the circle can say no. Pinned to its strings by a gametest. */
-    public enum Refusal {
-        BROKEN_CIRCLE("broken_circle"),
-        NOTHING_LAID("nothing_laid"),
-        NO_ROOM("no_room"),
-        ONE_STACK_ONLY("one_stack_only"),
-        DOES_NOT_STACK("does_not_stack"),
-        DAMAGEABLE("damageable"),
-        PLAIN_MIXED_IN("plain_mixed_in"),
-        TWO_NETWORKS("two_networks"),
-        SAME_WINDOW_TWICE("same_window_twice"),
-        STALE_WINDOW("stale_window"),
-        NETWORK_INCOMPLETE("network_incomplete"),
-        NETWORK_FULL("network_full"),
-        UNKNOWN_NETWORK("unknown_network");
-
-        public final String key;
-
-        Refusal(String suffix) {
-            this.key = "message.quantumitems.refused." + suffix;
-        }
-    }
-
-    /** Records the reason and returns the sentinel, so every refusal is one line. */
-    private int refuse(Refusal reason) {
-        refusal = reason;
-        return -1;
-    }
-
-    /** The reason the last dry run refused, or null if it did not. */
-    @Nullable
-    public Refusal lastRefusal() {
-        return refusal;
-    }
-
     private int performRitual(ServerLevel level, boolean apply) {
-        refusal = null;
         if (!isStructureValid()) {
-            return refuse(Refusal.BROKEN_CIRCLE); // someone mined the machine mid-ritual
+            return -1; // someone mined the machine mid-ritual
         }
         List<ResonatorBlockEntity> circle = new ArrayList<>(4);
         for (BlockPos corner : CORNERS) {
             ResonatorBlockEntity resonator = resonatorAt(corner);
             if (resonator == null) {
-                return refuse(Refusal.BROKEN_CIRCLE);
+                return -1; // a corner is not a resonator any more
             }
             circle.add(resonator);
         }
@@ -526,10 +460,10 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
             }
         }
         if (occupied.isEmpty()) {
-            return refuse(Refusal.NOTHING_LAID);
+            return -1; // nothing laid out to entangle
         }
         if (vacant.isEmpty()) {
-            return refuse(Refusal.NO_ROOM);
+            return -1; // no empty resonator for the new window to appear on
         }
         int outputCorner = circle.indexOf(vacant.get(0));
 
@@ -540,15 +474,15 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         if (linked.isEmpty()) {
             // Fresh entanglement: exactly one plain, stackable, undamageable input.
             if (occupied.size() != 1) {
-                return refuse(Refusal.ONE_STACK_ONLY);
+                return -1; // a new network takes exactly one stack
             }
             ResonatorBlockEntity inputResonator = occupied.get(0);
             ItemStack input = inputResonator.getItem(0);
             if (input.getMaxStackSize() <= 1) {
-                return refuse(Refusal.DOES_NOT_STACK);
+                return -1; // a window with room for one item would be pointless
             }
             if (input.isDamageableItem()) {
-                return refuse(Refusal.DAMAGEABLE);
+                return -1; // damage belongs to one copy; a window has no single copy
             }
             if (!apply) {
                 return outputCorner;
@@ -576,39 +510,39 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         // recoherence is the price of growth, and it makes the member addition
         // fully local (all canonical instances sit in loaded BEs right here).
         if (linked.size() != occupied.size()) {
-            return refuse(Refusal.PLAIN_MIXED_IN);
+            return -1; // plain strays mixed in with the windows
         }
         QuantumLinkData first = linked.get(0).getItem(0).get(ModRegistry.QUANTUM_LINK.get());
         QuantumNetworks.Network network = networks.network(first.networkId());
         if (network == null || engine == null) {
-            return refuse(Refusal.UNKNOWN_NETWORK);
+            return -1; // the world remembers no such network
         }
         Set<Integer> presentMembers = new HashSet<>();
         for (ResonatorBlockEntity resonator : linked) {
             ItemStack window = resonator.getItem(0);
             QuantumLinkData link = window.get(ModRegistry.QUANTUM_LINK.get());
             if (link.networkId() != first.networkId()) {
-                return refuse(Refusal.TWO_NETWORKS);
+                return -1; // two different networks on the table
             }
             if (!presentMembers.add(link.memberId())) {
-                return refuse(Refusal.SAME_WINDOW_TWICE);
+                return -1; // the same window laid out twice
             }
             if (engine.reconcile(window) != QuantumEngine.Status.CANONICAL) {
-                return refuse(Refusal.STALE_WINDOW);
+                return -1; // a stale copy: its pool has moved on without it
             }
         }
         if (!presentMembers.equals(network.aliveMembers)) {
-            return refuse(Refusal.NETWORK_INCOMPLETE);
+            return -1; // some window of this network is elsewhere in the world
         }
         if (network.aliveMembers.size() >= QuantumNetworks.MAX_MEMBERS) {
-            return refuse(Refusal.NETWORK_FULL);
+            return -1; // already at four windows
         }
         if (!apply) {
             return outputCorner;
         }
         int member = networks.addMember(first.networkId());
         if (member < 0) {
-            return refuse(Refusal.NETWORK_FULL);
+            return -1;
         }
         ItemStack newWindow = linked.get(0).getItem(0).copy();
         newWindow.set(ModRegistry.QUANTUM_LINK.get(), new QuantumLinkData(first.networkId(), member));

@@ -437,44 +437,6 @@ public class RitualGameTests {
     }
 
     /**
-     * Every refusal the code can produce has a line the player can read, in
-     * both shipped languages.
-     *
-     * <p>This is the one kind of defect that ships silently: a missing key
-     * shows the raw string instead of an explanation, in exactly the moment
-     * the player has just lost a shard and most needs one. Nothing else checks
-     * it — resource packs are not loaded on a gametest server, so the file is
-     * read straight off the classpath.
-     */
-    @GameTest(template = "arena", templateNamespace = "quantumitems")
-    public void everyRefusalHasWordsInEveryLanguage(GameTestHelper helper) {
-        for (String lang : new String[]{"en_us", "ru_ru"}) {
-            String path = "/assets/quantumitems/lang/" + lang + ".json";
-            String text;
-            try (java.io.InputStream in = RitualGameTests.class.getResourceAsStream(path)) {
-                if (in == null) {
-                    helper.fail("missing lang file " + path);
-                    return;
-                }
-                text = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-            } catch (java.io.IOException e) {
-                helper.fail("could not read " + path + ": " + e);
-                return;
-            }
-            com.google.gson.JsonObject keys = com.google.gson.JsonParser.parseString(text).getAsJsonObject();
-            if (!keys.has("message.quantumitems.refused")) {
-                helper.fail(lang + " is missing the refusal prefix");
-            }
-            for (QuantumCoreBlockEntity.Refusal refusal : QuantumCoreBlockEntity.Refusal.values()) {
-                if (!keys.has(refusal.key)) {
-                    helper.fail(lang + " has no line for " + refusal + " (" + refusal.key + ")");
-                }
-            }
-        }
-        helper.succeed();
-    }
-
-    /**
      * Advancements are awarded to a ServerPlayer that is actually in the
      * player list, so the mock has to be the real thing rather than the
      * GameType stand-in {@code makeMockPlayer} returns. Vanilla marks this one
