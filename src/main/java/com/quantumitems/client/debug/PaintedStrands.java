@@ -23,8 +23,8 @@ import java.util.List;
 /**
  * Strands painted by hand with the {@link com.quantumitems.debug.StrandWandItem}.
  *
- * <p>SCAFFOLDING — goes with the wand. It exists to look at the beam geometry
- * anywhere except inside a ritual, at any length and any colour.
+ * <p>Goes with the wand: a creative toy, kept because it is the only way to see
+ * the beam geometry at a length and colour the ritual never uses.
  *
  * <p>Client-side only, which is what keeps it small: the list lives here, the
  * renderer reads it here, and nothing is saved or sent. It is dropped when the

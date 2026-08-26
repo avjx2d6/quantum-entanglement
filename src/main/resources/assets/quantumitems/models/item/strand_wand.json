@@ -1,5 +1,5 @@
 {
-  "__comment": "SCAFFOLDING — borrows a vanilla sprite so the debug wand needs no art of its own.",
+  "__comment": "Borrows a vanilla sprite: a creative toy does not need art of its own.",
   "parent": "minecraft:item/generated",
   "textures": {
     "layer0": "minecraft:item/blaze_rod"

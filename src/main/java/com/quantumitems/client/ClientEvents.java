@@ -75,6 +75,11 @@ public final class ClientEvents {
                 }
                 return;
             }
+            if (stack.is(ModRegistry.STRAND_WAND.get())) {
+                tooltip.add(doctrine("tooltip.quantumitems.strand_wand.use"));
+                tooltip.add(doctrine("tooltip.quantumitems.strand_wand.creative"));
+                return;
+            }
             // Nothing else gets a tooltip. The four items used to carry a line
             // of flavour apiece — "a splinter of somewhere else", "an eye that
             // opens onto somewhere else" — which told a player nothing and

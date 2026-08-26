@@ -11,13 +11,14 @@ import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 
 /**
- * A toy. Click one block, click another, and a strand of the ritual's own
- * glowing line is stretched between the two points; sneak-click the air to
- * change its colour, sneak-click a block to wipe them all.
+ * Click one block, click another, and a strand of the ritual's own glowing line
+ * is stretched between the two points; sneak-click the air to change its
+ * colour, sneak-click a block to wipe them all.
  *
- * <p>SCAFFOLDING — strip this and {@link PaintedStrands} before release, along
- * with the registry entry and the two lang keys. Nothing in the mod depends on
- * either.
+ * <p>A creative toy that ships on purpose. It affects nothing — no block, no
+ * recipe, no ritual reads it — so it sits in the creative tab without being in
+ * anyone's way, and it is the only way to see the beam geometry at a length and
+ * colour the ritual never uses.
  *
  * <p>Everything it draws lives on the client and nowhere else: no block, no
  * entity, no saved data, nothing sent to anyone. That is what makes it thirty
