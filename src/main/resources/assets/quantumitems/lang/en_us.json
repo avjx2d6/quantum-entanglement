@@ -10,7 +10,7 @@
   "tooltip.quantumitems.window.hint": "Hold Shift for details",
   "tooltip.quantumitems.window.shared": "All copies share one supply of items. Take from any copy and every copy loses them.",
   "tooltip.quantumitems.window.ground": "Drop it on the ground and it turns back into ordinary items.",
-  "tooltip.quantumitems.window.automation": "Hoppers and pipes pull ordinary items out. Taking the last one ends the link.",
+  "tooltip.quantumitems.window.automation": "Hoppers and droppers pull ordinary items out. Taking the last one ends the link.",
   "tooltip.quantumitems.window.shulker": "Safe to keep in a shulker box.",
   "item.quantumitems.eye_of_elsewhere": "Eye of Elsewhere",
   "subtitles.quantumitems.ritual_hum": "Ritual hums",

@@ -10,7 +10,7 @@
   "tooltip.quantumitems.window.hint": "Shift — подробнее",
   "tooltip.quantumitems.window.shared": "Все копии берут из одних и тех же предметов. Забрали из одной — пропало у всех.",
   "tooltip.quantumitems.window.ground": "Брошенная на землю, снова становится обычными предметами.",
-  "tooltip.quantumitems.window.automation": "Воронки и трубы вытягивают обычные предметы. Последний предмет разрывает связь.",
+  "tooltip.quantumitems.window.automation": "Воронки и раздатчики вытягивают обычные предметы. Последний предмет разрывает связь.",
   "tooltip.quantumitems.window.shulker": "В шалкеровом ящике хранится безопасно.",
   "item.quantumitems.eye_of_elsewhere": "Сквозное око",
   "subtitles.quantumitems.ritual_hum": "Гул ритуала",

@@ -1,0 +1,38 @@
+name: release
+
+# Fires on a version tag: git tag v0.5.4 && git push --tags
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write   # needed to create the release and attach the jar
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - run: ./gradlew build --no-daemon
+
+      # Sources and the -all jar are not what a player installs; only the plain
+      # mod jar is attached, so the release page has exactly one obvious file.
+      - name: Collect the mod jar
+        run: |
+          mkdir -p upload
+          find build/libs -name '*.jar' ! -name '*-sources.jar' ! -name '*-all.jar' \
+            -exec cp {} upload/ \;
+          ls -l upload
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: upload/*.jar
+          generate_release_notes: true

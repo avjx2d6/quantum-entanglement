@@ -10,7 +10,7 @@
   "tooltip.quantumitems.window.hint": "Shift — докладніше",
   "tooltip.quantumitems.window.shared": "Усі копії беруть з одного запасу предметів. Забрали з однієї — зникло в усіх.",
   "tooltip.quantumitems.window.ground": "Киньте на землю — і вона знову стане звичайними предметами.",
-  "tooltip.quantumitems.window.automation": "Лійки й труби витягують звичайні предмети. Останній предмет розриває зв'язок.",
+  "tooltip.quantumitems.window.automation": "Лійки й роздавачі витягують звичайні предмети. Останній предмет розриває зв'язок.",
   "tooltip.quantumitems.window.shulker": "У шалкеровій скрині зберігається безпечно.",
   "item.quantumitems.eye_of_elsewhere": "Наскрізне око",
   "subtitles.quantumitems.ritual_hum": "Гул ритуалу",

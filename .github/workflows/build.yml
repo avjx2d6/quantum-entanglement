@@ -1,0 +1,38 @@
+name: build
+
+# Only main and pull requests into it. Every push of every branch would be
+# noise: the working branch moves several times an hour and the answer is
+# nearly always the same one the last run gave.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Compiles, then runs the GameTest server: the suite is the point of
+      # this job. A green tick here means it built and passed on a machine
+      # that has never seen the project, with no local Gradle cache to lean on.
+      - run: ./gradlew build --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: quantum-entanglement-jar
+          path: build/libs/*.jar
+          if-no-files-found: error
