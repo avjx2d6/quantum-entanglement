@@ -34,12 +34,13 @@ back into ordinary items, but the items are always accounted for.
   right there. Nothing is gained, nothing is lost.
 - **The ritual.** Networks are made at a multiblock ritual circle — a 5×5
   amethyst floor, four resonators, and a two-tall Quantum Core — fed by a rare
-  **Quantum Shard** found deep in Ancient Cities. Lay out your stacks, drop the
-  shard, and watch the circle work. A running ritual even siphons a little
-  experience from anyone standing near.
+  **Quantum Knot** found in Ancient City chests. Lay one stack on one
+  resonator, leave one empty for the new window, drop the Knot on the Core and
+  watch the circle work. The Knot is used up either way; break a rule and the
+  ritual simply stops, with your items untouched.
 - **A built-in guide.** Every mod item carries a **Ponder** scene — the ritual,
   step by step, right in-game. No wiki needed.
-- **Advancements** for finding your first shard, building the circle, and
+- **Advancements** for finding your first Knot, building the circle, and
   filling a network to its cap.
 
 ## Dependencies
@@ -65,8 +66,8 @@ mix-ins, which is why hoppers, shulkers, crafting, furnaces, death drops and
 modded transport all obey the same rules with no per-block code. Duplication is
 impossible by construction: every extraction is bounded by the pool.
 
-The mod ships with 100+ automated GameTests covering the entanglement rules and
-the ritual.
+The mod ships with over a hundred automated GameTests covering the
+entanglement rules and the ritual.
 
 ## License
 
