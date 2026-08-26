@@ -1,10 +1,16 @@
 {
+  "parent": "quantumitems:entanglement/root",
   "display": {
-    "icon": { "id": "quantumitems:quantum_knot" },
-    "title": { "translate": "advancement.quantumitems.knot.title" },
-    "description": { "translate": "advancement.quantumitems.knot.description" },
+    "icon": {
+      "id": "quantumitems:quantum_knot"
+    },
+    "title": {
+      "translate": "advancement.quantumitems.knot.title"
+    },
+    "description": {
+      "translate": "advancement.quantumitems.knot.description"
+    },
     "frame": "task",
-    "background": "minecraft:textures/block/deepslate.png",
     "show_toast": true,
     "announce_to_chat": true,
     "hidden": false
@@ -12,8 +18,18 @@
   "criteria": {
     "obtained": {
       "trigger": "minecraft:inventory_changed",
-      "conditions": { "items": [ { "items": "quantumitems:quantum_knot" } ] }
+      "conditions": {
+        "items": [
+          {
+            "items": "quantumitems:quantum_knot"
+          }
+        ]
+      }
     }
   },
-  "requirements": [ [ "obtained" ] ]
+  "requirements": [
+    [
+      "obtained"
+    ]
+  ]
 }

@@ -1,9 +1,15 @@
 {
   "parent": "quantumitems:entanglement/knot",
   "display": {
-    "icon": { "id": "quantumitems:eye_of_elsewhere" },
-    "title": { "translate": "advancement.quantumitems.eye.title" },
-    "description": { "translate": "advancement.quantumitems.eye.description" },
+    "icon": {
+      "id": "quantumitems:eye_of_elsewhere"
+    },
+    "title": {
+      "translate": "advancement.quantumitems.eye.title"
+    },
+    "description": {
+      "translate": "advancement.quantumitems.eye.description"
+    },
     "frame": "task",
     "show_toast": true,
     "announce_to_chat": true,
@@ -12,8 +18,18 @@
   "criteria": {
     "obtained": {
       "trigger": "minecraft:inventory_changed",
-      "conditions": { "items": [ { "items": "quantumitems:eye_of_elsewhere" } ] }
+      "conditions": {
+        "items": [
+          {
+            "items": "quantumitems:eye_of_elsewhere"
+          }
+        ]
+      }
     }
   },
-  "requirements": [ [ "obtained" ] ]
+  "requirements": [
+    [
+      "obtained"
+    ]
+  ]
 }

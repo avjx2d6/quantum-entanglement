@@ -1,9 +1,15 @@
 {
   "parent": "quantumitems:entanglement/entangled",
   "display": {
-    "icon": { "id": "minecraft:echo_shard" },
-    "title": { "translate": "advancement.quantumitems.your_own_fault.title" },
-    "description": { "translate": "advancement.quantumitems.your_own_fault.description" },
+    "icon": {
+      "id": "quantumitems:quantum_knot"
+    },
+    "title": {
+      "translate": "advancement.quantumitems.your_own_fault.title"
+    },
+    "description": {
+      "translate": "advancement.quantumitems.your_own_fault.description"
+    },
     "frame": "task",
     "show_toast": true,
     "announce_to_chat": false,
@@ -14,5 +20,9 @@
       "trigger": "minecraft:impossible"
     }
   },
-  "requirements": [ [ "trigger" ] ]
+  "requirements": [
+    [
+      "trigger"
+    ]
+  ]
 }

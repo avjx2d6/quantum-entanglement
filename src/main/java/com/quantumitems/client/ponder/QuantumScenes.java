@@ -256,7 +256,7 @@ public class QuantumScenes {
                 be -> be.layDown(new ItemStack(Items.IRON_INGOT, 16), Direction.SOUTH));
         scene.idle(10);
         scene.overlay().showOutlineWithText(util.select().position(a).add(util.select().position(b)), 95)
-                .text("A new network takes exactly ONE stack, and it must stack and not wear out")
+                .text("A new network takes exactly ONE stack, and it must be stackable with no durability")
                 .attachKeyFrame()
                 .pointAt(util.vector().topOf(a))
                 .placeNearTarget();
@@ -286,7 +286,7 @@ public class QuantumScenes {
         scene.idle(105);
 
         scene.overlay().showText(100)
-                .text("Growing a network needs every one of its windows laid out, and nothing else")
+                .text("To grow a network, lay out every window it has - and nothing else")
                 .pointAt(util.vector().topOf(b))
                 .placeNearTarget();
         scene.idle(110);

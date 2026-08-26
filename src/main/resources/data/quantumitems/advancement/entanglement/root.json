@@ -1,0 +1,29 @@
+{
+  "__comment": "The tab in the advancements screen is named after its ROOT, so the root cannot also be a real goal — the tab would read 'No Loose Ends'. Granted on the first tick, with the toast and the chat line suppressed so nobody is congratulated for logging in.",
+  "display": {
+    "icon": {
+      "id": "minecraft:amethyst_block"
+    },
+    "title": {
+      "translate": "advancement.quantumitems.root.title"
+    },
+    "description": {
+      "translate": "advancement.quantumitems.root.description"
+    },
+    "frame": "task",
+    "background": "minecraft:textures/block/deepslate.png",
+    "show_toast": false,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "here": {
+      "trigger": "minecraft:tick"
+    }
+  },
+  "requirements": [
+    [
+      "here"
+    ]
+  ]
+}

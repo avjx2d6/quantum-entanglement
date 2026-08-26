@@ -1,9 +1,15 @@
 {
   "parent": "quantumitems:entanglement/entangled",
   "display": {
-    "icon": { "id": "quantumitems:resonator" },
-    "title": { "translate": "advancement.quantumitems.quartet.title" },
-    "description": { "translate": "advancement.quantumitems.quartet.description" },
+    "icon": {
+      "id": "quantumitems:resonator"
+    },
+    "title": {
+      "translate": "advancement.quantumitems.quartet.title"
+    },
+    "description": {
+      "translate": "advancement.quantumitems.quartet.description"
+    },
     "frame": "challenge",
     "show_toast": true,
     "announce_to_chat": true,
@@ -14,5 +20,9 @@
       "trigger": "minecraft:impossible"
     }
   },
-  "requirements": [ [ "trigger" ] ]
+  "requirements": [
+    [
+      "trigger"
+    ]
+  ]
 }

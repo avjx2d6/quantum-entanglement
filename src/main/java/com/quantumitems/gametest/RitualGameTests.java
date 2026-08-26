@@ -437,6 +437,61 @@ public class RitualGameTests {
     }
 
     /**
+     * Every shipped language carries exactly the same keys, and none of them is
+     * blank.
+     *
+     * <p>This is the failure that ships silently. A key present in one file and
+     * missing from another does not crash or warn — the player simply reads
+     * {@code item.quantumitems.quantum_knot} where a name should be, and only
+     * in that language, which is the one nobody testing the mod is playing in.
+     * There are three files now; there is no chance of noticing by eye.
+     *
+     * <p>Resource packs are not loaded on a gametest server, so the files are
+     * read straight off the classpath.
+     */
+    @GameTest(template = "arena", templateNamespace = "quantumitems")
+    public void everyLanguageCarriesTheSameKeys(GameTestHelper helper) {
+        String[] languages = {"en_us", "ru_ru", "uk_ua"};
+        com.google.gson.JsonObject reference = null;
+        for (String language : languages) {
+            String path = "/assets/quantumitems/lang/" + language + ".json";
+            com.google.gson.JsonObject keys;
+            try (java.io.InputStream in = RitualGameTests.class.getResourceAsStream(path)) {
+                if (in == null) {
+                    helper.fail("missing lang file " + path);
+                    return;
+                }
+                keys = com.google.gson.JsonParser.parseString(
+                        new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8))
+                        .getAsJsonObject();
+            } catch (java.io.IOException e) {
+                helper.fail("could not read " + path + ": " + e);
+                return;
+            }
+            for (String key : keys.keySet()) {
+                if (keys.get(key).getAsString().isBlank()) {
+                    helper.fail(language + " leaves " + key + " blank");
+                }
+            }
+            if (reference == null) {
+                reference = keys;
+                continue;
+            }
+            for (String key : reference.keySet()) {
+                if (!keys.has(key)) {
+                    helper.fail(language + " is missing " + key);
+                }
+            }
+            for (String key : keys.keySet()) {
+                if (!reference.has(key)) {
+                    helper.fail(language + " has " + key + ", which " + languages[0] + " does not");
+                }
+            }
+        }
+        helper.succeed();
+    }
+
+    /**
      * Advancements are awarded to a ServerPlayer that is actually in the
      * player list, so the mock has to be the real thing rather than the
      * GameType stand-in {@code makeMockPlayer} returns. Vanilla marks this one

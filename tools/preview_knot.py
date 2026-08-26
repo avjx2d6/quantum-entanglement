@@ -242,3 +242,30 @@ strip([render(rot_x(GUI_TILT), 220, settled, 0.30, d / 6.0) for d in range(6)],
       "knot_film.png")
 
 print("previews written to", OUT)
+
+
+def particle_sprite(path, px=16):
+    """The item's `particle` texture: the same knot, rasterised small.
+
+    A BuiltInModel needs one, and the old file was the shard's — purple
+    amethyst, while the knot is green through magenta. Nobody sees it often,
+    but when they do it should be the same object.
+    """
+    img = render(rot_x(GUI_TILT), px * 8, walk(70), 0.30, 0.0, gain=0.55, bg=0.0)
+    rgb = np.asarray(img.resize((px, px), Image.BOX), dtype=float)
+    peak = rgb.max(axis=2)
+    # Averaging an additive render down to 16 pixels leaves it very dark, and
+    # a sprite has no blend mode to make up the difference. Each painted pixel
+    # is pushed up until its strongest channel reaches full, which keeps the
+    # hue and costs only the shading — none of which survives 16 pixels anyway.
+    lit = peak > 10
+    scaled = np.zeros_like(rgb)
+    scaled[lit] = rgb[lit] * (235.0 / peak[lit])[:, None]
+    out = np.zeros((px, px, 4), dtype=np.uint8)
+    out[..., :3] = np.clip(scaled, 0, 255).astype(np.uint8)
+    out[..., 3] = np.where(lit, 255, 0)
+    Image.fromarray(out, "RGBA").save(path)
+    print("particle sprite ->", path)
+
+
+particle_sprite(OUT + "quantum_knot.png")
