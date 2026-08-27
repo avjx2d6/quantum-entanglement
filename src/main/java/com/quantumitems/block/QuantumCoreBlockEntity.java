@@ -12,6 +12,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
@@ -289,10 +290,14 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
                 }
             }
             case CRESCENDO -> {
-                // Smooth light ramp: 0 → 15 across the crescendo, one level at a
-                // time (setGlow no-ops when the level is unchanged, so this is at
-                // most 15 block updates over the whole phase).
-                int targetGlow = Math.min(15, (int) ((long) core.phaseAge * 15 / CRESCENDO_TICKS));
+                // Block light is an integer 0..15, so this can never be smooth —
+                // but it does not have to be a metronome either. Linear spacing
+                // put a step every twelve ticks for nine seconds, which is what
+                // read as jerking. Squared, the first step lands at tick 46 and
+                // they crowd together toward the end, so the stepping itself
+                // carries the build.
+                float wind = Mth.clamp(core.phaseAge / (float) CRESCENDO_TICKS, 0, 1);
+                int targetGlow = Math.round(15 * wind * wind);
                 core.setGlow(serverLevel, targetGlow);
                 if (core.phaseAge >= CRESCENDO_TICKS) {
                     int result = core.performRitual(serverLevel, true);
@@ -381,7 +386,14 @@ public class QuantumCoreBlockEntity extends SyncedBlockEntity {
         for (BlockPos pos : new BlockPos[]{worldPosition, worldPosition.above()}) {
             BlockState state = level.getBlockState(pos);
             if (state.is(ModRegistry.QUANTUM_CORE.get()) && state.getValue(QuantumCoreBlock.GLOW) != glow) {
-                level.setBlock(pos, state.setValue(QuantumCoreBlock.GLOW, glow), 3);
+                // UPDATE_CLIENTS and not the usual flag 3, which also carries
+                // UPDATE_NEIGHBORS. Nothing depends on how brightly the core is
+                // lit, and with neighbour updates an observer or a comparator
+                // beside it fired on every step of the ramp — fifteen pulses
+                // per ritual that nobody asked for. Lighting is recalculated
+                // from the state change itself either way.
+                level.setBlock(pos, state.setValue(QuantumCoreBlock.GLOW, glow),
+                        net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
             }
         }
     }
