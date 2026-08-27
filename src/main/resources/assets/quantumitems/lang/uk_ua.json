@@ -17,6 +17,7 @@
   "subtitles.quantumitems.ritual_riser": "Ритуал наростає",
   "subtitles.quantumitems.ritual_burst": "Вибух ритуалу",
   "subtitles.quantumitems.ritual_cancel": "Ритуал руйнується",
+  "message.quantumitems.shaders": "Quantum Entanglement: увімкнено шейдери, тому промені ритуалу можуть стати білими або не відображатися взагалі. Це не поломка — те, як вони малюються, вирішує шейдерпак, і мод на це вплинути не може.",
   "quantumitems.ponder.tag.quantum_entanglement": "Квантова заплутаність",
   "quantumitems.ponder.tag.quantum_entanglement.description": "Зв'язуйте стопки так, щоб предмети, взяті з однієї, зникали з усіх.",
   "quantumitems.ponder.circle.header": "Складання ритуального кола",

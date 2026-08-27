@@ -52,6 +52,7 @@ public final class ClientEvents {
                 RitualHumSound.forgetAll();
                 RitualBeamRenderer.forgetAll();
                 SpinClock.forgetAll();
+                ShaderWarning.forgetAll();
             }
         }
 

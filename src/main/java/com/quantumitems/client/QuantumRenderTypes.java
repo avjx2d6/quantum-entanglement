@@ -2,11 +2,9 @@ package com.quantumitems.client;
 
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import com.quantumitems.QuantumItemsMod;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.GraphicsStatus;
-import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
 /**
@@ -22,34 +20,25 @@ public final class QuantumRenderTypes extends RenderType {
     }
 
     /**
-     * A flat white 4×4. The strand has no texture of its own — every pixel of
-     * it is the vertex colour — but the shader below wants a sampler, and one
-     * white texel is the cheapest way to give it one that changes nothing.
-     */
-    private static final ResourceLocation STRAND_TEXTURE =
-            ResourceLocation.fromNamespaceAndPath(QuantumItemsMod.MOD_ID, "textures/misc/strand.png");
-
-    /**
-     * Additive glowing geometry for every strand in the mod.
-     *
-     * <p>Depth is tested but not written: the beam is hidden by blocks in front
-     * of it, and the far side of the tube shows through the near side, which is
-     * what makes it read as light rather than as painted metal.
+     * Untextured additive geometry for every strand in the mod.
      *
      * <p>Not vanilla's {@code lightning()}, which draws into the WEATHER target
      * rather than the main one — that made the beams composite oddly over the
      * scene and blink out at the edge of view — and whose write mask includes
      * depth, so a beam would silently occlude whatever was behind it.
      *
-     * <h4>Why the beacon beam's shader and not the lightning one</h4>
+     * <p>Depth is tested but not written: the beam is hidden by blocks in front
+     * of it, and the far side of the tube shows through the near side, which is
+     * what makes it read as light rather than as painted metal.
      *
-     * <p>Under a shader pack the core shader is not ours: Iris swaps the
-     * ShaderInstance behind {@code RENDERTYPE_*_SHADER} for its own program,
-     * chosen by which vanilla shader the render type asked for. Borrowing the
-     * lightning shader therefore hands every strand to the pack's
-     * {@code gbuffers_lightning}, and packs are entitled to do whatever they
-     * like there because vanilla only ever draws one thing with it. Photon
-     * does this, verbatim:
+     * <h4>Under a shader pack this is not the shader that runs</h4>
+     *
+     * <p>Iris swaps the ShaderInstance behind every {@code RENDERTYPE_*_SHADER}
+     * for a program of the pack's own, picked by WHICH vanilla shader the render
+     * type asked for. So borrowing the lightning shader hands every strand to
+     * the pack's {@code gbuffers_lightning} — and packs are entitled to do
+     * anything they like in there, because vanilla only ever draws one thing
+     * with it. Photon does exactly this, verbatim:
      *
      * <pre>{@code
      * #if defined PROGRAM_GBUFFERS_LIGHTNING
@@ -60,28 +49,29 @@ public final class QuantumRenderTypes extends RenderType {
      * #endif
      * }</pre>
      *
-     * <p>— which is why the beams came out pure white on that pack and were
-     * fine on Complementary. Nothing on our side can override it; the program
-     * runs after us.
+     * <p>which is why the beams come out pure white there and are fine on
+     * Complementary. Nothing on our side can override it: that program runs
+     * after ours.
      *
-     * <p>{@code gbuffers_beaconbeam} is the right neighbourhood instead: it is
-     * the one vanilla program that means "a coloured column of light", so packs
-     * keep its colour and mark it emissive rather than reinventing it — Photon
-     * gives it a glow material mask and leaves the blend function alone. The
-     * price is the beacon shader's vertex format ({@code BLOCK}: uv, lightmap
-     * and normal on top of position and colour) and a texture to sample, both
-     * supplied above and in {@link StrandGeometry}.
+     * <p>Borrowing the BEACON BEAM shader instead was tried, on the reasoning
+     * that it is the one vanilla program meaning "a coloured column of light"
+     * and packs therefore keep its colour. On Photon the beams vanished
+     * altogether — its beacon program is a deferred SOLID one, and a surface
+     * that writes no depth has nothing for the deferred passes to find. White
+     * beams beat no beams, so the lightning shader stays and
+     * {@link ShaderWarning} says so in chat instead. Getting this genuinely
+     * right needs a pack-side patch or a render path that writes depth, and
+     * neither is a thing to guess at without a GPU to look at.
      */
     public static final RenderType RITUAL_BEAM = create(
             "quantumitems_ritual_beam",
-            DefaultVertexFormat.BLOCK,
+            DefaultVertexFormat.POSITION_COLOR,
             VertexFormat.Mode.QUADS,
             1536,
             false,
             true,
             RenderType.CompositeState.builder()
-                    .setShaderState(RENDERTYPE_BEACON_BEAM_SHADER)
-                    .setTextureState(new TextureStateShard(STRAND_TEXTURE, false, false))
+                    .setShaderState(RENDERTYPE_LIGHTNING_SHADER)
                     .setWriteMaskState(COLOR_WRITE)
                     .setTransparencyState(LIGHTNING_TRANSPARENCY)
                     .setDepthTestState(LEQUAL_DEPTH_TEST)

@@ -126,6 +126,7 @@ public final class PaintedStrands {
         PoseStack poseStack = event.getPoseStack();
         SuperRenderTypeBuffer buffer = DefaultSuperRenderTypeBuffer.getInstance();
         var consumer = buffer.getBuffer(QuantumRenderTypes.RITUAL_BEAM);
+        com.quantumitems.client.ShaderWarning.checkOnce();
 
         poseStack.pushPose();
         poseStack.translate(-camera.x, -camera.y, -camera.z);

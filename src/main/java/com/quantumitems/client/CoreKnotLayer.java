@@ -76,6 +76,7 @@ public final class CoreKnotLayer {
         Vec3 camera = event.getCamera().getPosition();
         PoseStack poseStack = event.getPoseStack();
         SuperRenderTypeBuffer buffer = DefaultSuperRenderTypeBuffer.getInstance();
+        ShaderWarning.checkOnce();
 
         for (Pending knot : PENDING) {
             poseStack.pushPose();

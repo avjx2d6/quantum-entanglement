@@ -268,6 +268,7 @@ public final class RitualBeamRenderer {
 
         float radius = WIDTH * (1.0f + ramp * 0.6f) * 0.5f;
         var consumer = buffer.getBuffer(QuantumRenderTypes.RITUAL_BEAM);
+        ShaderWarning.checkOnce();
 
         poseStack.pushPose();
         poseStack.translate(-camera.x, -camera.y, -camera.z);
