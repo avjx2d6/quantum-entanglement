@@ -111,13 +111,32 @@ public class QuantumCoreRenderer implements BlockEntityRenderer<QuantumCoreBlock
                     Mth.clamp(age / QuantumCoreBlockEntity.CRESCENDO_TICKS, 0, 1), 1.2);
             default -> 0.0f;
         };
-        EntangledKnotRenderer.agitation = fury;
-        poseStack.translate(0.5, 1.4 + Mth.sin(time / 10.0f) * 0.04f, 0.5);
-        poseStack.mulPose(Axis.YP.rotationDegrees(angle));
+        double height = 1.4 + Mth.sin(time / 10.0f) * 0.04f;
         // It swells as it overloads. At 0.7 the knot is a third of a block
         // across and spinning, which is small enough to hide any amount of
         // writhing — growing it is what makes the writhing visible at all.
         float grow = 0.7f * (1 + 0.55f * fury);
+
+        // Not drawn here. The knot is made of strands, strands write no depth,
+        // and the block-entity pass is early enough in the frame that clouds,
+        // weather, particles and translucent terrain all still get to paint
+        // over it — see CoreKnotLayer. It is handed over instead, to be drawn
+        // in the same late stage as the beams.
+        //
+        // Except in Ponder, whose scenes render block entities from a fake
+        // level of their own and never reach a RenderLevelStageEvent. Anything
+        // queued there would be flushed into the next real frame at a
+        // meaningless position, so the guide keeps drawing it inline: nothing
+        // in a Ponder scene is drawn after the block entities anyway.
+        if (core.getLevel() == Minecraft.getInstance().level) {
+            CoreKnotLayer.submit(core.getBlockPos(), height, angle, fury, grow, light, shard);
+            poseStack.popPose();
+            return;
+        }
+
+        EntangledKnotRenderer.agitation = fury;
+        poseStack.translate(0.5, height, 0.5);
+        poseStack.mulPose(Axis.YP.rotationDegrees(angle));
         poseStack.scale(grow, grow, grow);
         try {
             itemRenderer.renderStatic(shard, ItemDisplayContext.GROUND, light, packedOverlay,

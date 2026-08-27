@@ -2,8 +2,8 @@ package com.quantumitems.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.world.phys.Vec3;
-import org.joml.Matrix4f;
 
 /**
  * An untextured glowing tube threaded through a path of nodes — the one piece
@@ -59,7 +59,7 @@ public final class StrandGeometry {
                             float[] bright, Tint tint, Vec3 toCamera,
                             float radius, int sides, boolean closed) {
         int n = pts.length - 1;
-        Matrix4f pose = poseStack.last().pose();
+        PoseStack.Pose last = poseStack.last();
 
         Vec3[] tangent = new Vec3[n + 1];
         if (closed) {
@@ -99,6 +99,7 @@ public final class StrandGeometry {
         // corner: every vertex is shared by four corners, and the tint may be
         // doing real work (a hue ramp, a dot product) for each one.
         Vec3[][] ring = new Vec3[n + 1][sides];
+        Vec3[][] normals = new Vec3[n + 1][sides];
         int[][] color = new int[n + 1][sides];
         for (int i = 0; i <= n; i++) {
             Vec3 ui = u[i];
@@ -111,6 +112,7 @@ public final class StrandGeometry {
             for (int k = 0; k < sides; k++) {
                 double a = 2 * Math.PI * k / sides;
                 Vec3 normal = ui.scale(Math.cos(a)).add(vi.scale(Math.sin(a)));
+                normals[i][k] = normal;
                 ring[i][k] = pts[i].add(normal.scale(radius));
                 float facing = toCamera == null ? 1.0f
                         : (float) Math.abs(normal.dot(toCamera));
@@ -121,18 +123,36 @@ public final class StrandGeometry {
         for (int i = 0; i < n; i++) {
             for (int k = 0; k < sides; k++) {
                 int k2 = (k + 1) % sides;
-                emit(consumer, pose, ring[i][k], color[i][k], bright[i]);
-                emit(consumer, pose, ring[i][k2], color[i][k2], bright[i]);
-                emit(consumer, pose, ring[i + 1][k2], color[i + 1][k2], bright[i + 1]);
-                emit(consumer, pose, ring[i + 1][k], color[i + 1][k], bright[i + 1]);
+                emit(consumer, last, ring[i][k], normals[i][k], color[i][k], bright[i]);
+                emit(consumer, last, ring[i][k2], normals[i][k2], color[i][k2], bright[i]);
+                emit(consumer, last, ring[i + 1][k2], normals[i + 1][k2], color[i + 1][k2], bright[i + 1]);
+                emit(consumer, last, ring[i + 1][k], normals[i + 1][k], color[i + 1][k], bright[i + 1]);
             }
         }
     }
 
-    private static void emit(VertexConsumer consumer, Matrix4f pose, Vec3 p, int rgb, float bright) {
-        consumer.addVertex(pose, (float) p.x, (float) p.y, (float) p.z)
+    /**
+     * The strand's texture is one white texel, so every vertex samples the
+     * middle of it and the colour survives untouched (see
+     * {@link QuantumRenderTypes#RITUAL_BEAM} for why there is a texture at all).
+     */
+    private static final float U = 0.5f;
+    private static final float V = 0.5f;
+
+    private static void emit(VertexConsumer consumer, PoseStack.Pose pose, Vec3 p, Vec3 normal,
+                             int rgb, float bright) {
+        consumer.addVertex(pose.pose(), (float) p.x, (float) p.y, (float) p.z)
                 .setColor((int) (((rgb >> 16) & 0xFF) * bright),
                         (int) (((rgb >> 8) & 0xFF) * bright),
-                        (int) ((rgb & 0xFF) * bright), 255);
+                        (int) ((rgb & 0xFF) * bright), 255)
+                .setUv(U, V)
+                // The strand emits; it is never lit. Vanilla's beacon shader
+                // ignores this outright, and a shader pack reads it as "as
+                // bright as this can get", which is what we want either way.
+                .setLight(LightTexture.FULL_BRIGHT)
+                // Unused by vanilla too, but a pack writes it into the gbuffer
+                // and lights the scene off it, so it had better be the real
+                // surface normal rather than a placeholder.
+                .setNormal(pose, (float) normal.x, (float) normal.y, (float) normal.z);
     }
 }
