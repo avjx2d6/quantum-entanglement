@@ -51,6 +51,20 @@ and that is the pack's call rather than a fault in the maps. Photon's LabPBR
 decoder is otherwise faithful — including the emission guard
 `specular_map.a * float(specular_map.a != 1.0)`, which is the alpha rule below
 implemented on their side.
+
+And switching it on is not free for everyone else, which is worth knowing
+before recommending it. In `d4_deferred_shading` the hardcoded table runs first
+and the specular texture OVERWRITES it, so a block whose resource pack ships no
+_s map gets Iris's default of all zeros: roughness (1-0)^2 = 1, fully rough.
+The f0 survives, because that line is a max — but
+
+    ssr_multiplier = step(0.01, f0 - f0 * roughness * SSR_ROUGHNESS_THRESHOLD)
+
+with roughness at 1 and the threshold at 2 goes negative, and the reflection is
+gone. That is why turning Specular Mapping on takes the mirror off vanilla
+amethyst at the same moment it makes these maps work: the pack's hardcoded gem
+is beaten by a texture that says nothing, because saying nothing is still
+saying something once the texture is being read at all.
 """
 
 import argparse
