@@ -30,6 +30,27 @@ missing alpha as full emission.
 
 Nothing here affects vanilla. Without a shader pack these files are never
 opened; they cost a few hundred bytes each in the jar and that is all.
+
+WHAT THESE FILES CANNOT DO, which cost an evening to establish and is worth
+writing down. A pack does not have to read them, and Photon ships with
+`//#define SPECULAR_MAPPING` — commented out, off — so by default it reads none
+of this. What it does instead is HARDCODED_SPECULAR: a table of block names in
+its own `block.properties`,
+
+    block.10013 = diamond_block ... amethyst_block budding_amethyst
+
+which gets material 13, "Gems": f0 0.25 and screen-space reflections forced on.
+That is where the mirror on a vanilla amethyst floor comes from, and no texture
+we ship can put a modded block on that list — the list belongs to the pack.
+There is no tag to join either; the file defines one amethyst tag alias and
+then never uses it.
+
+So the honest ceiling for a mod is this: with Specular Mapping switched on,
+these maps are read and are worth having. With it off, they do nothing at all,
+and that is the pack's call rather than a fault in the maps. Photon's LabPBR
+decoder is otherwise faithful — including the emission guard
+`specular_map.a * float(specular_map.a != 1.0)`, which is the alpha rule below
+implemented on their side.
 """
 
 import argparse
@@ -71,8 +92,15 @@ HIGHLIGHT_REACH = 2
 # but SMOOTH reflection, so nearly all of the effect is in the red channel.
 # Pushing F0 up instead is the usual way to end up with something that reads as
 # wet plastic.
-CRYSTAL_SMOOTH = 0.80
-CRYSTAL_F0 = 0.05
+CRYSTAL_SMOOTH = 0.78
+# Quartz really has an F0 near 0.05, and 0.05 was what this said first. It was
+# right and it looked wrong: packs do not use the real number for gems. Photon
+# hands amethyst 0.25, five times physical, because that is what makes a gem
+# read as a gem — and a resonator standing on an amethyst floor is compared
+# against the block next to it, not against a reference table. This sits just
+# under the pack's own figure so it is at home beside vanilla amethyst without
+# out-shining it somewhere more physical.
+CRYSTAL_F0 = 0.22
 # Amethyst is translucent, and subsurface is what carries that. Kept low: this
 # channel goes waxy fast, and a waxy crystal is worse than a flat one.
 CRYSTAL_SSS = 0.22
