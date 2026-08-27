@@ -17,7 +17,7 @@
   "subtitles.quantumitems.ritual_riser": "Ritual builds",
   "subtitles.quantumitems.ritual_burst": "Ritual bursts",
   "subtitles.quantumitems.ritual_cancel": "Ritual collapses",
-  "message.quantumitems.shaders": "Quantum Entanglement: a shader pack is running, so the ritual beams may come out white or not show up at all. Nothing is broken — the shader pack decides how they are drawn, and this mod cannot override it.",
+  "message.quantumitems.shaders": "Quantum Entanglement: shaders are on, so the ritual beams may not render correctly. How they are drawn is decided by the shader pack, and the mod cannot change it.",
   "quantumitems.ponder.tag.quantum_entanglement": "Quantum Entanglement",
   "quantumitems.ponder.tag.quantum_entanglement.description": "Link stacks together so that taking items from one takes them from all.",
   "quantumitems.ponder.circle.header": "Assembling the Ritual Circle",
