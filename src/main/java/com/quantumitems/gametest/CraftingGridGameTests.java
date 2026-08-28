@@ -266,4 +266,45 @@ public class CraftingGridGameTests {
                 "one plank off each pool");
         helper.succeed();
     }
+
+    /**
+     * The Crafter block: vanilla's own autocrafter, and its own road to the
+     * same duplication. It never touches slotChangedCraftingGrid — it reads its
+     * nine slots, dispenses, and shrinks afterwards — so it needs the rule
+     * enforced where it crafts.
+     */
+    @GameTest(template = "empty", templateNamespace = "quantumitems", timeoutTicks = 200)
+    public static void crafterBlockRefusesDoubledWindows(GameTestHelper helper) {
+        ItemStack[] windows = makeWindows(helper, Items.OAK_PLANKS, 1, 3);
+        BlockPos crafter = new BlockPos(1, 1, 1);
+        helper.setBlock(crafter, net.minecraft.world.level.block.Blocks.CRAFTER);
+        net.minecraft.world.Container container =
+                (net.minecraft.world.Container) helper.getBlockEntity(crafter);
+        container.setItem(0, windows[0]);
+        container.setItem(1, windows[1]);
+        container.setItem(2, windows[2]);
+
+        helper.startSequence()
+                .thenExecute(() -> helper.setBlock(crafter.above(),
+                        net.minecraft.world.level.block.Blocks.REDSTONE_BLOCK))
+                .thenIdle(20)
+                .thenExecute(() -> {
+                    int slabs = 0;
+                    for (net.minecraft.world.entity.item.ItemEntity entity
+                            : helper.getLevel().getEntitiesOfClass(
+                                    net.minecraft.world.entity.item.ItemEntity.class,
+                                    net.minecraft.world.phys.AABB.ofSize(
+                                            net.minecraft.world.phys.Vec3.atCenterOf(
+                                                    helper.absolutePos(crafter)), 12, 12, 12))) {
+                        if (entity.getItem().is(Items.OAK_SLAB)) {
+                            slabs += entity.getItem().getCount();
+                        }
+                    }
+                    int left = pool(helper, windows[0]);
+                    helper.assertTrue(left + slabs / 2 <= 1,
+                            "a pool of 1 plank produced " + slabs + " slabs from a Crafter, "
+                                    + left + " left in the pool");
+                })
+                .thenSucceed();
+    }
 }

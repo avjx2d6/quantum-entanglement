@@ -7,6 +7,7 @@
     "AbstractContainerMenuMixin",
     "AnvilMenuMixin",
     "BundleContentsMutableMixin",
+    "CrafterBlockMixin",
     "CraftingMenuMixin",
     "HopperBlockEntityMixin",
     "InvWrapperMixin",
