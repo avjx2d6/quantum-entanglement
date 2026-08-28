@@ -1,79 +1,103 @@
+<img src="src/main/resources/logo.png" width="96" align="right" alt="">
+
 # Quantum Entanglement
 
-*The old "shadow item" dupe bug, rebuilt as a real mechanic — without the dupe.*
+A NeoForge mod for Minecraft 1.21.1.
 
-For **NeoForge 1.21.1**.
+Old versions of Minecraft had a bug where an item could end up in two places at
+once, and taking from one copy emptied the other. It was a duplication exploit
+and it got fixed. This mod puts the same idea back deliberately, with the
+duplication taken out.
 
----
+Up to four item stacks can be tied to one shared supply. Take five iron from
+any of them and all four are five lighter. Put ten back and all four have ten
+more. There is exactly one pile of items; the stacks are windows onto it.
 
-## What it is
+Two rules hold everywhere, without exception:
 
-Long ago, a vanilla bug let two item stacks quietly share the same object in
-memory: touch one, the other changed. Quantum Entanglement takes that idea and
-makes it a deliberate, dupe-proof mechanic.
+- **Nothing is ever duplicated.**
+- **Nothing is ever lost.**
 
-Several item stacks — **windows** — can belong to one **network** and share a
-single **pool** of items. Every window always shows the whole pool. Take items
-from one and they leave all of them, across any distance, any inventory, any
-player.
+Everything else in the mod exists to keep those two true. A window dropped on
+the ground turns back into ordinary items. A window pulled apart by a hopper
+comes out as ordinary items. Take the last item and the link simply ends.
 
-One iron rule holds everywhere: **items are never duplicated and never lost.**
-The link itself is fragile on purpose — mishandle a window and it collapses
-back into ordinary items, but the items are always accounted for.
+## Making one
 
-## How it plays
+You need a Quantum Knot. They are not craftable — they turn up in Ancient City
+chests, which means the Deep Dark is the gate to the whole mod.
 
-- **Entangle up to four windows** that share one pool. Store them anywhere —
-  chests at opposite ends of the world, other players' inventories, a shulker
-  box in your pocket.
-- **It's an artifact, not logistics.** Hoppers, pipes and machines can only
-  ever pull *ordinary* items out of a window — they can never hold the link
-  itself. Take the last item through automation and the network ends honestly.
-- **Fragility is a feature.** Rename or enchant a window, or drop it on the
-  ground, and the link collapses: the whole pool spills out as plain items,
-  right there. Nothing is gained, nothing is lost.
-- **The ritual.** Networks are made at a multiblock ritual circle — a 5×5
-  amethyst floor, four resonators, and a two-tall Quantum Core — fed by a rare
-  **Quantum Knot** found in Ancient City chests. Lay one stack on one
-  resonator, leave one empty for the new window, drop the Knot on the Core and
-  watch the circle work. The Knot is used up either way; break a rule and the
-  ritual simply stops, with your items untouched.
-- **A built-in guide.** Every mod item carries a **Ponder** scene — the ritual,
-  step by step, right in-game. No wiki needed.
-- **Advancements** for finding your first Knot, building the circle, and
-  filling a network to its cap.
+The ritual is a 5×5 floor of amethyst blocks, a Resonator on each corner and a
+Quantum Core in the middle. Nothing else may stand above the floor.
 
-## Dependencies
+To create a network, put one stack on one Resonator, leave the others empty,
+and set a Knot on the Core. The ritual runs, the Knot is consumed, and you get
+back two windows onto that stack — one where you left it, one in an empty
+Resonator.
 
-**None.** [Ponder](https://github.com/Creators-of-Create/Ponder) and
-[Flywheel](https://github.com/Engine-Room/Flywheel) are bundled inside the jar,
-so the in-game guide works out of the box. Create is *not* required.
+To grow a network, lay out every window it already has, one per Resonator,
+leave one Resonator empty, and run it again. Each ritual adds one window. Four
+is the ceiling, because there are four Resonators.
 
-Already running Create? No problem — the shared libraries are de-duplicated by
-version, so only one copy loads.
+The stack has to be stackable and undamageable. Tools, armour and anything with
+durability are refused. If a rule is broken the ritual stops, your items stay
+where they are, and the Knot is spent anyway — putting it on the Core is the
+commitment, not the outcome.
 
-## Install
+The mod ships an in-game guide covering all of this. Hover any of its items or
+blocks and press <kbd>W</kbd>.
 
-Drop the jar into your `mods/` folder. That's it.
+## Living with a window
 
-## Under the hood
+A window is an ordinary-looking stack with an ID in its tooltip. Hold
+<kbd>Shift</kbd> for the full rules.
 
-The pool of every network is the single source of truth, kept in server
-save-data; windows are dumb carriers of a `(network, member)` tag. The server
-writes the live count into each window as the pool changes, so reads stay
-completely vanilla. Every count change funnels through a handful of `ItemStack`
-mix-ins, which is why hoppers, shulkers, crafting, furnaces, death drops and
-modded transport all obey the same rules with no per-block code. Duplication is
-impossible by construction: every extraction is bounded by the pool.
+- It is safe in a shulker box.
+- Hoppers, droppers and machines can pull from it, and what they get is
+  ordinary items — a machine never ends up holding a window.
+- A container holding one updates comparators when the shared supply changes
+  somewhere else, which makes a pair of windows a wireless redstone line.
 
-The mod ships with over a hundred automated GameTests covering the
-entanglement rules and the ritual.
+## Installing
 
-## License
+Minecraft 1.21.1 and NeoForge 21.1.235 or newer. Drop the jar in `mods` on both
+the client and the server; the same file works on either. Ponder, which the
+guide is built on, is bundled inside — nothing else to install.
 
-[MIT](LICENSE). Bundled Ponder / Flywheel / Catnip are MIT, © their authors.
+Multiplayer works. All item movement is decided by the server.
 
-## Credits
+Shader packs are a known rough edge. The ritual beams are additive glowing
+geometry, and a shader pack is free to draw that however it likes — some render
+it pure white. The mod says so in chat once when it sees a pack running. Nothing
+else is affected.
 
-Design and direction by **avjx2d6**. Implementation was done with heavy AI
-assistance (Anthropic's Claude), driven test-first.
+## Building
+
+```
+./gradlew build
+```
+
+Java 21. The jar lands in `build/libs`.
+
+```
+./gradlew runClient          # client with the mod loaded
+./gradlew runGameTestServer  # the test suite, 108 in-world tests
+```
+
+The tests are the reason the two rules above can be stated flatly. They run a
+real server, build real machines and count real items.
+
+`tools/` holds the scripts that generate art and models rather than storing
+results by hand — the logo, the specular maps, the core's item model, the
+sounds. Each one regenerates its output from the source next to it, so nothing
+drifts out of step with what it was made from.
+
+## Admin commands
+
+`/quantum networks` lists live networks and their contents, `/quantum remove
+<id>` deletes one, `/quantum debug on` logs every pool operation. All require
+permission level 2.
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
