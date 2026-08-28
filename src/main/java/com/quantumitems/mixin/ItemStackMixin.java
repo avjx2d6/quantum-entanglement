@@ -108,7 +108,14 @@ public abstract class ItemStackMixin {
             return;
         }
         ItemStack self = (ItemStack) (Object) this;
-        if (self.has(ModRegistry.QUANTUM_LINK.get())) {
+        // Only the REAL window collapses. A menu preview is built by copying an
+        // input and writing components into the copy — an anvil writes a name,
+        // a repair cost and an enchantment list — and that copy is rebuilt on
+        // every keystroke and discarded without being handed to anyone, since
+        // ItemCombinerMenu.removed returns only the input slots to the player.
+        // Cashing a network out into one deleted the items. See
+        // QuantumEngine#isLiveInstance.
+        if (self.has(ModRegistry.QUANTUM_LINK.get()) && engine.isLiveInstance(self)) {
             engine.cashOutToPlain(self);
         }
     }

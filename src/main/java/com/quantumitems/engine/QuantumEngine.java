@@ -884,6 +884,38 @@ public final class QuantumEngine {
         QuantumDebug.log(server, message);
     }
 
+    /**
+     * Is this the very instance the engine believes is the member's window?
+     *
+     * <p>Almost nothing should ask. Identity is deliberately NOT how windows
+     * are recognised anywhere else — vanilla replaces slot instances with equal
+     * copies on packet round-trips and chunk reloads, and punishing that was a
+     * whole class of bug. Every count path works by link and is bounded by the
+     * pool, so a copy can be trusted there.
+     *
+     * <p>A COMPONENT WRITE is the exception, because a copy of a window is
+     * exactly what vanilla's preview machinery is made of. An anvil builds its
+     * result by copying the left input and writing a name, a repair cost and an
+     * enchantment list into the copy; a grindstone and a smithing table do the
+     * same. That copy lives in a ResultContainer, is rebuilt on every keystroke
+     * and thrown away without being given to anyone — and
+     * {@code ItemCombinerMenu.removed} hands only the INPUT slots back to the
+     * player. Cashing a network out into one destroyed the items outright.
+     *
+     * <p>So a component write only collapses a network when it lands on the
+     * real window. A rename that reaches the player's hands is caught anyway,
+     * one touch later, by the snapshot check in {@link #reconcile} — on a stack
+     * that actually exists.
+     */
+    public boolean isLiveInstance(ItemStack stack) {
+        QuantumLinkData link = stack.get(ModRegistry.QUANTUM_LINK.get());
+        if (link == null) {
+            return false;
+        }
+        WeakReference<ItemStack> ref = canonical.get(key(link.networkId(), link.memberId()));
+        return ref != null && ref.get() == stack;
+    }
+
     /** Live snapshot for {@code /quantum networks}: is a member's window instance still around? */
     public boolean hasLiveInstance(int networkId, int memberId) {
         WeakReference<ItemStack> ref = canonical.get(key(networkId, memberId));
