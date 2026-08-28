@@ -884,6 +884,54 @@ public final class QuantumEngine {
         QuantumDebug.log(server, message);
     }
 
+    /** networkId → the one window of it currently sitting inside a machine inventory. */
+    private final Map<Integer, WeakReference<ItemStack>> inMachines = new HashMap<>();
+
+    /**
+     * Is some OTHER window of this stack's network already inside a machine?
+     *
+     * <p>Third-party autocrafting is the one place the mod cannot reach. A
+     * mechanical crafter, an AE2 pattern or anything like them gathers several
+     * inventories, reads them as one recipe grid and counts stacks — and every
+     * window of a network shows the pool, so three of them read as three items
+     * when the network owns one. That is the crafting-grid duplication again,
+     * assembled out of machines instead of slots, and no amount of patching
+     * vanilla menus reaches it.
+     *
+     * <p>Refusing windows in machines outright would be the easy answer and the
+     * wrong one: a depot, a basin, a single crafter holding ONE window counts
+     * nothing twice and is a perfectly good thing to build. So the rule is the
+     * same narrow one the crafting grid got — at most one window of a network
+     * inside machine inventories — which makes the doubled arrangement
+     * unbuildable and leaves every honest one alone.
+     *
+     * <p>The claim lapses on its own. It is a weak reference, and it stops
+     * counting the moment the stack is emptied or cashed out, which is what
+     * happens when a machine's window is extracted (extraction always yields
+     * plain) or the network ends.
+     */
+    public boolean machineSlotTaken(ItemStack window) {
+        QuantumLinkData link = window.get(ModRegistry.QUANTUM_LINK.get());
+        if (link == null) {
+            return false;
+        }
+        WeakReference<ItemStack> ref = inMachines.get(link.networkId());
+        ItemStack held = ref == null ? null : ref.get();
+        if (held == null || held == window || held.isEmpty()
+                || !held.has(ModRegistry.QUANTUM_LINK.get())) {
+            return false;
+        }
+        return true;
+    }
+
+    /** Records that this window now occupies its network's one machine slot. */
+    public void claimMachineSlot(ItemStack window) {
+        QuantumLinkData link = window.get(ModRegistry.QUANTUM_LINK.get());
+        if (link != null) {
+            inMachines.put(link.networkId(), new WeakReference<>(window));
+        }
+    }
+
     /**
      * Is this the very instance the engine believes is the member's window?
      *

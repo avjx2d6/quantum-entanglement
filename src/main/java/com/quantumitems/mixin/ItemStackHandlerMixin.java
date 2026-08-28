@@ -64,4 +64,34 @@ public abstract class ItemStackHandlerMixin {
         quantumitems$onContentsChanged(slot);
         cir.setReturnValue(portion);
     }
+
+    /**
+     * At most one window of a network may sit inside machine inventories at a
+     * time — see {@link QuantumEngine#machineSlotTaken}. The second is simply
+     * not accepted: the stack comes back untouched, nothing is destroyed and
+     * nothing collapses, exactly as when a machine's slot is full.
+     *
+     * <p>This is what makes a doubled autocrafting arrangement unbuildable
+     * without knowing anything about the mod that built it. A depot, a basin or
+     * a single crafter holding ONE window is untouched, because one window
+     * cannot be counted twice.
+     */
+    @Inject(method = "insertItem", at = @At("HEAD"), cancellable = true)
+    private void quantumitems$insertWindow(int slot, ItemStack stack, boolean simulate,
+                                           CallbackInfoReturnable<ItemStack> cir) {
+        if (stack.isEmpty() || !stack.has(ModRegistry.QUANTUM_LINK.get())) {
+            return;
+        }
+        QuantumEngine engine = QuantumEngine.onServerThread();
+        if (engine == null) {
+            return;
+        }
+        if (engine.machineSlotTaken(stack)) {
+            cir.setReturnValue(stack); // refused whole, simulate and real alike
+            return;
+        }
+        if (!simulate) {
+            engine.claimMachineSlot(stack);
+        }
+    }
 }
