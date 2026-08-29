@@ -492,6 +492,45 @@ public class RitualGameTests {
     }
 
     /**
+     * Every recipe the mod ships is unlocked by an advancement, so it shows up
+     * in the vanilla recipe book.
+     *
+     * <p>Without one a recipe is not wrong, it is INVISIBLE: it works if you
+     * happen to know it, and there is no way to find out inside the game.
+     * Players with JEI never notice; players without it conclude the blocks are
+     * uncraftable. The mod already teaches its machine through Ponder, so
+     * hiding how to build the machine was the one gap in that.
+     *
+     * <p>Checked against the server's own loaded data rather than a list
+     * written here, so a recipe added later and forgotten fails this.
+     */
+    @GameTest(template = "arena", templateNamespace = "quantumitems")
+    public void everyRecipeIsUnlockedByAnAdvancement(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        java.util.Set<net.minecraft.resources.ResourceLocation> unlocked = new java.util.HashSet<>();
+        for (var advancement : server.getAdvancements().getAllAdvancements()) {
+            unlocked.addAll(advancement.value().rewards().recipes());
+        }
+        int checked = 0;
+        for (var recipe : server.getRecipeManager().getRecipes()) {
+            if (!recipe.id().getNamespace().equals(com.quantumitems.QuantumItemsMod.MOD_ID)) {
+                continue;
+            }
+            checked++;
+            if (!unlocked.contains(recipe.id())) {
+                helper.fail(recipe.id() + " has no advancement granting it — it will never appear"
+                        + " in the recipe book, and without JEI nobody can find it");
+                return;
+            }
+        }
+        if (checked == 0) {
+            helper.fail("no recipes found in the mod's namespace — this test is not testing anything");
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
      * Advancements are awarded to a ServerPlayer that is actually in the
      * player list, so the mock has to be the real thing rather than the
      * GameType stand-in {@code makeMockPlayer} returns. Vanilla marks this one
